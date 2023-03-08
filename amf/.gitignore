@@ -1,2 +1,5 @@
 /target
 AMF
+*.h264
+*.h265
+*.av1
