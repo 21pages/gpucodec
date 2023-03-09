@@ -1,15 +1,7 @@
-use std::ffi::c_int;
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
 
-extern "C" {
-    fn amf_encode() -> c_int;
-}
+include!(concat!(env!("OUT_DIR"), "/amf_ffi.rs"));
 
-mod test {
-    use super::*;
-    #[test]
-    fn test() {
-        unsafe {
-            amf_encode();
-        };
-    }
-}
+pub mod encode;
