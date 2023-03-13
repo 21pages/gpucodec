@@ -4,4 +4,5 @@
 
 include!(concat!(env!("OUT_DIR"), "/amf_ffi.rs"));
 
+pub mod decode;
 pub mod encode;

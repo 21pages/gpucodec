@@ -61,6 +61,7 @@ fn main() {
     builder
         .includes(Some(PathBuf::from("AMF/amf")))
         .file("src/encode.cpp")
+        .file("src/decode.cpp")
         .cpp(false)
         .compile("amf");
 }

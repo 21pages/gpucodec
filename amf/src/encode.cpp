@@ -67,6 +67,8 @@ struct encoder_packet {
 
 class MyEncoder {
 
+public:
+    AMF_RESULT init_result = AMF_FAIL;
 private:
     // AMF Internals
     AMFFactoryHelper m_AMFFactory;
@@ -93,7 +95,7 @@ public:
         m_codec(codec),
         m_Resolution(width, height) 
     {
-        initialize();
+        init_result = initialize();
     }
 
     ~MyEncoder() {
@@ -173,17 +175,25 @@ public:
                 packet.data = m_PacketDataBuffer.data();
                 std::memcpy(packet.data, pBuffer->GetNative(), packet.size);
                 callback(packet.data, packet.size, 0, 0, obj);
-                return AMF_OK;
+                pBuffer = NULL;
         }
-        return AMF_FAIL;
+        data = NULL;
+        surface = NULL;
+        return res;
     }
 
     AMF_RESULT destroy()
     {
-        m_AMFEncoder->Terminate();
-        m_AMFEncoder = NULL;
-        m_AMFContext->Terminate();
-        m_AMFContext = NULL; // m_AMFContext is the last
+        if (m_AMFEncoder)
+        {
+            m_AMFEncoder->Terminate();
+            m_AMFEncoder = NULL;
+        }
+        if (m_AMFContext)
+        {
+            m_AMFContext->Terminate();
+            m_AMFContext = NULL; // m_AMFContext is the last
+        }
         m_AMFFactory.Terminate();
         return AMF_OK;
     }
@@ -377,6 +387,12 @@ extern "C" MyEncoder* amf_new_encoder(amf::AMF_MEMORY_TYPE memoryType,
         return NULL;
     }
     MyEncoder *enc = new MyEncoder(memoryType, surfaceFormat, codecStr, width, height);
+    if (enc && enc->init_result != AMF_OK) {
+        AMFTraceError(AMF_FACILITY, L"init error code:%d",  enc->init_result);
+        enc->destroy();
+        delete enc;
+        enc = NULL;
+    }
     return enc;
 }
 
