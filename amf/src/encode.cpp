@@ -80,8 +80,8 @@ private:
     // const
     AMF_COLOR_BIT_DEPTH_ENUM m_eDepth = AMF_COLOR_BIT_DEPTH_8;
     int m_query_timeout = 50;
-    float m_fFrameRate = 30.f;
-    bool m_bMaximumSpeed = true;
+    int m_frameRate = 30;
+    amf_int64 m_bitRateIn = 5000000L;
 
     // Buffers
 	std::vector<uint8_t> m_PacketDataBuffer;
@@ -103,12 +103,18 @@ public:
     AMF_RESULT encode(struct encoder_frame* frame, EncodeCallback callback, void* obj)
     {
         amf::AMFSurfacePtr surface = NULL;
+        amf::AMFComputeSyncPointPtr pSyncPoint;
         AMF_RESULT res;
 
         // alloc surface
         res = m_AMFContext->AllocSurface(m_AMFMemoryType, m_AMFSurfaceFormat, m_Resolution.first,
 										 m_Resolution.second, &surface);
         AMF_RETURN_IF_FAILED(res, L"AllocSurface() failed");
+
+        if (m_AMFCompute != NULL)
+        {
+            m_AMFCompute->PutSyncPoint(&pSyncPoint);
+        }
 
         // copy data
         size_t planeCount = surface->GetPlanesCount();
@@ -136,6 +142,11 @@ public:
             }
         }
 
+        if (m_AMFCompute != NULL)
+        {
+		    res = m_AMFCompute->FinishQueue();
+            pSyncPoint->Wait();
+		}
         //res = surface->Convert(m_AMFMemoryType);
 
         res = m_AMFEncoder->SubmitInput(surface);
@@ -285,6 +296,10 @@ private:
             // do not check error for AMF_VIDEO_ENCODER_B_PIC_PATTERN - can be not supported - check Capability Manager sample
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_QUERY_TIMEOUT, m_query_timeout); //ms
             AMF_RETURN_IF_FAILED(res, L"encoder->SetProperty(AMF_VIDEO_ENCODER_QUERY_TIMEOUT, %d) failed", m_query_timeout);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_TARGET_BITRATE, m_bitRateIn);
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_TARGET_BITRATE, %" LPRId64 L") failed", m_bitRateIn);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_FRAMERATE, ::AMFConstructRate(m_frameRate, 1));
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_FRAMERATE, %d) failed", m_frameRate, 1);
         }
         else if (codecStr == amf_wstring(AMFVideoEncoder_HEVC))
         {
@@ -305,6 +320,10 @@ private:
             // ------------- Encoder params dynamic ---------------
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_QUERY_TIMEOUT, m_query_timeout); //ms
             AMF_RETURN_IF_FAILED(res, L"encoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_QUERY_TIMEOUT, %d) failed", m_query_timeout);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE, m_bitRateIn);
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE, %" LPRId64 L") failed", m_bitRateIn);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMERATE, ::AMFConstructRate(m_frameRate, 1));
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMERATE, %d) failed", m_frameRate, 1);
         }
         else if (codecStr == amf_wstring(AMFVideoEncoder_AV1))
         {
@@ -325,7 +344,11 @@ private:
             // ------------- Encoder params dynamic ---------------
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_AV1_QUERY_TIMEOUT, m_query_timeout); //ms
             AMF_RETURN_IF_FAILED(res, L"encoder->SetProperty(AMF_VIDEO_ENCODER_AV1_QUERY_TIMEOUT, %d) failed", m_query_timeout);
-        }
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_AV1_TARGET_BITRATE, m_bitRateIn);
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_AV1_TARGET_BITRATE, %" LPRId64 L") failed", m_bitRateIn);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_AV1_FRAMERATE, ::AMFConstructRate(m_frameRate, 1));
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_AV1_FRAMERATE, %d) failed", m_frameRate, 1);
+        }   
         return AMF_OK;
     }
 
