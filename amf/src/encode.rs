@@ -1,29 +1,17 @@
 use crate::{
-    amf_encode, amf_new_encoder,
-    AMF_SURFACE_FORMAT::{self, *},
+    amf_destroy_encoder, amf_encode, amf_new_encoder, Codec, AMF_MEMORY_TYPE, AMF_SURFACE_FORMAT,
     MAX_AV_PLANES,
 };
-use log::{error, trace};
-use std::{
-    ffi::{c_void, CString},
-    fmt::Display,
-    os::raw::c_int,
-    slice,
-    sync::{Arc, Mutex},
-    thread,
-    time::Instant,
-};
+use log::trace;
+use std::{ffi::c_void, fmt::Display, os::raw::c_int, slice};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EncodeContext {
-    pub name: String,
-    pub width: i32,
-    pub height: i32,
-    pub pixfmt: AMF_SURFACE_FORMAT,
-    pub align: i32,
-    pub bitrate: i32,
-    pub timebase: [i32; 2],
-    pub gop: i32,
+    pub memoryType: AMF_MEMORY_TYPE,
+    pub surfaceFormat: AMF_SURFACE_FORMAT,
+    pub codec: Codec,
+    pub width: usize,
+    pub height: usize,
 }
 
 pub struct EncodeFrame {
@@ -45,7 +33,6 @@ pub struct Encoder {
     pub linesize: Vec<i32>,
     pub offset: Vec<i32>,
     pub length: i32,
-    start: Instant,
 }
 
 impl Encoder {
@@ -58,27 +45,15 @@ impl Encoder {
             let mut length = Vec::<i32>::new();
             length.resize(1, 0);
             let codec = amf_new_encoder(
-                // CString::new(ctx.name.as_str()).map_err(|_| ())?.as_ptr(),
+                ctx.memoryType,
+                ctx.surfaceFormat,
+                ctx.codec,
                 ctx.width as _,
                 ctx.height as _,
-                ctx.pixfmt,
-                // ctx.align,
-                // ctx.bitrate as _,
-                // ctx.timebase[0],
-                // ctx.timebase[1],
-                // ctx.gop,
-                // ctx.quality as _,
-                // ctx.rc as _,
-                // linesize.as_mut_ptr(),
-                // offset.as_mut_ptr(),
-                // length.as_mut_ptr(),
-                // Some(Encoder::callback),
             );
-
             if codec.is_null() {
                 return Err(());
             }
-
             Ok(Encoder {
                 codec: Box::from_raw(codec as *mut c_void),
                 frames: Box::into_raw(Box::new(Vec::<EncodeFrame>::new())),
@@ -86,35 +61,33 @@ impl Encoder {
                 linesize,
                 offset,
                 length: length[0],
-                start: Instant::now(),
             })
         }
     }
 
-    pub fn encode(&mut self, data: &[u8]) -> Result<&mut Vec<EncodeFrame>, i32> {
+    pub fn encode(
+        &mut self,
+        datas: Vec<*const u8>,
+        linesizes: Vec<usize>,
+    ) -> Result<&mut Vec<EncodeFrame>, i32> {
         unsafe {
-            // let mut linesize = vec![2880, 1440, 1440];
-            let mut linesize = vec![2880, 2880];
-            linesize.resize(MAX_AV_PLANES as _, 0);
-            let y = data.as_ptr();
-            let uv = y.add((linesize[0] * self.ctx.height) as _);
-            // let u = y.add((linesize[0] * self.ctx.height) as _);
-            // let v = u.add((linesize[1] * self.ctx.height) as _);
-            // let mut data_array = vec![y, u, v];
-            let mut data_array = vec![y, uv];
-            data_array.resize(MAX_AV_PLANES as _, std::ptr::null());
+            let mut datas = datas;
+            let mut linesizes = linesizes;
+            datas.resize(MAX_AV_PLANES as _, std::ptr::null());
+            linesizes.resize(MAX_AV_PLANES as _, 0);
             (&mut *self.frames).clear();
             let result = amf_encode(
                 &mut *self.codec,
-                data_array.as_mut_ptr() as _,
-                linesize.as_mut_ptr() as _,
-                // (*data).as_ptr(),
-                // data.len() as _,
+                datas.as_ptr() as _,
+                linesizes.as_ptr() as _,
                 Some(Encoder::callback),
                 self.frames as *mut _ as *mut c_void,
-                // self.start.elapsed().as_millis() as _,
             );
-            Ok(&mut *self.frames)
+            if result != 0 {
+                Err(result)
+            } else {
+                Ok(&mut *self.frames)
+            }
         }
     }
 
@@ -128,30 +101,12 @@ impl Encoder {
             });
         }
     }
-
-    // pub fn set_bitrate(&mut self, bitrate: i32) -> Result<(), ()> {
-    //     let ret = unsafe { crate::set_bitrate(&mut *self.codec, bitrate) };
-    //     if ret == 0 {
-    //         Ok(())
-    //     } else {
-    //         Err(())
-    //     }
-    // }
-
-    // pub fn format_from_name(name: String) -> Result<DataFormat, ()> {
-    //     if name.contains("h264") {
-    //         return Ok(H264);
-    //     } else if name.contains("hevc") {
-    //         return Ok(H265);
-    //     }
-    //     Err(())
-    // }
 }
 
 impl Drop for Encoder {
     fn drop(&mut self) {
         unsafe {
-            // free_encoder(self.codec.as_mut());
+            amf_destroy_encoder(self.codec.as_mut());
             let _ = Box::from_raw(self.frames);
             trace!("Encoder dropped");
         }

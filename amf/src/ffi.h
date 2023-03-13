@@ -1,7 +1,7 @@
 #ifndef AMF_FFI_H
 #define AMF_FFI_H
 
-#include <stdint.h>
+#include "common.h"
 
 typedef enum AMF_SURFACE_FORMAT
 {
@@ -31,12 +31,35 @@ typedef enum AMF_SURFACE_FORMAT
     AMF_SURFACE_LAST = AMF_SURFACE_P016
 } AMF_SURFACE_FORMAT;
 
-#define MAX_AV_PLANES 8
+typedef enum AMF_MEMORY_TYPE
+{
+    AMF_MEMORY_UNKNOWN          = 0,
+    AMF_MEMORY_HOST             = 1,
+    AMF_MEMORY_DX9              = 2,
+    AMF_MEMORY_DX11             = 3,
+    AMF_MEMORY_OPENCL           = 4,
+    AMF_MEMORY_OPENGL           = 5,
+    AMF_MEMORY_XV               = 6,
+    AMF_MEMORY_GRALLOC          = 7,
+    AMF_MEMORY_COMPUTE_FOR_DX9  = 8, // deprecated, the same as AMF_MEMORY_OPENCL
+    AMF_MEMORY_COMPUTE_FOR_DX11 = 9, // deprecated, the same as AMF_MEMORY_OPENCL
+    AMF_MEMORY_VULKAN           = 10,
+    AMF_MEMORY_DX12             = 11,
+} AMF_MEMORY_TYPE;
 
-typedef void (*EncodeCallback)(const uint8_t *data, int len, int64_t pts, int key, const void *obj);
 
-void* amf_new_encoder(uint32_t width, uint32_t height, AMF_SURFACE_FORMAT surfaceFormat);
+void* amf_new_encoder(AMF_MEMORY_TYPE memoryType, 
+                    AMF_SURFACE_FORMAT surfaceFormat,
+                    enum Codec codec,
+                    uint32_t width, 
+                    uint32_t height);
 
-int amf_encode(void *enc, uint8_t *data[MAX_AV_PLANES], uint32_t linesize[MAX_AV_PLANES],  EncodeCallback callback, void* obj);
+int amf_encode(void *enc,
+            uint8_t *data[MAX_AV_PLANES],
+            uint32_t linesize[MAX_AV_PLANES],
+            EncodeCallback callback,
+            void* obj);
+
+int amf_destroy_encoder(void *enc);
 
 #endif // AMF_FFI_H
