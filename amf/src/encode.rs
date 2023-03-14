@@ -68,7 +68,7 @@ impl Encoder {
     pub fn encode(
         &mut self,
         datas: Vec<*const u8>,
-        linesizes: Vec<usize>,
+        linesizes: Vec<u32>,
     ) -> Result<&mut Vec<EncodeFrame>, i32> {
         unsafe {
             let mut datas = datas;

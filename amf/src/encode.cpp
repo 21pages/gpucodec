@@ -146,7 +146,7 @@ public:
 		    res = m_AMFCompute->FinishQueue();
             pSyncPoint->Wait();
 		}
-        //res = surface->Convert(m_AMFMemoryType);
+        // res = surface->Convert(m_AMFMemoryType);
 
         res = m_AMFEncoder->SubmitInput(surface);
         AMF_RETURN_IF_FAILED(res, L"SubmitInput() failed");

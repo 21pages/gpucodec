@@ -14,7 +14,7 @@ use std::{
 
 fn main() {
     let en_ctx = EncodeContext {
-        memoryType: AMF_MEMORY_OPENCL, //DX9 got Segmentation fault, DX11/Host color abnormal
+        memoryType: AMF_MEMORY_DX11, //DX9 got Segmentation fault, DX11/Host color abnormal
         surfaceFormat: AMF_SURFACE_NV12,
         codec: H264,
         width: 2880,
@@ -40,9 +40,9 @@ fn main() {
         for _ in 0..100 {
             yuv_file.read(&mut buf).unwrap();
             let start = Instant::now();
-            let linesizes: Vec<usize> = vec![2880, 2880];
+            let linesizes: Vec<u32> = vec![2880, 2880];
             let y = buf.as_ptr();
-            let uv = y.add((linesizes[0] * en_ctx.height as usize) as _);
+            let uv = y.add((linesizes[0] * en_ctx.height as u32) as _);
             let datas = vec![y, uv];
             let data = encoder.encode(datas, linesizes).unwrap();
             enc_sum += start.elapsed();
