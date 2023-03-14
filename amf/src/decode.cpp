@@ -6,6 +6,8 @@
 #include <public/common/DataStream.h>
 #include <public/samples/CPPSamples/common/BitStreamParser.h>
 
+#include <cstring>
+
 #include "common.h"
 
 #define AMF_FACILITY        L"AMFDecoder"
@@ -23,6 +25,9 @@ private:
     amf::AMF_SURFACE_FORMAT m_formatOut;
     amf_wstring m_codec;
     // BitStreamType m_bsType;
+
+    // buffer
+    std::vector<std::vector<uint8_t>> m_buffer;
 public:
     MyDecoder(amf::AMF_MEMORY_TYPE memoryTypeOut, amf::AMF_SURFACE_FORMAT formatOut, amf_wstring codec):
         m_memoryTypeOut(memoryTypeOut), m_formatOut(formatOut), m_codec(codec)
@@ -63,24 +68,36 @@ public:
             amf::AMF_SURFACE_FORMAT format =  surface->GetFormat();
             uint8_t * datas[MAX_AV_PLANES] = {NULL};
             uint32_t linesizes[MAX_AV_PLANES] = {0};
-            int width = 0, height = 0;
+            int y_width = 0, y_height = 0;
+            m_buffer.resize(count);
+            // Plane's width, height, linesize is different from ffmepg
             for (amf_size i = 0; i < count && i < MAX_AV_PLANES; i++)
             {
                 amf::AMFPlanePtr plane = surface->GetPlaneAt(i);
-                datas[i] = (uint8_t*)plane->GetNative();
-                linesizes[i] = plane->GetHPitch();
-
-                amf_int32 offsetX   = plane->GetOffsetX();
-                amf_int32 offsetY   = plane->GetOffsetY();
-                amf_int32 pixelSize = plane->GetPixelSizeInBytes();
-                printf("offset X:%d, offsetY:%d, pixelSize:%d, linesize:%d\n", offsetX, offsetY, pixelSize, linesizes[i]);
                 if (i == 0)
                 {
-                    width = plane->GetWidth();
-                    height = plane->GetHeight();
+                    y_width = plane->GetWidth();
+                    y_height = plane->GetHeight();
                 }
+                // write surface removing offsets and alignments
+                amf_uint8 *data     = reinterpret_cast<amf_uint8*>(plane->GetNative());
+                amf_int32 offsetX   = plane->GetOffsetX();
+                amf_int32 offsetY   = plane->GetOffsetY();              //  Y       UV
+                amf_int32 pixelSize = plane->GetPixelSizeInBytes();     //  1       2
+                amf_int32 height    = plane->GetHeight();               // 1800     900
+                amf_int32 width     = plane->GetWidth();                // 2880     1800 
+                amf_int32 pitchH    = plane->GetHPitch();               // 3072     3072
+
+                m_buffer[i].resize(pixelSize * width * height);
+                for( amf_int32 y = 0; y < height; y++)
+                {
+                    amf_uint8 *line = data + (y + offsetY) * pitchH;
+                    std::memcpy(&m_buffer[i][pixelSize * width * y], line, pixelSize * width);
+                }
+                datas[i] = m_buffer[i].data();
+                linesizes[i] = pixelSize * width;
             }
-            callback(datas, linesizes, format, width, height, obj, 0);
+            callback(datas, linesizes, format, y_width, y_height, obj, 0);
             surface = NULL;
         }
         oData = NULL;

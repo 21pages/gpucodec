@@ -14,7 +14,7 @@ use std::{
 
 fn main() {
     let en_ctx = EncodeContext {
-        memoryType: AMF_MEMORY_DX11, //DX9 got Segmentation fault
+        memoryType: AMF_MEMORY_OPENCL, //DX9 got Segmentation fault
         surfaceFormat: AMF_SURFACE_NV12,
         codec: H264,
         width: 2880,
