@@ -51,12 +51,12 @@ typedef enum AMF_MEMORY_TYPE
 void* amf_new_encoder(AMF_MEMORY_TYPE memoryType, 
                         AMF_SURFACE_FORMAT surfaceFormat,
                         enum Codec codec,
-                        uint32_t width, 
-                        uint32_t height);
+                        int32_t width, 
+                        int32_t height);
 
 int amf_encode(void *enc,
                 uint8_t *data[MAX_AV_PLANES],
-                uint32_t linesize[MAX_AV_PLANES],
+                int32_t linesize[MAX_AV_PLANES],
                 EncodeCallback callback,
                 void* obj);
 
@@ -68,7 +68,7 @@ void* amf_new_decoder(AMF_MEMORY_TYPE memoryTypeOut,
 
 int amf_decode(void *dec,
                 uint8_t *data,
-                uint32_t length,
+                int32_t length,
                 DecodeCallback callback,
                 void *obj);
 

@@ -14,10 +14,10 @@ pub struct DecodeContext {
 
 pub struct DecodeFrame {
     pub surface_format: AMF_SURFACE_FORMAT,
-    pub width: usize,
-    pub height: usize,
+    pub width: i32,
+    pub height: i32,
     pub data: Vec<Vec<u8>>,
-    pub linesize: Vec<usize>,
+    pub linesize: Vec<i32>,
     pub key: bool,
 }
 
@@ -88,7 +88,7 @@ impl Decoder {
 
     unsafe extern "C" fn callback(
         datas: *mut *mut u8,
-        linesizes: *mut u32,
+        linesizes: *mut i32,
         surfaceFormat: c_int,
         width: c_int,
         height: c_int,
@@ -109,28 +109,28 @@ impl Decoder {
         };
 
         if surfaceFormat == AMF_SURFACE_FORMAT::AMF_SURFACE_YUV420P as c_int {
-            let y = from_raw_parts(datas[0], (linesizes[0] * height as u32) as usize).to_vec();
-            let u = from_raw_parts(datas[1], (linesizes[1] * height as u32 / 2) as usize).to_vec();
-            let v = from_raw_parts(datas[2], (linesizes[2] * height as u32 / 2) as usize).to_vec();
+            let y = from_raw_parts(datas[0], (linesizes[0] * height) as usize).to_vec();
+            let u = from_raw_parts(datas[1], (linesizes[1] * height / 2) as usize).to_vec();
+            let v = from_raw_parts(datas[2], (linesizes[2] * height / 2) as usize).to_vec();
 
             frame.data.push(y);
             frame.data.push(u);
             frame.data.push(v);
 
-            frame.linesize.push(linesizes[0] as _);
-            frame.linesize.push(linesizes[1] as _);
-            frame.linesize.push(linesizes[2] as _);
+            frame.linesize.push(linesizes[0]);
+            frame.linesize.push(linesizes[1]);
+            frame.linesize.push(linesizes[2]);
 
             frames.push(frame);
         } else if surfaceFormat == AMF_SURFACE_FORMAT::AMF_SURFACE_NV12 as c_int {
-            let y = from_raw_parts(datas[0], (linesizes[0] * height as u32) as usize).to_vec();
-            let uv = from_raw_parts(datas[1], (linesizes[1] * height as u32 / 2) as usize).to_vec();
+            let y = from_raw_parts(datas[0], (linesizes[0] * height) as usize).to_vec();
+            let uv = from_raw_parts(datas[1], (linesizes[1] * height / 2) as usize).to_vec();
 
             frame.data.push(y);
             frame.data.push(uv);
 
-            frame.linesize.push(linesizes[0] as _);
-            frame.linesize.push(linesizes[1] as _);
+            frame.linesize.push(linesizes[0]);
+            frame.linesize.push(linesizes[1]);
 
             frames.push(frame);
         } else {

@@ -64,7 +64,7 @@ public:
             amf_size count = surface->GetPlanesCount();
             amf::AMF_SURFACE_FORMAT format =  surface->GetFormat();
             uint8_t * datas[MAX_AV_PLANES] = {NULL};
-            uint32_t linesizes[MAX_AV_PLANES] = {0};
+            int32_t linesizes[MAX_AV_PLANES] = {0};
             int y_width = 0, y_height = 0;
             m_buffer.resize(count);
             // Plane's width, height, linesize is different from ffmepg
@@ -208,7 +208,7 @@ extern "C" Decoder* amf_new_decoder(amf::AMF_MEMORY_TYPE memoryTypeOut, amf::AMF
     return dec;
 }
 
-extern "C" int amf_decode(Decoder *dec, uint8_t *data, uint32_t length, DecodeCallback callback, void *obj)
+extern "C" int amf_decode(Decoder *dec, uint8_t *data, int32_t length, DecodeCallback callback, void *obj)
 {
     return dec->decode(data, length, callback, obj);
 }

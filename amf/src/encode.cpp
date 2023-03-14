@@ -74,7 +74,7 @@ private:
     amf::AMFComponentPtr m_AMFEncoder = NULL;
     amf::AMF_MEMORY_TYPE    m_AMFMemoryType;
     amf::AMF_SURFACE_FORMAT m_AMFSurfaceFormat;
-    std::pair<uint32_t, uint32_t> m_Resolution;
+    std::pair<int32_t, int32_t> m_Resolution;
     amf_wstring m_codec;
     // const
     AMF_COLOR_BIT_DEPTH_ENUM m_eDepth = AMF_COLOR_BIT_DEPTH_8;
@@ -86,7 +86,7 @@ private:
 	std::vector<uint8_t> m_PacketDataBuffer;
 
 public:
-    Encoder(amf::AMF_MEMORY_TYPE memoryType, amf::AMF_SURFACE_FORMAT surfaceFormat, amf_wstring codec, uint32_t width, uint32_t height):
+    Encoder(amf::AMF_MEMORY_TYPE memoryType, amf::AMF_SURFACE_FORMAT surfaceFormat, amf_wstring codec, int32_t width, int32_t height):
         m_AMFMemoryType(memoryType),
         m_AMFSurfaceFormat(surfaceFormat), 
         m_codec(codec),
@@ -230,6 +230,7 @@ private:
             break;
         case amf::AMF_MEMORY_OPENCL:
             res = m_AMFContext->InitOpenCL(NULL);
+            AMF_RETURN_IF_FAILED(res, L"InitOpenCL(NULL) failed");
             break;
         default:
             AMFTraceInfo(AMF_FACILITY, L"no init operation\n");
@@ -239,7 +240,7 @@ private:
         if (amf::AMF_MEMORY_DX11 == m_AMFMemoryType || amf::AMF_MEMORY_OPENCL == m_AMFMemoryType)
         {
             res = m_AMFContext->GetCompute(m_AMFMemoryType, &m_AMFCompute);
-            AMF_RETURN_IF_FAILED(res, L"GetCompute DX11 failed");
+            AMF_RETURN_IF_FAILED(res, L"GetCompute failed, memoryType:%d", m_AMFMemoryType);
         }
 
         AMFTraceDebug(L"Encoder: %s\n", m_codec.c_str());
@@ -364,8 +365,8 @@ private:
 extern "C" Encoder* amf_new_encoder(amf::AMF_MEMORY_TYPE memoryType, 
                                     amf::AMF_SURFACE_FORMAT surfaceFormat,
                                     Codec codec,
-                                    uint32_t width, 
-                                    uint32_t height) 
+                                    int32_t width, 
+                                    int32_t height) 
 {
     amf_wstring codecStr;
     switch (codec)
@@ -393,7 +394,7 @@ extern "C" Encoder* amf_new_encoder(amf::AMF_MEMORY_TYPE memoryType,
     return enc;
 }
 
-extern "C" int amf_encode(Encoder *enc, uint8_t *data[MAX_AV_PLANES], uint32_t linesize[MAX_AV_PLANES], EncodeCallback callback, void* obj)
+extern "C" int amf_encode(Encoder *enc, uint8_t *data[MAX_AV_PLANES], int32_t linesize[MAX_AV_PLANES], EncodeCallback callback, void* obj)
 {
     struct encoder_frame frame;
     for (int i = 0; i < MAX_AV_PLANES; i++) {

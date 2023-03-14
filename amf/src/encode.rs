@@ -10,8 +10,8 @@ pub struct EncodeContext {
     pub memoryType: AMF_MEMORY_TYPE,
     pub surfaceFormat: AMF_SURFACE_FORMAT,
     pub codec: Codec,
-    pub width: usize,
-    pub height: usize,
+    pub width: i32,
+    pub height: i32,
 }
 
 pub struct EncodeFrame {
@@ -68,7 +68,7 @@ impl Encoder {
     pub fn encode(
         &mut self,
         datas: Vec<*const u8>,
-        linesizes: Vec<u32>,
+        linesizes: Vec<i32>,
     ) -> Result<&mut Vec<EncodeFrame>, i32> {
         unsafe {
             let mut datas = datas;
