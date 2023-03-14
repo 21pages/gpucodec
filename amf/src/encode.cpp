@@ -16,9 +16,6 @@
 #include <public/samples/CPPSamples/common/EncoderParamsHEVC.h>
 #include <public/samples/CPPSamples/common/EncoderParamsAV1.h>
 #include <public/samples/CPPSamples/common/ParametersStorage.h>
-#include <public/samples/CPPSamples/common/CmdLineParser.h>
-#include <public/samples/CPPSamples/common/CmdLogger.h>
-#include <public/samples/CPPSamples/common/PipelineDefines.h>
 
 #include <iostream>
 #include <math.h>
@@ -65,7 +62,7 @@ struct encoder_packet {
 };
 
 
-class MyEncoder {
+class Encoder {
 
 public:
     AMF_RESULT init_result = AMF_FAIL;
@@ -89,7 +86,7 @@ private:
 	std::vector<uint8_t> m_PacketDataBuffer;
 
 public:
-    MyEncoder(amf::AMF_MEMORY_TYPE memoryType, amf::AMF_SURFACE_FORMAT surfaceFormat, amf_wstring codec, uint32_t width, uint32_t height):
+    Encoder(amf::AMF_MEMORY_TYPE memoryType, amf::AMF_SURFACE_FORMAT surfaceFormat, amf_wstring codec, uint32_t width, uint32_t height):
         m_AMFMemoryType(memoryType),
         m_AMFSurfaceFormat(surfaceFormat), 
         m_codec(codec),
@@ -98,8 +95,8 @@ public:
         init_result = initialize();
     }
 
-    ~MyEncoder() {
-        AMFTraceDebug(AMF_FACILITY, L"~MyEncoder()\n");
+    ~Encoder() {
+        AMFTraceDebug(AMF_FACILITY, L"~Encoder()\n");
     }
 
     AMF_RESULT encode(struct encoder_frame* frame, EncodeCallback callback, void* obj)
@@ -364,7 +361,7 @@ private:
 
 };
 
-extern "C" MyEncoder* amf_new_encoder(amf::AMF_MEMORY_TYPE memoryType, 
+extern "C" Encoder* amf_new_encoder(amf::AMF_MEMORY_TYPE memoryType, 
                                     amf::AMF_SURFACE_FORMAT surfaceFormat,
                                     Codec codec,
                                     uint32_t width, 
@@ -386,7 +383,7 @@ extern "C" MyEncoder* amf_new_encoder(amf::AMF_MEMORY_TYPE memoryType,
         AMFTraceError(AMF_FACILITY, L"unknown codec:%d\n", codec);
         return NULL;
     }
-    MyEncoder *enc = new MyEncoder(memoryType, surfaceFormat, codecStr, width, height);
+    Encoder *enc = new Encoder(memoryType, surfaceFormat, codecStr, width, height);
     if (enc && enc->init_result != AMF_OK) {
         AMFTraceError(AMF_FACILITY, L"init error code:%d",  enc->init_result);
         enc->destroy();
@@ -396,7 +393,7 @@ extern "C" MyEncoder* amf_new_encoder(amf::AMF_MEMORY_TYPE memoryType,
     return enc;
 }
 
-extern "C" int amf_encode(MyEncoder *enc, uint8_t *data[MAX_AV_PLANES], uint32_t linesize[MAX_AV_PLANES], EncodeCallback callback, void* obj)
+extern "C" int amf_encode(Encoder *enc, uint8_t *data[MAX_AV_PLANES], uint32_t linesize[MAX_AV_PLANES], EncodeCallback callback, void* obj)
 {
     struct encoder_frame frame;
     for (int i = 0; i < MAX_AV_PLANES; i++) {
@@ -406,7 +403,7 @@ extern "C" int amf_encode(MyEncoder *enc, uint8_t *data[MAX_AV_PLANES], uint32_t
     return enc->encode(&frame, callback, obj);
 }
 
-extern "C" int amf_destroy_encoder(MyEncoder *enc)
+extern "C" int amf_destroy_encoder(Encoder *enc)
 {
     return enc->destroy();
 }

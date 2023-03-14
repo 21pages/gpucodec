@@ -1,10 +1,10 @@
 #include <public/common/AMFFactory.h>
 #include <public/common/AMFSTL.h>
-#include <public/include/components/VideoDecoderUVD.h>
 #include <public/common/ByteArray.h>
 #include <public/common/TraceAdapter.h>
-#include <public/common/DataStream.h>
-#include <public/samples/CPPSamples/common/BitStreamParser.h>
+#include <public/common/Thread.h>
+#include <public/include/components/VideoDecoderUVD.h>
+
 
 #include <cstring>
 
@@ -12,32 +12,29 @@
 
 #define AMF_FACILITY        L"AMFDecoder"
 
-class MyDecoder {
+class Decoder {
 public:
     AMF_RESULT init_result = AMF_FAIL;
 private:
     AMFFactoryHelper m_AMFFactory;
     amf::AMFContextPtr m_AMFContext = NULL;
     amf::AMFComponentPtr m_AMFDecoder = NULL;
-    // amf::AMFDataStreamPtr m_datastream = NULL;
-    // BitStreamParserPtr m_parser = NULL;
     amf::AMF_MEMORY_TYPE m_memoryTypeOut;
     amf::AMF_SURFACE_FORMAT m_formatOut;
     amf_wstring m_codec;
-    // BitStreamType m_bsType;
 
     // buffer
     std::vector<std::vector<uint8_t>> m_buffer;
 public:
-    MyDecoder(amf::AMF_MEMORY_TYPE memoryTypeOut, amf::AMF_SURFACE_FORMAT formatOut, amf_wstring codec):
+    Decoder(amf::AMF_MEMORY_TYPE memoryTypeOut, amf::AMF_SURFACE_FORMAT formatOut, amf_wstring codec):
         m_memoryTypeOut(memoryTypeOut), m_formatOut(formatOut), m_codec(codec)
     {
         init_result = initialize();
     }
     
-    ~MyDecoder()
+    ~Decoder()
     {
-        AMFTraceDebug(AMF_FACILITY, L"~MyDecoder()");
+        AMFTraceDebug(AMF_FACILITY, L"~Decoder()");
     }
 
     AMF_RESULT decode(uint8_t *iData, uint32_t iDataSize, DecodeCallback callback, void *obj)
@@ -186,26 +183,22 @@ private:
     }
 };
 
-extern "C" MyDecoder* amf_new_decoder(amf::AMF_MEMORY_TYPE memoryTypeOut, amf::AMF_SURFACE_FORMAT formatOut, Codec codec)
+extern "C" Decoder* amf_new_decoder(amf::AMF_MEMORY_TYPE memoryTypeOut, amf::AMF_SURFACE_FORMAT formatOut, Codec codec)
 {
     amf_wstring codecStr;
-    BitStreamType bsType;
     switch (codec)
     {
     case H264:
         codecStr = AMFVideoDecoderUVD_H264_AVC;
-        bsType = BitStreamH264AnnexB;
         break;
     case H265:
         codecStr = AMFVideoDecoderHW_H265_HEVC;
-        bsType = BitStream265AnnexB;
         break;
     case AV1:
         codecStr = AMFVideoDecoderHW_AV1;
-        bsType = BitStreamIVF;
         break;
     }
-    MyDecoder *dec = new MyDecoder(memoryTypeOut, formatOut, codecStr);
+    Decoder *dec = new Decoder(memoryTypeOut, formatOut, codecStr);
     if (dec && dec->init_result != AMF_OK)
     {
         dec->destroy();
@@ -215,12 +208,12 @@ extern "C" MyDecoder* amf_new_decoder(amf::AMF_MEMORY_TYPE memoryTypeOut, amf::A
     return dec;
 }
 
-extern "C" int amf_decode(MyDecoder *dec, uint8_t *data, uint32_t length, DecodeCallback callback, void *obj)
+extern "C" int amf_decode(Decoder *dec, uint8_t *data, uint32_t length, DecodeCallback callback, void *obj)
 {
     return dec->decode(data, length, callback, obj);
 }
 
-extern "C" int amf_destroy_decoder(MyDecoder *dec)
+extern "C" int amf_destroy_decoder(Decoder *dec)
 {
     return dec->destroy();
 }

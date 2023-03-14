@@ -10,11 +10,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-// cargo run --package amf --example encode --release
+// cargo run --package amf --example enc_dec --release
 
 fn main() {
     let en_ctx = EncodeContext {
-        memoryType: AMF_MEMORY_OPENCL, //DX9 got Segmentation fault
+        memoryType: AMF_MEMORY_OPENCL, //DX9 got Segmentation fault, DX11/Host color abnormal
         surfaceFormat: AMF_SURFACE_NV12,
         codec: H264,
         width: 2880,
@@ -30,10 +30,12 @@ fn main() {
     let mut yuv_file = std::fs::File::open("D:\\tmp\\2880x1800_nv12.yuv").unwrap();
     let len = 7776000;
     let mut buf = vec![0u8; len];
-    let mut sum = Duration::ZERO;
+    let mut enc_sum = Duration::ZERO;
+    let mut dec_sum = Duration::ZERO;
     let mut h264_file = std::fs::File::create("D:\\tmp\\tmp.264").unwrap();
-    let mut decode_file = std::fs::File::create("D:\\tmp\\tmp.yuv").unwrap();
-    let mut counter = 0;
+    let mut decode_file = std::fs::File::create("D:\\tmp\\2880x1800_nv12_decoded.yuv").unwrap();
+    let mut enc_counter = 0;
+    let mut dec_counter = 0;
     unsafe {
         for _ in 0..100 {
             yuv_file.read(&mut buf).unwrap();
@@ -43,12 +45,14 @@ fn main() {
             let uv = y.add((linesizes[0] * en_ctx.height as usize) as _);
             let datas = vec![y, uv];
             let data = encoder.encode(datas, linesizes).unwrap();
-            sum += start.elapsed();
-            counter += data.len();
+            enc_sum += start.elapsed();
+            enc_counter += data.len();
             for f in data {
                 h264_file.write_all(&f.data).unwrap();
-
+                let start = Instant::now();
                 let decoded = decoder.decode(&f.data).unwrap();
+                dec_sum += start.elapsed();
+                dec_counter += 1;
                 for f in decoded {
                     for v in f.data.iter() {
                         decode_file.write_all(v).unwrap();
@@ -56,6 +60,7 @@ fn main() {
                 }
             }
         }
-        println!("avg:{:?}, counter:{}", sum / 100, counter);
+        println!("enc:avg:{:?}, counter:{}", enc_sum / 100, enc_counter);
+        println!("dec:avg:{:?}, counter:{}", dec_sum / 100, dec_counter);
     }
 }
