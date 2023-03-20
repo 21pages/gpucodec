@@ -25,8 +25,8 @@ fn main() {
     let mut encoder = Encoder::new(en_ctx.clone()).unwrap();
     let mut decoder = Decoder::new(de_ctx.clone()).unwrap();
 
-    let input_dir = PathBuf::from("E:\\tmp\\input");
-    let output_dir = PathBuf::from("E:\\tmp");
+    let input_dir = PathBuf::from("/home/sun/yuv/input");
+    let output_dir = PathBuf::from("/home/sun/yuv");
     let yuv_file_name = input_dir.join("2880x1800_nv12.yuv");
     let encoded_file_name = output_dir.join("2880x1800_encoded.264");
     let decoded_file_name = output_dir.join("2880x1800_nv12_decoded.yuv");
