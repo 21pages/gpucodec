@@ -5,7 +5,10 @@ use std::{
 };
 
 fn main() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let externals_dir = manifest_dir.parent().unwrap().join("externals");
     println!("cargo:rerun-if-changed=src");
+    println!("cargo:rerun-if-changed={}", externals_dir.display());
     bindgen::builder()
         .header("src/ffi.h")
         .rustified_enum("*")
@@ -15,8 +18,6 @@ fn main() {
         .unwrap();
 
     let mut builder = Build::new();
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let externals_dir = manifest_dir.parent().unwrap().join("externals");
 
     // system
     #[cfg(target_os = "windows")]

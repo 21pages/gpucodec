@@ -5,6 +5,10 @@ use std::{
 };
 
 fn main() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let externals_dir = manifest_dir.parent().unwrap().join("externals");
+    println!("cargo:rerun-if-changed=src");
+    println!("cargo:rerun-if-changed={}", externals_dir.display());
     bindgen::builder()
         .header("src/ffi.h")
         .rustified_enum("*")
@@ -15,29 +19,27 @@ fn main() {
 
     let mut builder = Build::new();
 
-    println!("cargo:rerun-if-changed=src");
-    println!("cargo:rerun-if-changed=AMF");
+    // system
+    #[cfg(windows)]
+    println!("cargo:rustc-link-lib=ole32");
 
-    #[cfg(target_os = "windows")]
-    {
-        let dyn_libs = ["ole32"];
-        dyn_libs.map(|lib| println!("cargo:rustc-link-lib={}", lib));
-    }
-
-    builder.include(format!("AMF/amf/public/common"));
+    // amf
+    let amf_path = externals_dir.join("AMF_v1.4.29");
+    builder.include(format!("{}/amf/public/common", amf_path.display()));
+    builder.include(amf_path.join("amf"));
     for f in vec![
         "AMFFactory.cpp",
         "AMFSTL.cpp",
         "Thread.cpp",
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         "Windows/ThreadWindows.cpp",
         "TraceAdapter.cpp",
     ] {
-        builder.file(format!("AMF/amf/public/common/{}", f));
+        builder.file(format!("{}/amf/public/common/{}", amf_path.display(), f));
     }
 
+    // crate
     builder
-        .includes(Some(PathBuf::from("AMF/amf")))
         .file("src/encode.cpp")
         .file("src/decode.cpp")
         .cpp(false)
