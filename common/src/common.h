@@ -1,5 +1,5 @@
-#ifndef FFI_H
-#define FFI_H
+#ifndef COMMON_H
+#define COMMON_H
 
 #include <stdint.h>
 
@@ -16,6 +16,7 @@ enum CodecID
 
 enum HWDeviceType
 {
+    HOST,
     DX9,
     DX10,
     DX11,
@@ -33,4 +34,4 @@ enum PixelFormat
 };
 
 
-#endif
+#endif // COMMON_H

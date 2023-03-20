@@ -1,15 +1,13 @@
-use crate::{
-    amf_destroy_encoder, amf_encode, amf_new_encoder, Codec, AMF_MEMORY_TYPE, AMF_SURFACE_FORMAT,
-    MAX_AV_PLANES,
-};
+use crate::{amf_destroy_encoder, amf_encode, amf_new_encoder};
+use common::{CodecID, HWDeviceType, PixelFormat, MAX_DATA_NUM};
 use log::trace;
 use std::{ffi::c_void, fmt::Display, os::raw::c_int, slice};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EncodeContext {
-    pub memoryType: AMF_MEMORY_TYPE,
-    pub surfaceFormat: AMF_SURFACE_FORMAT,
-    pub codec: Codec,
+    pub device: HWDeviceType,
+    pub format: PixelFormat,
+    pub codec: CodecID,
     pub width: i32,
     pub height: i32,
 }
@@ -39,17 +37,17 @@ impl Encoder {
     pub fn new(ctx: EncodeContext) -> Result<Self, ()> {
         unsafe {
             let mut linesize = Vec::<i32>::new();
-            linesize.resize(MAX_AV_PLANES as _, 0);
+            linesize.resize(MAX_DATA_NUM as _, 0);
             let mut offset = Vec::<i32>::new();
-            offset.resize(MAX_AV_PLANES as _, 0);
+            offset.resize(MAX_DATA_NUM as _, 0);
             let mut length = Vec::<i32>::new();
             length.resize(1, 0);
             let codec = amf_new_encoder(
-                ctx.memoryType,
-                ctx.surfaceFormat,
-                ctx.codec,
-                ctx.width as _,
-                ctx.height as _,
+                ctx.device as i32,
+                ctx.format as i32,
+                ctx.codec as i32,
+                ctx.width,
+                ctx.height,
             );
             if codec.is_null() {
                 return Err(());
@@ -73,8 +71,8 @@ impl Encoder {
         unsafe {
             let mut datas = datas;
             let mut linesizes = linesizes;
-            datas.resize(MAX_AV_PLANES as _, std::ptr::null());
-            linesizes.resize(MAX_AV_PLANES as _, 0);
+            datas.resize(MAX_DATA_NUM as _, std::ptr::null());
+            linesizes.resize(MAX_DATA_NUM as _, 0);
             (&mut *self.frames).clear();
             let result = amf_encode(
                 &mut *self.codec,

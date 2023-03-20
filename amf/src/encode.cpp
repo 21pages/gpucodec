@@ -18,6 +18,7 @@
 #include <cstring>
 
 #include "common.h"
+#include "callback.h"
 
 #define AMF_FACILITY        L"AMFEncoder"
 #define MILLISEC_TIME       10000
@@ -25,10 +26,10 @@
 /** Encoder input frame */
 struct encoder_frame {
 	/** Data for the frame/audio */
-	uint8_t *data[MAX_AV_PLANES];
+	uint8_t *data[MAX_DATA_NUM];
 
 	/** size of each plane */
-	uint32_t linesize[MAX_AV_PLANES];
+	uint32_t linesize[MAX_DATA_NUM];
 
 	/** Presentation timestamp */
 	int64_t pts;
@@ -100,6 +101,7 @@ public:
         amf::AMFSurfacePtr surface = NULL;
         amf::AMFComputeSyncPointPtr pSyncPoint;
         AMF_RESULT res;
+        bool encoded = false;
 
         // alloc surface
         res = m_AMFContext->AllocSurface(m_AMFMemoryType, m_AMFSurfaceFormat, m_Resolution.first,
@@ -168,11 +170,12 @@ public:
                 packet.data = m_PacketDataBuffer.data();
                 std::memcpy(packet.data, pBuffer->GetNative(), packet.size);
                 callback(packet.data, packet.size, 0, 0, obj);
+                encoded = true;
                 pBuffer = NULL;
         }
         data = NULL;
         surface = NULL;
-        return res;
+        return encoded ? AMF_OK : AMF_FAIL;
     }
 
     AMF_RESULT destroy()
@@ -333,26 +336,44 @@ private:
 
 };
 
-extern "C" Encoder* amf_new_encoder(amf::AMF_MEMORY_TYPE memoryType, 
-                                    amf::AMF_SURFACE_FORMAT surfaceFormat,
-                                    Codec codec,
-                                    int32_t width, 
-                                    int32_t height) 
+static bool convert_codec(CodecID lhs, amf_wstring& rhs)
 {
-    amf_wstring codecStr;
-    switch (codec)
+    switch (lhs)
     {
     case H264:
-        codecStr = AMFVideoEncoderVCE_AVC;
+        rhs = AMFVideoEncoderVCE_AVC;
         break;
-    case H265:
-        codecStr = AMFVideoEncoder_HEVC;
+    case HEVC:
+        rhs = AMFVideoEncoder_HEVC;
         break;
     case AV1:
-        codecStr = AMFVideoEncoder_AV1;
+        rhs = AMFVideoEncoder_AV1;
         break;
     default:
-        AMFTraceError(AMF_FACILITY, L"unknown codec:%d\n", codec);
+        AMFTraceError(AMF_FACILITY, L"unknown codec: %d\n", lhs);
+        return false;
+    }
+    return true;
+}
+
+#include "common.cpp"
+
+extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, CodecID codecID,
+                                int32_t width, int32_t height) 
+{
+    amf_wstring codecStr;
+    if (!convert_codec(codecID, codecStr))
+    {
+        return NULL;
+    }
+    amf::AMF_MEMORY_TYPE memoryType;
+    if (!convert_device(device, memoryType))
+    {
+        return NULL;
+    }
+     amf::AMF_SURFACE_FORMAT surfaceFormat;
+    if (!convert_format(format, surfaceFormat))
+    {
         return NULL;
     }
     Encoder *enc = new Encoder(memoryType, surfaceFormat, codecStr, width, height);
@@ -365,17 +386,19 @@ extern "C" Encoder* amf_new_encoder(amf::AMF_MEMORY_TYPE memoryType,
     return enc;
 }
 
-extern "C" int amf_encode(Encoder *enc, uint8_t *data[MAX_AV_PLANES], int32_t linesize[MAX_AV_PLANES], EncodeCallback callback, void* obj)
+extern "C" int amf_encode(void *e, uint8_t *data[MAX_DATA_NUM], int32_t linesize[MAX_DATA_NUM], EncodeCallback callback, void* obj)
 {
+    Encoder *enc = (Encoder*)e;
     struct encoder_frame frame;
-    for (int i = 0; i < MAX_AV_PLANES; i++) {
+    for (int i = 0; i < MAX_DATA_NUM; i++) {
         frame.data[i] = data[i];
         frame.linesize[i] = linesize[i];
     }
     return enc->encode(&frame, callback, obj);
 }
 
-extern "C" int amf_destroy_encoder(Encoder *enc)
+extern "C" int amf_destroy_encoder(void *e)
 {
+    Encoder *enc = (Encoder*)e;
     return enc->destroy();
 }

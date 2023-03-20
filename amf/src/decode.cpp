@@ -9,6 +9,7 @@
 #include <cstring>
 
 #include "common.h"
+#include "callback.h"
 
 #define AMF_FACILITY        L"AMFDecoder"
 
@@ -39,7 +40,8 @@ public:
 
     AMF_RESULT decode(uint8_t *iData, uint32_t iDataSize, DecodeCallback callback, void *obj)
     {
-        AMF_RESULT res;
+        AMF_RESULT res = AMF_FAIL;
+        bool decoded = false;
         amf::AMFBufferPtr iDataWrapBuffer = NULL;
 
         res = m_AMFContext->CreateBufferFromHostNative(iData, iDataSize, &iDataWrapBuffer, NULL);
@@ -63,12 +65,12 @@ public:
             AMF_RETURN_IF_INVALID_POINTER(surface, L"surface is NULL");
             amf_size count = surface->GetPlanesCount();
             amf::AMF_SURFACE_FORMAT format =  surface->GetFormat();
-            uint8_t * datas[MAX_AV_PLANES] = {NULL};
-            int32_t linesizes[MAX_AV_PLANES] = {0};
+            uint8_t * datas[MAX_DATA_NUM] = {NULL};
+            int32_t linesizes[MAX_DATA_NUM] = {0};
             int y_width = 0, y_height = 0;
             m_buffer.resize(count);
             // Plane's width, height, linesize is different from ffmepg
-            for (amf_size i = 0; i < count && i < MAX_AV_PLANES; i++)
+            for (amf_size i = 0; i < count && i < MAX_DATA_NUM; i++)
             {
                 amf::AMFPlanePtr plane = surface->GetPlaneAt(i);
                 if (i == 0)
@@ -95,11 +97,12 @@ public:
                 linesizes[i] = pixelSize * width;
             }
             callback(datas, linesizes, format, y_width, y_height, obj, 0);
+            decoded = true;
             surface = NULL;
         }
         oData = NULL;
         iDataWrapBuffer = NULL;
-        return res;
+        return decoded ? AMF_OK : AMF_FAIL;
     }
 
     AMF_RESULT destroy()
@@ -183,22 +186,49 @@ private:
     }
 };
 
-extern "C" Decoder* amf_new_decoder(amf::AMF_MEMORY_TYPE memoryTypeOut, amf::AMF_SURFACE_FORMAT formatOut, Codec codec)
+static bool convert_codec(CodecID lhs, amf_wstring& rhs)
 {
-    amf_wstring codecStr;
-    switch (codec)
+    switch (lhs)
     {
     case H264:
-        codecStr = AMFVideoDecoderUVD_H264_AVC;
+        rhs = AMFVideoDecoderUVD_H264_AVC;
         break;
-    case H265:
-        codecStr = AMFVideoDecoderHW_H265_HEVC;
+    case HEVC:
+        rhs = AMFVideoDecoderHW_H265_HEVC;
+        break;
+    case VP9:
+        rhs = AMFVideoDecoderHW_VP9;
         break;
     case AV1:
-        codecStr = AMFVideoDecoderHW_AV1;
+        rhs = AMFVideoDecoderHW_AV1;
         break;
+    default:
+        AMFTraceError(AMF_FACILITY, L"unknown codec: %d\n", lhs);
+        return false;
     }
-    Decoder *dec = new Decoder(memoryTypeOut, formatOut, codecStr);
+    return true;
+}
+
+#include "common.cpp"
+
+extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, CodecID codecID)
+{
+    amf_wstring codecStr;
+    if (!convert_codec(codecID, codecStr))
+    {
+        return NULL;
+    }
+    amf::AMF_MEMORY_TYPE memoryTypeOut;
+    if (!convert_device(device, memoryTypeOut))
+    {
+        return NULL;
+    }
+     amf::AMF_SURFACE_FORMAT surfaceFormat;
+    if (!convert_format(format, surfaceFormat))
+    {
+        return NULL;
+    }
+    Decoder *dec = new Decoder(memoryTypeOut, surfaceFormat, codecStr);
     if (dec && dec->init_result != AMF_OK)
     {
         dec->destroy();
@@ -208,12 +238,18 @@ extern "C" Decoder* amf_new_decoder(amf::AMF_MEMORY_TYPE memoryTypeOut, amf::AMF
     return dec;
 }
 
-extern "C" int amf_decode(Decoder *dec, uint8_t *data, int32_t length, DecodeCallback callback, void *obj)
+extern "C" int amf_decode(void *decoder, uint8_t *data, int32_t length, DecodeCallback callback, void *obj)
 {
+    Decoder *dec = (Decoder*)decoder;
     return dec->decode(data, length, callback, obj);
 }
 
-extern "C" int amf_destroy_decoder(Decoder *dec)
+extern "C" int amf_destroy_decoder(void *decoder)
 {
-    return dec->destroy();
+    Decoder *dec = (Decoder*)decoder;
+    if (dec)
+    {
+        return dec->destroy();
+    }
+    return 0;
 }

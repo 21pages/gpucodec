@@ -1,19 +1,17 @@
-use crate::{
-    amf_decode, amf_destroy_decoder, amf_new_decoder, Codec, AMF_MEMORY_TYPE, AMF_SURFACE_FORMAT,
-    MAX_AV_PLANES,
-};
+use crate::{amf_decode, amf_destroy_decoder, amf_new_decoder};
+use common::{CodecID, HWDeviceType, PixelFormat, MAX_DATA_NUM};
 use log::{error, trace};
 use std::{ffi::c_void, os::raw::c_int, slice::from_raw_parts, vec};
 
 #[derive(Debug, Clone)]
 pub struct DecodeContext {
-    pub memory_type: AMF_MEMORY_TYPE,
-    pub format_out: AMF_SURFACE_FORMAT,
-    pub codec: Codec,
+    pub device: HWDeviceType,
+    pub format: PixelFormat,
+    pub codec: CodecID,
 }
 
 pub struct DecodeFrame {
-    pub surface_format: AMF_SURFACE_FORMAT,
+    pub format: PixelFormat,
     pub width: i32,
     pub height: i32,
     pub data: Vec<Vec<u8>>,
@@ -34,8 +32,8 @@ impl std::fmt::Display for DecodeFrame {
 
         write!(
             f,
-            "surface_format:{}, width:{}, height:{},key:{}, {}",
-            self.surface_format as i32, self.width, self.height, self.key, s,
+            "format:{:?}, width:{}, height:{},key:{}, {}",
+            self.format, self.width, self.height, self.key, s,
         )
     }
 }
@@ -52,12 +50,10 @@ unsafe impl Sync for Decoder {}
 impl Decoder {
     pub fn new(ctx: DecodeContext) -> Result<Self, ()> {
         unsafe {
-            let codec = amf_new_decoder(ctx.memory_type, ctx.format_out, ctx.codec);
-
+            let codec = amf_new_decoder(ctx.device as i32, ctx.format as i32, ctx.codec as i32);
             if codec.is_null() {
                 return Err(());
             }
-
             Ok(Decoder {
                 codec: Box::from_raw(codec as *mut c_void),
                 frames: Box::into_raw(Box::new(Vec::<DecodeFrame>::new())),
@@ -89,18 +85,18 @@ impl Decoder {
     unsafe extern "C" fn callback(
         datas: *mut *mut u8,
         linesizes: *mut i32,
-        surfaceFormat: c_int,
+        format: c_int,
         width: c_int,
         height: c_int,
         obj: *const c_void,
         key: c_int,
     ) {
         let frames = &mut *(obj as *mut Vec<DecodeFrame>);
-        let datas = from_raw_parts(datas, MAX_AV_PLANES as _);
-        let linesizes = from_raw_parts(linesizes, MAX_AV_PLANES as _);
+        let datas = from_raw_parts(datas, MAX_DATA_NUM as _);
+        let linesizes = from_raw_parts(linesizes, MAX_DATA_NUM as _);
 
         let mut frame = DecodeFrame {
-            surface_format: std::mem::transmute(surfaceFormat),
+            format: std::mem::transmute(format),
             width: width as _,
             height: height as _,
             data: vec![],
@@ -108,7 +104,7 @@ impl Decoder {
             key: key != 0,
         };
 
-        if surfaceFormat == AMF_SURFACE_FORMAT::AMF_SURFACE_YUV420P as c_int {
+        if format == PixelFormat::YUV420P as c_int {
             let y = from_raw_parts(datas[0], (linesizes[0] * height) as usize).to_vec();
             let u = from_raw_parts(datas[1], (linesizes[1] * height / 2) as usize).to_vec();
             let v = from_raw_parts(datas[2], (linesizes[2] * height / 2) as usize).to_vec();
@@ -122,7 +118,7 @@ impl Decoder {
             frame.linesize.push(linesizes[2]);
 
             frames.push(frame);
-        } else if surfaceFormat == AMF_SURFACE_FORMAT::AMF_SURFACE_NV12 as c_int {
+        } else if format == PixelFormat::NV12 as c_int {
             let y = from_raw_parts(datas[0], (linesizes[0] * height) as usize).to_vec();
             let uv = from_raw_parts(datas[1], (linesizes[1] * height / 2) as usize).to_vec();
 
@@ -134,7 +130,7 @@ impl Decoder {
 
             frames.push(frame);
         } else {
-            error!("unsupported pixfmt {}", surfaceFormat);
+            error!("unsupported pixfmt {}", format);
         }
     }
 }

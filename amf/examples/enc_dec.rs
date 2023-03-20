@@ -1,10 +1,8 @@
 use amf::{
     decode::{DecodeContext, Decoder},
     encode::{EncodeContext, Encoder},
-    Codec::*,
-    AMF_MEMORY_TYPE::*,
-    AMF_SURFACE_FORMAT::*,
 };
+use common::{CodecID, HWDeviceType, PixelFormat};
 use std::{
     io::{Read, Write},
     path::PathBuf,
@@ -21,16 +19,16 @@ support:
 
 fn main() {
     let en_ctx = EncodeContext {
-        memoryType: AMF_MEMORY_DX11, //DX9 got Segmentation fault
-        surfaceFormat: AMF_SURFACE_NV12,
-        codec: H264,
+        device: HWDeviceType::DX11, //DX9 got Segmentation fault
+        format: PixelFormat::NV12,
+        codec: CodecID::H264,
         width: 2880,
         height: 1800,
     };
     let de_ctx = DecodeContext {
-        memory_type: AMF_MEMORY_DX11,
-        format_out: AMF_SURFACE_NV12,
-        codec: H264,
+        device: HWDeviceType::DX11,
+        format: PixelFormat::NV12,
+        codec: CodecID::H264,
     };
     let mut encoder = Encoder::new(en_ctx.clone()).unwrap();
     let mut decoder = Decoder::new(de_ctx.clone()).unwrap();
