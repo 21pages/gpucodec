@@ -12,10 +12,6 @@
 #include <public/include/components/VideoEncoderVCE.h>
 #include <public/include/components/VideoEncoderHEVC.h>
 #include <public/include/components/VideoEncoderAV1.h>
-#include <public/samples/CPPSamples/common/EncoderParamsAVC.h>
-#include <public/samples/CPPSamples/common/EncoderParamsHEVC.h>
-#include <public/samples/CPPSamples/common/EncoderParamsAV1.h>
-#include <public/samples/CPPSamples/common/ParametersStorage.h>
 
 #include <iostream>
 #include <math.h>
@@ -198,11 +194,8 @@ private:
 
     AMF_RESULT initialize() 
     {
-        ParametersStorage params;
         AMF_RESULT res;
         
-        res = RegisterParams(&params);
-        AMF_RETURN_IF_FAILED(res, L"Command line arguments couldn't be parsed");
         res = m_AMFFactory.Init();
         AMF_RETURN_IF_FAILED(res, L"AMF Failed to initialize");
         amf::AMFTraceEnableWriter(AMF_TRACE_WRITER_CONSOLE, true);
@@ -248,7 +241,7 @@ private:
         res = m_AMFFactory.GetFactory()->CreateComponent(m_AMFContext, m_codec.c_str(), &m_AMFEncoder);
         AMF_RETURN_IF_FAILED(res, L"CreateComponent(%s) failed", m_codec.c_str());
 
-        res = SetParams(&params, m_codec);
+        res = SetParams(m_codec);
         AMF_RETURN_IF_FAILED(res, L"Could not set params in encoder.");
 
         res = m_AMFEncoder->Init(m_AMFSurfaceFormat, m_Resolution.first, m_Resolution.second);
@@ -257,30 +250,8 @@ private:
         return AMF_OK;
     }
 
-    AMF_RESULT RegisterParams(ParametersStorage* pParams)
-    {
-        if (m_codec == amf_wstring(AMFVideoEncoderVCE_AVC))
-        {
-            RegisterEncoderParamsAVC(pParams);
-        }
-        else if (m_codec == amf_wstring(AMFVideoEncoder_HEVC))
-        {
-            RegisterEncoderParamsHEVC(pParams);
-        }
-        else if (m_codec == amf_wstring(AMFVideoEncoder_AV1))
-        {
-            RegisterEncoderParamsAV1(pParams);
-        }
-        else
-        {
-            LOG_ERROR(L"Invalid codec ID");
-            return AMF_FAIL;
-        }
 
-        return AMF_OK;
-    }
-
-    AMF_RESULT SetParams(ParametersStorage* pParams, const  amf_wstring& codecStr)
+    AMF_RESULT SetParams(const  amf_wstring& codecStr)
     {
         AMF_RESULT res;
         if (codecStr == amf_wstring(AMFVideoEncoderVCE_AVC))

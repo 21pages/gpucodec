@@ -15,14 +15,12 @@ fn main() {
 
     let mut builder = Build::new();
 
-    // println!("rerun-if-changed=src");
-    println!("rerun-if-changed=src/encode.cpp");
-    println!("rerun-if-changed=src/ffi.h");
-    println!("rerun-if-changed=AMF");
+    println!("cargo:rerun-if-changed=src");
+    println!("cargo:rerun-if-changed=AMF");
 
     #[cfg(target_os = "windows")]
     {
-        let dyn_libs = ["User32", "bcrypt", "ole32", "advapi32"];
+        let dyn_libs = ["ole32"];
         dyn_libs.map(|lib| println!("cargo:rustc-link-lib={}", lib));
     }
 
@@ -36,17 +34,6 @@ fn main() {
         "TraceAdapter.cpp",
     ] {
         builder.file(format!("AMF/amf/public/common/{}", f));
-    }
-
-    builder.include(format!("AMF/amf/public/samples/CPPSamples/common"));
-    for f in vec![
-        "CmdLogger.cpp",
-        "EncoderParamsAV1.cpp",
-        "EncoderParamsAVC.cpp",
-        "EncoderParamsHEVC.cpp",
-        "ParametersStorage.cpp",
-    ] {
-        builder.file(format!("AMF/amf/public/samples/CPPSamples/common/{}", f));
     }
 
     builder
