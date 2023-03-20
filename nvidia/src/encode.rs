@@ -1,12 +1,11 @@
-use crate::{nvidia_destroy_encoder, nvidia_encode, nvidia_new_encoder, NV_ENC_BUFFER_FORMAT};
-use common::{CodecID, HWDeviceType, PixelFormat, MAX_DATA_NUM};
+use crate::{nvidia_destroy_encoder, nvidia_encode, nvidia_new_encoder};
+use common::{CodecID, PixelFormat, MAX_DATA_NUM};
 use log::trace;
 use std::{ffi::c_void, fmt::Display, os::raw::c_int, slice};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EncodeContext {
-    // pub memoryType: AMF_MEMORY_TYPE,
-    pub surfaceFormat: NV_ENC_BUFFER_FORMAT,
+    pub format: PixelFormat,
     pub codec: CodecID,
     pub width: i32,
     pub height: i32,
@@ -47,7 +46,7 @@ impl Encoder {
                 ctx.width,
                 ctx.height,
                 ctx.codec as c_int,
-                ctx.surfaceFormat,
+                ctx.format as u32,
                 0,
             );
             if codec.is_null() {

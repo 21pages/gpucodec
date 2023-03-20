@@ -6,6 +6,7 @@
 #include <Samples/Utils/NvCodecUtils.h>
 
 #include "common.h"
+#include "callback.h"
 
 static bool codecID_to_cuCodecID(CodecID codecID, cudaVideoCodec &cuda)
 {
@@ -29,9 +30,27 @@ static bool codecID_to_cuCodecID(CodecID codecID, cudaVideoCodec &cuda)
 struct Decoder
 {
     NvDecoder *dec = NULL;
+    CUcontext cuContext = NULL;
 
     Decoder() {}
 };
+
+extern "C" int nvidia_destroy_decoder(void* decoder)
+{
+    Decoder *p = (Decoder*)decoder;
+    if (p)
+    {
+        if (p->dec)
+        {
+            delete p->dec;
+        }
+        if (p->cuContext)
+        {
+            cuCtxDestroy(p->cuContext);
+        }
+    }
+    return 0;
+}
 
 extern "C" void* nvidia_new_decoder(CodecID codecID, int iGpu) 
 {
@@ -64,8 +83,7 @@ extern "C" void* nvidia_new_decoder(CodecID codecID, int iGpu)
             goto _exit;
         }
         std::cout << "GPU in use: " << szDeviceName << std::endl;
-        CUcontext cuContext = NULL;
-        if (!ck(cuCtxCreate(&cuContext, 0, cuDevice)))
+        if (!ck(cuCtxCreate(&p->cuContext, 0, cuDevice)))
         {
             goto _exit;
         }
@@ -76,7 +94,7 @@ extern "C" void* nvidia_new_decoder(CodecID codecID, int iGpu)
             goto _exit;
         }
         bool bLowLatency = true;
-        p->dec = new NvDecoder(cuContext, false, cudaCodecID, bLowLatency, false, &cropRect, &resizeDim);
+        p->dec = new NvDecoder(p->cuContext, false, cudaCodecID, bLowLatency, false, &cropRect, &resizeDim);
         /* Set operating point for AV1 SVC. It has no impact for other profiles or codecs
         * PFNVIDOPPOINTCALLBACK Callback from video parser will pick operating point set to NvDecoder  */
         p->dec->SetOperatingPoint(opPoint, bDispAllLayers);
@@ -92,7 +110,8 @@ extern "C" void* nvidia_new_decoder(CodecID codecID, int iGpu)
 _exit:
     if (p)
     {
-
+        nvidia_destroy_decoder(p);
+        delete p;
     }
     return NULL;
 }
@@ -121,32 +140,7 @@ extern "C" int nvidia_decode(void* decoder, uint8_t *data, int len, DecodeCallba
             callback(datas, linesizes, NV12, dec->GetDecodeWidth(), dec->GetHeight(), obj, 0);
             ret = 0;
         }
-        // else
-        // {
-        //     // 4:2:0 output width is 2 byte aligned. If decoded width is odd , luma has 1 pixel padding
-        //     // Remove padding from luma while dumping it to disk
-        //     // dump luma
-        //     for (auto i = 0; i < dec.GetHeight(); i++)
-        //     {
-        //         fpOut.write(reinterpret_cast<char*>(pFrame), dec.GetDecodeWidth()*dec.GetBPP());
-        //         pFrame += dec.GetWidth() * dec.GetBPP();
-        //     }
-        //     // dump Chroma
-        //     fpOut.write(reinterpret_cast<char*>(pFrame), dec.GetChromaPlaneSize());
-        // }
+        // todo: odd width
     }
     return ret;
-}
-
-extern "C" int nvidia_destroy_decoder(void* decoder)
-{
-    Decoder *p = (Decoder*)decoder;
-    if (p)
-    {
-        if (p->dec)
-        {
-            delete p->dec;
-        }
-    }
-    return 0;
 }

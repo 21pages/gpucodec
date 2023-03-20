@@ -4,16 +4,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-use common::{CodecID, HWDeviceType, PixelFormat, MAX_DATA_NUM};
+use common::{CodecID, HWDeviceType, PixelFormat};
 use nvidia::{
     decode::{DecodeContext, Decoder},
-    encode::{EncodeContext, EncodeFrame, Encoder},
-    NV_ENC_BUFFER_FORMAT::*,
+    encode::{EncodeContext, Encoder},
 };
 
 fn main() {
     let en_ctx = EncodeContext {
-        surfaceFormat: NV_ENC_BUFFER_FORMAT_NV12,
+        format: PixelFormat::NV12,
         codec: CodecID::H264,
         width: 2880,
         height: 1800,

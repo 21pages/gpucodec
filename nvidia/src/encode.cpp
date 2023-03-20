@@ -8,70 +8,9 @@
 #include <Samples/Utils/NvEncoderCLIOptions.h>
 
 #include "common.h"
+#include "callback.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
-
-
-// void ShowEncoderCapability()
-// {
-//     ck(cuInit(0));
-//     int nGpu = 0;
-//     ck(cuDeviceGetCount(&nGpu));
-//     std::cout << "Encoder Capability" << std::endl << std::endl;
-//     for (int iGpu = 0; iGpu < nGpu; iGpu++) {
-//         CUdevice cuDevice = 0;
-//         ck(cuDeviceGet(&cuDevice, iGpu));
-//         char szDeviceName[80];
-//         ck(cuDeviceGetName(szDeviceName, sizeof(szDeviceName), cuDevice));
-//         CUcontext cuContext = NULL;
-//         ck(cuCtxCreate(&cuContext, 0, cuDevice));
-//         NvEncoderCuda enc(cuContext, 1280, 720, NV_ENC_BUFFER_FORMAT_NV12);
-
-//         std::cout << "GPU " << iGpu << " - " << szDeviceName << std::endl << std::endl;
-//         std::cout << "\tH264:\t\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_H264_GUID,
-//                                      NV_ENC_CAPS_SUPPORTED_RATECONTROL_MODES) ? "yes" : "no" ) << std::endl <<
-//             "\tH264_444:\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_H264_GUID,
-//                                      NV_ENC_CAPS_SUPPORT_YUV444_ENCODE) ? "yes" : "no" ) << std::endl <<
-//             "\tH264_ME:\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_H264_GUID,
-//                                      NV_ENC_CAPS_SUPPORT_MEONLY_MODE) ? "yes" : "no" ) << std::endl <<
-//             "\tH264_WxH:\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_H264_GUID,
-//                                      NV_ENC_CAPS_WIDTH_MAX) ) << "*" <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_H264_GUID, NV_ENC_CAPS_HEIGHT_MAX) ) << std::endl <<
-//             "\tHEVC:\t\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_HEVC_GUID,
-//                                      NV_ENC_CAPS_SUPPORTED_RATECONTROL_MODES) ? "yes" : "no" ) << std::endl <<
-//             "\tHEVC_Main10:\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_HEVC_GUID,
-//                                      NV_ENC_CAPS_SUPPORT_10BIT_ENCODE) ? "yes" : "no" ) << std::endl <<
-//             "\tHEVC_Lossless:\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_HEVC_GUID,
-//                                      NV_ENC_CAPS_SUPPORT_LOSSLESS_ENCODE) ? "yes" : "no" ) << std::endl <<
-//             "\tHEVC_SAO:\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_HEVC_GUID,
-//                                      NV_ENC_CAPS_SUPPORT_SAO) ? "yes" : "no" ) << std::endl <<
-//             "\tHEVC_444:\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_HEVC_GUID,
-//                                      NV_ENC_CAPS_SUPPORT_YUV444_ENCODE) ? "yes" : "no" ) << std::endl <<
-//             "\tHEVC_ME:\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_HEVC_GUID,
-//                                      NV_ENC_CAPS_SUPPORT_MEONLY_MODE) ? "yes" : "no" ) << std::endl <<
-//             "\tHEVC_WxH:\t" << "  " <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_HEVC_GUID,
-//                                      NV_ENC_CAPS_WIDTH_MAX) ) << "*" <<
-//             ( enc.GetCapabilityValue(NV_ENC_CODEC_HEVC_GUID, NV_ENC_CAPS_HEIGHT_MAX) ) << std::endl;
-
-//         std::cout << std::endl;
-
-//         enc.DestroyEncoder();
-//         ck(cuCtxDestroy(cuContext));
-//     }
-// }
-
-
 struct Encoder
 {
     int32_t width;
@@ -86,18 +25,45 @@ struct Encoder
         width(width), height(height), format(format), gpu(gpu) {}
 };
 
-extern "C" void* nvidia_new_encoder(int32_t width, int32_t height, CodecID codecID, NV_ENC_BUFFER_FORMAT eFormat, int32_t gpu)
+extern "C" int nvidia_destroy_encoder(void *ve)
+{
+    Encoder *e = (Encoder*)ve;
+    if (e)
+    {
+        if (e->pEnc)
+        {
+            e->pEnc->DestroyEncoder();
+            delete e->pEnc;
+        }
+        if (e->cuContext)
+        {
+            cuCtxDestroy(e->cuContext);
+        }
+    }
+    return 0;
+}
+
+extern "C" void* nvidia_new_encoder(int32_t width, int32_t height, CodecID codecID, PixelFormat nformat, int32_t gpu)
 {
     Encoder * e = NULL;
     try 
     {
+        if (nformat != NV12)
+        {
+            goto _exit;
+        }
+        NV_ENC_BUFFER_FORMAT format = NV_ENC_BUFFER_FORMAT_NV12;
+        if (codecID != H264 && codecID != HEVC)
+        {
+            goto _exit;
+        }
         GUID guidCodec = NV_ENC_CODEC_H264_GUID;
         if (HEVC == codecID)
         {
             guidCodec = NV_ENC_CODEC_HEVC_GUID;
         }
 
-        e = new Encoder(width, height, eFormat, gpu);
+        e = new Encoder(width, height, format, gpu);
         if (!e)
         {
             std::cout << "failed to new Encoder" << std::endl;
@@ -157,21 +123,13 @@ extern "C" void* nvidia_new_encoder(int32_t width, int32_t height, CodecID codec
 _exit:
     if (e)
     {
-        if (e->cuContext)
-        {
-            cuCtxDestroy(e->cuContext);
-        }
-        if (e->pEnc)
-        {
-            delete e->pEnc;
-        }
+        nvidia_destroy_encoder(e);
         delete e;
-        e = NULL;
     }
     return NULL;
 }
 
-
+// to-do: datas, linesizes
 extern "C" int nvidia_encode(void *ve,  uint8_t *data, int32_t len, EncodeCallback callback, void* obj)
 {
     Encoder *e = (Encoder*)ve;
@@ -199,24 +157,4 @@ extern "C" int nvidia_encode(void *ve,  uint8_t *data, int32_t len, EncodeCallba
         }
     }
     return ret;
-}
-
-extern "C" int nvidia_destroy_encoder(void *ve)
-{
-    Encoder *e = (Encoder*)ve;
-    if (e)
-    {
-        if (e->pEnc)
-        {
-            e->pEnc->DestroyEncoder();
-            // ??
-            delete e->pEnc;
-        }
-        // ??
-        if (e->cuContext)
-        {
-            cuCtxDestroy(e->cuContext);
-        }
-    }
-    return 0;
 }
