@@ -19,14 +19,14 @@ support:
 
 fn main() {
     let en_ctx = EncodeContext {
-        device: HWDeviceType::DX11, //DX9 got Segmentation fault
+        device: HWDeviceType::OPENGL, //DX9 got Segmentation fault
         format: PixelFormat::NV12,
         codec: CodecID::H264,
         width: 2880,
         height: 1800,
     };
     let de_ctx = DecodeContext {
-        device: HWDeviceType::DX11,
+        device: HWDeviceType::OPENGL,
         format: PixelFormat::NV12,
         codec: CodecID::H264,
     };

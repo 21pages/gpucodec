@@ -22,6 +22,8 @@ fn main() {
     // system
     #[cfg(windows)]
     println!("cargo:rustc-link-lib=ole32");
+    #[cfg(target_os = "linux")]
+    println!("cargo:rustc-link-lib=stdc++");
 
     // amf
     let amf_path = externals_dir.join("AMF_v1.4.29");
@@ -33,6 +35,8 @@ fn main() {
         "Thread.cpp",
         #[cfg(windows)]
         "Windows/ThreadWindows.cpp",
+        #[cfg(target_os = "linux")]
+        "Linux/ThreadLinux.cpp",
         "TraceAdapter.cpp",
     ] {
         builder.file(format!("{}/amf/public/common/{}", amf_path.display(), f));
@@ -46,3 +50,5 @@ fn main() {
         .cpp(false)
         .compile("amf");
 }
+
+// https://www.amd.com/en/support/linux-drivers
