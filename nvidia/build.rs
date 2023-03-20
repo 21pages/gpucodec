@@ -15,7 +15,10 @@ fn main() {
         .unwrap();
 
     let mut builder = Build::new();
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let externals_dir = manifest_dir.parent().unwrap().join("externals");
 
+    // system
     #[cfg(target_os = "windows")]
     [
         "kernel32", "user32", "gdi32", "winspool", "shell32", "ole32", "oleaut32", "uuid",
@@ -23,16 +26,24 @@ fn main() {
     ]
     .map(|lib| println!("cargo:rustc-link-lib={}", lib));
 
-    let cuda_path = PathBuf::from("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6");
-    // let cuda_path = PathBuf::from("E:/ffmpeg/nv_sdk");
-    builder.include(cuda_path.join("include"));
-    println!(
-        "cargo:rustc-link-search={}",
-        cuda_path.join("lib").join("x64").display() // cuda_path.join("x64").display()
-    );
-    ["cudart_static", "cuda"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
+    // cuda
+    #[cfg(windows)]
+    {
+        let cuda_path = externals_dir.join("CUDA").join("win_v11.6");
+        builder.include(cuda_path.join("include"));
+        #[cfg(target_arch = "x86_64")]
+        let arch_dir = "x64";
+        #[cfg(target_arch = "x86")]
+        let arch_dir = "Win32";
+        println!(
+            "cargo:rustc-link-search={}",
+            cuda_path.join("lib").join(arch_dir).display()
+        );
+        ["cudart_static", "cuda"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
+    }
 
-    let sdk_path = PathBuf::from("E:/native_codec/nvidia/Video_Codec_SDK_11.1.5");
+    // video codc sdk
+    let sdk_path = externals_dir.join("Video_Codec_SDK_11.1.5");
     builder.includes([
         sdk_path.clone(),
         sdk_path.join("Interface"),
@@ -41,16 +52,19 @@ fn main() {
         sdk_path.join("Samples").join("NvCodec").join("NVEncoder"),
         sdk_path.join("Samples").join("NvCodec").join("NVDecoder"),
     ]);
-    println!(
-        "cargo:rustc-link-search={}",
-        sdk_path.join("Lib").join("x64").display()
-    );
-    ["nvcuvid", "nvencodeapi"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
-    for file in vec![
-        "NvEncoder.cpp",
-        "NvEncoderCuda.cpp",
-        // "NvEncoderOutputInVidMemCuda.cpp",
-    ] {
+    #[cfg(windows)]
+    {
+        #[cfg(target_arch = "x86_64")]
+        let arch_dir = "x64";
+        #[cfg(target_arch = "x86")]
+        let arch_dir = "Win32";
+        println!(
+            "cargo:rustc-link-search={}",
+            sdk_path.join("Lib").join(arch_dir).display()
+        );
+        ["nvcuvid", "nvencodeapi"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
+    }
+    for file in vec!["NvEncoder.cpp", "NvEncoderCuda.cpp"] {
         builder.file(
             sdk_path
                 .join("Samples")
@@ -59,10 +73,7 @@ fn main() {
                 .join(file),
         );
     }
-    for file in vec![
-        "NvDecoder.cpp",
-        // "NvEncoderOutputInVidMemCuda.cpp",
-    ] {
+    for file in vec!["NvDecoder.cpp"] {
         builder.file(
             sdk_path
                 .join("Samples")
@@ -71,10 +82,9 @@ fn main() {
                 .join(file),
         );
     }
-    // builder.file(sdk_path.join("Samples").join("Utils").join("crc.cu"));
 
+    // crate
     builder.include("../common/src");
-
     builder
         .file("src/encode.cpp")
         .file("src/decode.cpp")
