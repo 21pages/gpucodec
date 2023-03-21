@@ -1,7 +1,8 @@
-use codec::{decode::Decoder, encode::Encoder};
-use common::{
-    CodecID, DecodeContext, DecodeDriver, EncodeContext, EncodeDriver, HWDeviceType, PixelFormat,
+use codec::{
+    decode::{DecodeContext, DecodeDriver, Decoder},
+    encode::{EncodeContext, EncodeDriver, Encoder},
 };
+use common::{CodecID, HWDeviceType, PixelFormat};
 use std::{
     io::{Read, Write},
     path::PathBuf,

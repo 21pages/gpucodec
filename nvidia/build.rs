@@ -42,7 +42,9 @@ fn main() {
             "cargo:rustc-link-search={}",
             cuda_path.join("lib").join(arch_dir).display()
         );
-        ["cudart_static", "cuda"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
+        // ["cudart_static", "cuda"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
+        println!("cargo:rustc-link-lib=static=cudart_static");
+        println!("cargo:rustc-link-lib=dylib=cuda");
     }
     #[cfg(target_os = "linux")]
     {
@@ -75,7 +77,7 @@ fn main() {
             "cargo:rustc-link-search={}",
             sdk_path.join("Lib").join(arch_dir).display()
         );
-        ["nvcuvid", "nvencodeapi"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
+        ["nvcuvid", "nvencodeapi"].map(|lib| println!("cargo:rustc-link-lib=dylib={}", lib));
     }
     #[cfg(target_os = "linux")]
     {

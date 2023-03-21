@@ -1,8 +1,11 @@
-use common::{
-    encode_callback, EncodeCalls, EncodeContext, EncodeDriver::*, EncodeFrame, MAX_DATA_NUM,
-};
+use common::{CodecID, EncodeCalls, HWDeviceType, PixelFormat, MAX_DATA_NUM};
 use log::trace;
-use std::os::raw::c_void;
+use std::{
+    fmt::Display,
+    os::raw::{c_int, c_void},
+    slice::from_raw_parts,
+};
+use EncodeDriver::*;
 
 pub struct Encoder {
     calls: EncodeCalls,
@@ -23,6 +26,11 @@ impl Encoder {
             NVENC => nvidia::encode_calls(),
             AMF => amf::encode_calls(),
         };
+        // let calls = if ctx.driver == AMF {
+        //     amf::encode_calls()
+        // } else {
+        //     return Err(());
+        // };
         unsafe {
             let mut linesize = Vec::<i32>::new();
             linesize.resize(MAX_DATA_NUM as _, 0);
@@ -67,7 +75,7 @@ impl Encoder {
                 &mut *self.codec,
                 datas.as_ptr() as *mut *mut u8,
                 linesizes.as_ptr() as *mut i32,
-                Some(encode_callback),
+                Some(Self::callback),
                 self.frames as *mut _ as *mut c_void,
             );
             if result != 0 {
@@ -75,6 +83,17 @@ impl Encoder {
             } else {
                 Ok(&mut *self.frames)
             }
+        }
+    }
+
+    extern "C" fn callback(data: *const u8, size: c_int, pts: i64, key: i32, obj: *const c_void) {
+        unsafe {
+            let frames = &mut *(obj as *mut Vec<EncodeFrame>);
+            frames.push(EncodeFrame {
+                data: from_raw_parts(data, size as usize).to_vec(),
+                pts,
+                key,
+            });
         }
     }
 
@@ -88,5 +107,33 @@ impl Drop for Encoder {
             let _ = Box::from_raw(self.frames);
             trace!("Encoder dropped");
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum EncodeDriver {
+    NVENC,
+    AMF,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EncodeContext {
+    pub driver: EncodeDriver,
+    pub device: HWDeviceType,
+    pub format: PixelFormat,
+    pub codec: CodecID,
+    pub width: i32,
+    pub height: i32,
+}
+
+pub struct EncodeFrame {
+    pub data: Vec<u8>,
+    pub pts: i64,
+    pub key: i32,
+}
+
+impl Display for EncodeFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "encode len:{}, pts:{}", self.data.len(), self.pts)
     }
 }
