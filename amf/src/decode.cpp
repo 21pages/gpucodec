@@ -7,6 +7,7 @@
 
 
 #include <cstring>
+#include <iostream>
 
 #include "common.h"
 #include "callback.h"
@@ -213,43 +214,66 @@ static bool convert_codec(CodecID lhs, amf_wstring& rhs)
 
 extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, CodecID codecID)
 {
-    amf_wstring codecStr;
-    if (!convert_codec(codecID, codecStr))
+    try
     {
-        return NULL;
+        amf_wstring codecStr;
+        if (!convert_codec(codecID, codecStr))
+        {
+            return NULL;
+        }
+        amf::AMF_MEMORY_TYPE memoryTypeOut;
+        if (!convert_device(device, memoryTypeOut))
+        {
+            return NULL;
+        }
+        amf::AMF_SURFACE_FORMAT surfaceFormat;
+        if (!convert_format(format, surfaceFormat))
+        {
+            return NULL;
+        }
+        Decoder *dec = new Decoder(memoryTypeOut, surfaceFormat, codecStr);
+        if (dec && dec->init_result != AMF_OK)
+        {
+            dec->destroy();
+            delete dec;
+            dec = NULL;
+        }
+        return dec;
     }
-    amf::AMF_MEMORY_TYPE memoryTypeOut;
-    if (!convert_device(device, memoryTypeOut))
+    catch(const std::exception& e)
     {
-        return NULL;
+        std::cerr << e.what() << '\n';
     }
-     amf::AMF_SURFACE_FORMAT surfaceFormat;
-    if (!convert_format(format, surfaceFormat))
-    {
-        return NULL;
-    }
-    Decoder *dec = new Decoder(memoryTypeOut, surfaceFormat, codecStr);
-    if (dec && dec->init_result != AMF_OK)
-    {
-        dec->destroy();
-        delete dec;
-        dec = NULL;
-    }
-    return dec;
+    return NULL;
 }
 
 extern "C" int amf_decode(void *decoder, uint8_t *data, int32_t length, DecodeCallback callback, void *obj)
 {
-    Decoder *dec = (Decoder*)decoder;
-    return dec->decode(data, length, callback, obj);
+    try
+    {
+        Decoder *dec = (Decoder*)decoder;
+        return dec->decode(data, length, callback, obj);   
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
 }
 
 extern "C" int amf_destroy_decoder(void *decoder)
 {
-    Decoder *dec = (Decoder*)decoder;
-    if (dec)
+    try
     {
-        return dec->destroy();
+        Decoder *dec = (Decoder*)decoder;
+        if (dec)
+        {
+            return dec->destroy();
+        }
     }
-    return 0;
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
 }

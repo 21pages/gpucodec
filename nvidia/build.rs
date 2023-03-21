@@ -84,9 +84,14 @@ fn main() {
         // to-do: other arch
         println!(
             "cargo:rustc-link-search={}",
-            sdk_path.join("Lib").join("linux").join("stubs").join(arch_dir).display()
+            sdk_path
+                .join("Lib")
+                .join("linux")
+                .join("stubs")
+                .join(arch_dir)
+                .display()
         );
-        ["nvcuvid", "nvidia-encode"].map(|lib| println!("cargo:rustc-link-lib={}", lib)); // to-do: dynamic
+        ["nvcuvid", "nvidia-encode"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
     }
     for file in vec!["NvEncoder.cpp", "NvEncoderCuda.cpp"] {
         builder.file(

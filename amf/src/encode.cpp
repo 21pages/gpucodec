@@ -135,7 +135,7 @@ public:
                 static const amf_size l_origin[] = {0, 0, 0};
                 const amf_size        l_size[]   = {(amf_size)width, (amf_size)height, 1};
                 res = m_AMFCompute->CopyPlaneFromHost(frame->data[i], l_origin, l_size, frame->linesize[i],
-                                                    surface->GetPlaneAt(i), false);
+                                                    plane, false);
             }
         }
 
@@ -361,44 +361,68 @@ static bool convert_codec(CodecID lhs, amf_wstring& rhs)
 extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, CodecID codecID,
                                 int32_t width, int32_t height) 
 {
-    amf_wstring codecStr;
-    if (!convert_codec(codecID, codecStr))
+    try 
     {
-        return NULL;
-    }
-    amf::AMF_MEMORY_TYPE memoryType;
-    if (!convert_device(device, memoryType))
+        amf_wstring codecStr;
+        if (!convert_codec(codecID, codecStr))
+        {
+            return NULL;
+        }
+        amf::AMF_MEMORY_TYPE memoryType;
+        if (!convert_device(device, memoryType))
+        {
+            return NULL;
+        }
+        amf::AMF_SURFACE_FORMAT surfaceFormat;
+        if (!convert_format(format, surfaceFormat))
+        {
+            return NULL;
+        }
+        Encoder *enc = new Encoder(memoryType, surfaceFormat, codecStr, width, height);
+        if (enc && enc->init_result != AMF_OK) {
+            AMFTraceError(AMF_FACILITY, L"init error code:%d",  enc->init_result);
+            enc->destroy();
+            delete enc;
+            enc = NULL;
+        }
+        return enc;
+    } 
+    catch(const std::exception& e)
     {
-        return NULL;
+        std::cerr << e.what() << '\n';
     }
-     amf::AMF_SURFACE_FORMAT surfaceFormat;
-    if (!convert_format(format, surfaceFormat))
-    {
-        return NULL;
-    }
-    Encoder *enc = new Encoder(memoryType, surfaceFormat, codecStr, width, height);
-    if (enc && enc->init_result != AMF_OK) {
-        AMFTraceError(AMF_FACILITY, L"init error code:%d",  enc->init_result);
-        enc->destroy();
-        delete enc;
-        enc = NULL;
-    }
-    return enc;
+    return NULL;
 }
 
 extern "C" int amf_encode(void *e, uint8_t *data[MAX_DATA_NUM], int32_t linesize[MAX_DATA_NUM], EncodeCallback callback, void* obj)
 {
-    Encoder *enc = (Encoder*)e;
-    struct encoder_frame frame;
-    for (int i = 0; i < MAX_DATA_NUM; i++) {
-        frame.data[i] = data[i];
-        frame.linesize[i] = linesize[i];
+    try
+    {
+        Encoder *enc = (Encoder*)e;
+        struct encoder_frame frame;
+        for (int i = 0; i < MAX_DATA_NUM; i++) {
+            frame.data[i] = data[i];
+            frame.linesize[i] = linesize[i];
+        }
+        return enc->encode(&frame, callback, obj);
     }
-    return enc->encode(&frame, callback, obj);
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
 }
 
 extern "C" int amf_destroy_encoder(void *e)
 {
-    Encoder *enc = (Encoder*)e;
-    return enc->destroy();
+    try
+    {
+        Encoder *enc = (Encoder*)e;
+        return enc->destroy();
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
 }
