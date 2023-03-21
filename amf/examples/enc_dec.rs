@@ -1,8 +1,5 @@
-use amf::{
-    decode::{DecodeContext, Decoder},
-    encode::{EncodeContext, Encoder},
-};
-use common::{CodecID, HWDeviceType, PixelFormat};
+use amf::{decode::AMFDecoder, encode::AMFEncoder};
+use common::{CodecID, DecodeContext, EncodeContext, HWDeviceType, PixelFormat};
 use std::{
     io::{Read, Write},
     path::PathBuf,
@@ -30,8 +27,8 @@ fn main() {
         format: PixelFormat::NV12,
         codec: CodecID::H264,
     };
-    let mut encoder = Encoder::new(en_ctx.clone()).unwrap();
-    let mut decoder = Decoder::new(de_ctx.clone()).unwrap();
+    let mut encoder = AMFEncoder::new(en_ctx.clone()).unwrap();
+    let mut decoder = AMFDecoder::new(de_ctx.clone()).unwrap();
 
     let input_dir = PathBuf::from("D:\\tmp\\input");
     let output_dir = PathBuf::from("D:\\tmp");

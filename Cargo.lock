@@ -122,6 +122,8 @@ name = "codec"
 version = "0.1.0"
 dependencies = [
  "amf",
+ "common",
+ "nvidia",
 ]
 
 [[package]]

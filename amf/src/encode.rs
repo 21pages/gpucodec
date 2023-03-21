@@ -1,30 +1,9 @@
 use crate::{amf_destroy_encoder, amf_encode, amf_new_encoder};
-use common::{CodecID, HWDeviceType, PixelFormat, MAX_DATA_NUM};
+use common::{encode_callback, EncodeContext, EncodeFrame, MAX_DATA_NUM};
 use log::trace;
-use std::{ffi::c_void, fmt::Display, os::raw::c_int, slice};
+use std::ffi::c_void;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct EncodeContext {
-    pub device: HWDeviceType,
-    pub format: PixelFormat,
-    pub codec: CodecID,
-    pub width: i32,
-    pub height: i32,
-}
-
-pub struct EncodeFrame {
-    pub data: Vec<u8>,
-    pub pts: i64,
-    pub key: i32,
-}
-
-impl Display for EncodeFrame {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "encode len:{}, pts:{}", self.data.len(), self.pts)
-    }
-}
-
-pub struct Encoder {
+pub struct AMFEncoder {
     codec: Box<c_void>,
     frames: *mut Vec<EncodeFrame>,
     pub ctx: EncodeContext,
@@ -33,7 +12,7 @@ pub struct Encoder {
     pub length: i32,
 }
 
-impl Encoder {
+impl AMFEncoder {
     pub fn new(ctx: EncodeContext) -> Result<Self, ()> {
         unsafe {
             let mut linesize = Vec::<i32>::new();
@@ -52,7 +31,7 @@ impl Encoder {
             if codec.is_null() {
                 return Err(());
             }
-            Ok(Encoder {
+            Ok(AMFEncoder {
                 codec: Box::from_raw(codec as *mut c_void),
                 frames: Box::into_raw(Box::new(Vec::<EncodeFrame>::new())),
                 ctx,
@@ -78,7 +57,7 @@ impl Encoder {
                 &mut *self.codec,
                 datas.as_ptr() as _,
                 linesizes.as_ptr() as _,
-                Some(Encoder::callback),
+                Some(encode_callback),
                 self.frames as *mut _ as *mut c_void,
             );
             if result != 0 {
@@ -88,20 +67,9 @@ impl Encoder {
             }
         }
     }
-
-    extern "C" fn callback(data: *const u8, size: c_int, pts: i64, key: i32, obj: *const c_void) {
-        unsafe {
-            let frames = &mut *(obj as *mut Vec<EncodeFrame>);
-            frames.push(EncodeFrame {
-                data: slice::from_raw_parts(data, size as _).to_vec(),
-                pts,
-                key,
-            });
-        }
-    }
 }
 
-impl Drop for Encoder {
+impl Drop for AMFEncoder {
     fn drop(&mut self) {
         unsafe {
             amf_destroy_encoder(self.codec.as_mut());

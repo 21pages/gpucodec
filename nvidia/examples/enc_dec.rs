@@ -4,11 +4,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use common::{CodecID, HWDeviceType, PixelFormat};
-use nvidia::{
-    decode::{DecodeContext, Decoder},
-    encode::{EncodeContext, Encoder},
-};
+use common::{CodecID, DecodeContext, EncodeContext, HWDeviceType, PixelFormat};
+use nvidia::{decode::NvDecoder, encode::NvEncoder};
 
 fn main() {
     let en_ctx = EncodeContext {
@@ -16,17 +13,18 @@ fn main() {
         codec: CodecID::H264,
         width: 2880,
         height: 1800,
+        device: HWDeviceType::CUDA,
     };
     let de_ctx = DecodeContext {
         codec: CodecID::H264,
         device: HWDeviceType::CUDA,
-        format_out: PixelFormat::NV12,
+        format: PixelFormat::NV12,
     };
-    let mut encoder = Encoder::new(en_ctx.clone()).unwrap();
-    let mut decoder = Decoder::new(de_ctx.clone()).unwrap();
+    let mut encoder = NvEncoder::new(en_ctx.clone()).unwrap();
+    let mut decoder = NvDecoder::new(de_ctx.clone()).unwrap();
 
-    let input_dir = PathBuf::from("/home/sun/yuv/input");
-    let output_dir = PathBuf::from("/home/sun/yuv");
+    let input_dir = PathBuf::from("E:\\tmp\\input");
+    let output_dir = PathBuf::from("E:\\tmp");
     let yuv_file_name = input_dir.join("2880x1800_nv12.yuv");
     let encoded_file_name = output_dir.join("2880x1800_encoded.264");
     let decoded_file_name = output_dir.join("2880x1800_nv12_decoded.yuv");
