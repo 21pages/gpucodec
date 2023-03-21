@@ -4,5 +4,20 @@
 
 include!(concat!(env!("OUT_DIR"), "/nvidia_ffi.rs"));
 
-pub mod decode;
-pub mod encode;
+use common::{DecodeCalls, EncodeCalls};
+
+pub fn encode_calls() -> EncodeCalls {
+    EncodeCalls {
+        new: nvidia_new_encoder,
+        encode: nvidia_encode,
+        destroy: nvidia_destroy_encoder,
+    }
+}
+
+pub fn decode_calls() -> DecodeCalls {
+    DecodeCalls {
+        new: nvidia_new_decoder,
+        decode: nvidia_decode,
+        destroy: nvidia_destroy_decoder,
+    }
+}

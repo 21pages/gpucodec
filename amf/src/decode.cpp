@@ -212,7 +212,7 @@ static bool convert_codec(CodecID lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, CodecID codecID)
+extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, CodecID codecID, int32_t iGpu)
 {
     try
     {

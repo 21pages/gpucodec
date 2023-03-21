@@ -52,7 +52,7 @@ extern "C" int nvidia_destroy_decoder(void* decoder)
     return 0;
 }
 
-extern "C" void* nvidia_new_decoder(CodecID codecID, int iGpu) 
+extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, CodecID codecID, int32_t iGpu) 
 {
     Rect cropRect = {};
     Dim resizeDim = {};

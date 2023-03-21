@@ -1,34 +1,31 @@
-use amf::{decode::AMFDecoder, encode::AMFEncoder};
-use common::{CodecID, DecodeContext, EncodeContext, HWDeviceType, PixelFormat};
+use codec::{decode::Decoder, encode::Encoder};
+use common::{
+    CodecID, DecodeContext, DecodeDriver, EncodeContext, EncodeDriver, HWDeviceType, PixelFormat,
+};
 use std::{
     io::{Read, Write},
     path::PathBuf,
     time::{Duration, Instant},
 };
 
-// cargo run --package amf --example enc_dec --release
-
-/*
-support:
-    win:
-        memory: DX11, HOST, OPENCL
-*/
-
 fn main() {
     let en_ctx = EncodeContext {
-        device: HWDeviceType::DX11, //DX9 got Segmentation fault
+        driver: EncodeDriver::AMF,
+        device: HWDeviceType::DX11,
         format: PixelFormat::NV12,
         codec: CodecID::H264,
         width: 2880,
         height: 1800,
     };
     let de_ctx = DecodeContext {
+        driver: DecodeDriver::AMF,
         device: HWDeviceType::DX11,
         format: PixelFormat::NV12,
         codec: CodecID::H264,
+        gpu: 0,
     };
-    let mut encoder = AMFEncoder::new(en_ctx.clone()).unwrap();
-    let mut decoder = AMFDecoder::new(de_ctx.clone()).unwrap();
+    let mut encoder = Encoder::new(en_ctx.clone()).unwrap();
+    let mut decoder = Decoder::new(de_ctx.clone()).unwrap();
 
     let input_dir = PathBuf::from("D:\\tmp\\input");
     let output_dir = PathBuf::from("D:\\tmp");

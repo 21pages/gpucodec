@@ -1,25 +1,35 @@
-use crate::{amf_decode, amf_destroy_decoder, amf_new_decoder};
-use common::{decode_callback, DecodeContext, DecodeFrame};
+use common::{decode_callback, DecodeCalls, DecodeContext, DecodeDriver::*, DecodeFrame};
 use log::{error, trace};
 use std::ffi::c_void;
 
-pub struct AMFDecoder {
+pub struct Decoder {
+    calls: DecodeCalls,
     codec: Box<c_void>,
     frames: *mut Vec<DecodeFrame>,
     pub ctx: DecodeContext,
 }
 
-unsafe impl Send for AMFDecoder {}
-unsafe impl Sync for AMFDecoder {}
+unsafe impl Send for Decoder {}
+unsafe impl Sync for Decoder {}
 
-impl AMFDecoder {
+impl Decoder {
     pub fn new(ctx: DecodeContext) -> Result<Self, ()> {
+        let calls = match ctx.driver {
+            CUVID => nvidia::decode_calls(),
+            AMF => amf::decode_calls(),
+        };
         unsafe {
-            let codec = amf_new_decoder(ctx.device as i32, ctx.format as i32, ctx.codec as i32);
+            let codec = (calls.new)(
+                ctx.device as i32,
+                ctx.format as i32,
+                ctx.codec as i32,
+                ctx.gpu,
+            );
             if codec.is_null() {
                 return Err(());
             }
-            Ok(AMFDecoder {
+            Ok(Self {
+                calls,
                 codec: Box::from_raw(codec as *mut c_void),
                 frames: Box::into_raw(Box::new(Vec::<DecodeFrame>::new())),
                 ctx,
@@ -30,7 +40,7 @@ impl AMFDecoder {
     pub fn decode(&mut self, packet: &[u8]) -> Result<&mut Vec<DecodeFrame>, i32> {
         unsafe {
             (&mut *self.frames).clear();
-            let ret = amf_decode(
+            let ret = (self.calls.decode)(
                 &mut *self.codec,
                 packet.as_ptr() as _,
                 packet.len() as _,
@@ -48,10 +58,10 @@ impl AMFDecoder {
     }
 }
 
-impl Drop for AMFDecoder {
+impl Drop for Decoder {
     fn drop(&mut self) {
         unsafe {
-            amf_destroy_decoder(self.codec.as_mut());
+            (self.calls.destroy)(self.codec.as_mut());
             let _ = Box::from_raw(self.frames);
             trace!("Decoder dropped");
         }

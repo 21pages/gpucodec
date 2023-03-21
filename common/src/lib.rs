@@ -3,8 +3,8 @@
 #![allow(non_snake_case)]
 
 use std::{
-    ffi::{c_int, c_void},
     fmt::Display,
+    os::raw::{c_int, c_void},
     slice::from_raw_parts,
 };
 
@@ -13,7 +13,20 @@ use log::error;
 include!(concat!(env!("OUT_DIR"), "/common_ffi.rs"));
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum EncodeDriver {
+    NVENC,
+    AMF,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DecodeDriver {
+    CUVID,
+    AMF,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct EncodeContext {
+    pub driver: EncodeDriver,
     pub device: HWDeviceType,
     pub format: PixelFormat,
     pub codec: CodecID,
@@ -23,9 +36,11 @@ pub struct EncodeContext {
 
 #[derive(Debug, Clone)]
 pub struct DecodeContext {
+    pub driver: DecodeDriver,
     pub device: HWDeviceType,
     pub format: PixelFormat,
     pub codec: CodecID,
+    pub gpu: i32,
 }
 
 pub struct EncodeFrame {
@@ -135,4 +150,60 @@ pub unsafe extern "C" fn decode_callback(
     } else {
         error!("unsupported pixfmt {}", format);
     }
+}
+
+pub type NewEncoderCall = unsafe extern "C" fn(
+    device: i32,
+    format: i32,
+    codecID: i32,
+    width: i32,
+    height: i32,
+) -> *mut c_void;
+
+pub type EncodeCall = unsafe extern "C" fn(
+    encoder: *mut c_void,
+    data: *mut *mut u8,
+    linesize: *mut i32,
+    callback: EncodeCallback,
+    obj: *mut c_void,
+) -> c_int;
+
+pub type DestroyEncoderCall = unsafe extern "C" fn(encoder: *mut c_void) -> c_int;
+
+pub type NewDecoderCall =
+    unsafe extern "C" fn(device: i32, format: i32, codecID: i32, gpu: i32) -> *mut c_void;
+
+pub type DecodeCall = unsafe extern "C" fn(
+    decoder: *mut ::std::os::raw::c_void,
+    data: *mut u8,
+    length: i32,
+    callback: DecodeCallback,
+    obj: *mut ::std::os::raw::c_void,
+) -> c_int;
+
+pub type DestroyDecoderCall = unsafe extern "C" fn(decoder: *mut c_void) -> c_int;
+
+pub struct EncodeCalls {
+    pub new: NewEncoderCall,
+    pub encode: EncodeCall,
+    pub destroy: DestroyEncoderCall,
+}
+pub struct DecodeCalls {
+    pub new: NewDecoderCall,
+    pub decode: DecodeCall,
+    pub destroy: DestroyDecoderCall,
+}
+
+pub trait NativeEncoder {
+    fn new() -> NewEncoderCall;
+    fn encode() -> EncodeCall;
+    fn destroy() -> DestroyEncoderCall;
+}
+
+pub trait NativeDecoder {
+    fn new() -> NewDecoderCall;
+
+    fn decode() -> DecodeCall;
+
+    fn destroy() -> DestroyDecoderCall;
 }
