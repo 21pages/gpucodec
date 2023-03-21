@@ -25,9 +25,9 @@ struct Encoder
         width(width), height(height), format(format), gpu(gpu) {}
 };
 
-extern "C" int nvidia_destroy_encoder(void *ve)
+extern "C" int nvidia_destroy_encoder(void *encoder)
 {
-    Encoder *e = (Encoder*)ve;
+    Encoder *e = (Encoder*)encoder;
     if (e)
     {
         if (e->pEnc)
@@ -130,18 +130,21 @@ _exit:
 }
 
 // to-do: datas, linesizes
-extern "C" int nvidia_encode(void *ve,  uint8_t *data, int32_t len, EncodeCallback callback, void* obj)
+extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32_t linesizes[MAX_DATA_NUM], EncodeCallback callback, void* obj)
 {
-    Encoder *e = (Encoder*)ve;
+    Encoder *e = (Encoder*)encoder;
     NvEncoderCuda *pEnc = e->pEnc;
     CUcontext cuContext = e->cuContext;
     int ret = -1;
 
+    // to-do: linesizes
+    int len = e->height * (linesizes[0] + (linesizes[1] + 1) / 2);
+    uint8_t *pData = datas[0];
     if (len == pEnc->GetFrameSize())
     {
         std::vector<std::vector<uint8_t>> vPacket;
         const NvEncInputFrame* encoderInputFrame = pEnc->GetNextInputFrame();
-        NvEncoderCuda::CopyToDeviceFrame(cuContext, data, 0, (CUdeviceptr)encoderInputFrame->inputPtr,
+        NvEncoderCuda::CopyToDeviceFrame(cuContext, pData, 0, (CUdeviceptr)encoderInputFrame->inputPtr,
             (int)encoderInputFrame->pitch,
             pEnc->GetEncodeWidth(),
             pEnc->GetEncodeHeight(),

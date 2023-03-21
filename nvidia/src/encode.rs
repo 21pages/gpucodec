@@ -43,13 +43,17 @@ impl NvEncoder {
         }
     }
 
-    pub fn encode(&mut self, data: &[u8]) -> Result<&mut Vec<EncodeFrame>, i32> {
+    pub fn encode(
+        &mut self,
+        datas: Vec<*const u8>,
+        linesizes: Vec<i32>,
+    ) -> Result<&mut Vec<EncodeFrame>, i32> {
         unsafe {
             (&mut *self.frames).clear();
             let result = nvidia_encode(
                 &mut *self.codec,
-                data.as_ptr() as *mut u8,
-                data.len() as i32,
+                datas.as_ptr() as *mut *mut u8,
+                linesizes.as_ptr() as *mut i32,
                 Some(encode_callback),
                 self.frames as *mut _ as *mut c_void,
             );

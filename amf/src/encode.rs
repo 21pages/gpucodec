@@ -55,8 +55,8 @@ impl AMFEncoder {
             (&mut *self.frames).clear();
             let result = amf_encode(
                 &mut *self.codec,
-                datas.as_ptr() as _,
-                linesizes.as_ptr() as _,
+                datas.as_ptr() as *mut *mut u8,
+                linesizes.as_ptr() as *mut i32,
                 Some(encode_callback),
                 self.frames as *mut _ as *mut c_void,
             );

@@ -7,9 +7,9 @@
 
 void* nvidia_new_encoder(int32_t width, int32_t height, int codecID, uint32_t format, int32_t gpu);
 
-int nvidia_encode(void *e,  uint8_t *data, int32_t len, EncodeCallback callback, void* obj);
+int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32_t linesizes[MAX_DATA_NUM], EncodeCallback callback, void* obj);
 
-int nvidia_destroy_encoder(void *e);
+int nvidia_destroy_encoder(void *encoder);
 
 void* nvidia_new_decoder(int avCodecID, int iGpu);
 
