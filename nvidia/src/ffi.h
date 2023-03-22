@@ -3,8 +3,6 @@
 
 #include "../../common/src/callback.h"
 
-
-
 void* nvidia_new_encoder(int32_t device, int32_t format, int32_t codecID, int32_t width, int32_t height, int32_t gpu);
 
 int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32_t linesizes[MAX_DATA_NUM], EncodeCallback callback, void* obj);

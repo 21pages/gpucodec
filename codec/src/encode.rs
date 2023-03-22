@@ -26,11 +26,6 @@ impl Encoder {
             NVENC => nvidia::encode_calls(),
             AMF => amf::encode_calls(),
         };
-        // let calls = if ctx.driver == AMF {
-        //     amf::encode_calls()
-        // } else {
-        //     return Err(());
-        // };
         unsafe {
             let mut linesize = Vec::<i32>::new();
             linesize.resize(MAX_DATA_NUM as _, 0);

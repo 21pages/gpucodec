@@ -19,11 +19,6 @@ impl Decoder {
             CUVID => nvidia::decode_calls(),
             AMF => amf::decode_calls(),
         };
-        // let calls = if ctx.driver == AMF {
-        //     amf::decode_calls()
-        // } else {
-        //     return Err(());
-        // };
         unsafe {
             let codec = (calls.new)(
                 ctx.device as i32,
