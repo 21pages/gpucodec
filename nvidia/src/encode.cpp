@@ -1,7 +1,8 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
-#include <cuda.h>
+#include <dynlink_cuda.h>
+#include <dynlink_loader.h>
 #include <Samples/Utils/NvCodecUtils.h>
 #include <Samples/NvCodec/NvEncoder/NvEncoderCuda.h>
 #include <Samples/Utils/Logger.h>
@@ -13,6 +14,8 @@
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 struct Encoder
 {
+    CudaFunctions *cuda_dl = NULL;
+    NvencFunctions *nvenc_dl = NULL;
     int32_t width;
     int32_t height;
     NV_ENC_BUFFER_FORMAT format;
@@ -22,25 +25,52 @@ struct Encoder
     CUcontext cuContext = NULL;
 
     Encoder(int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format, int32_t gpu):
-        width(width), height(height), format(format), gpu(gpu) {}
+        width(width), height(height), format(format), gpu(gpu)
+    {
+        if (cuda_load_functions(&cuda_dl, NULL) < 0)
+        {
+            NVENC_THROW_ERROR("cuda_load_functions failed", NV_ENC_ERR_GENERIC);
+        }
+        if (nvenc_load_functions(&nvenc_dl, NULL) < 0)
+        {
+            NVENC_THROW_ERROR("nvenc_load_functions failed", NV_ENC_ERR_GENERIC);
+        }
+    }
 };
 
 extern "C" int nvidia_destroy_encoder(void *encoder)
 {
-    Encoder *e = (Encoder*)encoder;
-    if (e)
+    try
     {
-        if (e->pEnc)
+        Encoder *e = (Encoder*)encoder;
+        if (e)
         {
-            e->pEnc->DestroyEncoder();
-            delete e->pEnc;
+            if (e->pEnc)
+            {
+                e->pEnc->DestroyEncoder();
+                delete e->pEnc;
+            }
+            if (e->cuContext)
+            {
+                e->cuda_dl->cuCtxDestroy(e->cuContext);
+            }
+            if (e->nvenc_dl)
+            {
+                nvenc_free_functions(&e->nvenc_dl);
+            }
+            if (e->cuda_dl)
+            {
+                cuda_free_functions(&e->cuda_dl);
+            }
+
         }
-        if (e->cuContext)
-        {
-            cuCtxDestroy(e->cuContext);
-        }
+        return 0;
     }
-    return 0;
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
 }
 
 extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat,CodecID codecID, int32_t width, int32_t height, int32_t gpu)
@@ -70,12 +100,12 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat,Cod
             goto _exit;
         }
         NvEncoderInitParam initParam;
-        if(!ck(cuInit(0)))
+        if(!ck(e->cuda_dl->cuInit(0)))
         {
             goto _exit;
         }
         int nGpu = 0;
-        if (!ck(cuDeviceGetCount(&nGpu)))
+        if (!ck(e->cuda_dl->cuDeviceGetCount(&nGpu)))
         {
             goto _exit;
         }
@@ -85,22 +115,22 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat,Cod
             goto _exit;
         }
         CUdevice cuDevice = 0;
-        if (!ck(cuDeviceGet(&cuDevice, gpu)))
+        if (!ck(e->cuda_dl->cuDeviceGet(&cuDevice, gpu)))
         {
             goto _exit;
         }
         char szDeviceName[80];
-        if (!ck(cuDeviceGetName(szDeviceName, sizeof(szDeviceName), cuDevice)))
+        if (!ck(e->cuda_dl->cuDeviceGetName(szDeviceName, sizeof(szDeviceName), cuDevice)))
         {
             goto _exit;
         }
         std::cout << "GPU in use: " << szDeviceName << std::endl;
-        if (!ck(cuCtxCreate(&e->cuContext, 0, cuDevice)))
+        if (!ck(e->cuda_dl->cuCtxCreate(&e->cuContext, 0, cuDevice)))
         {
             goto _exit;
         }
 
-        e->pEnc = new NvEncoderCuda(e->cuContext, e->width, e->height, e->format, 0); // no delay
+        e->pEnc = new NvEncoderCuda(e->cuda_dl, e->nvenc_dl, e->cuContext, e->width, e->height, e->format, 0); // no delay
         NV_ENC_INITIALIZE_PARAMS initializeParams = { NV_ENC_INITIALIZE_PARAMS_VER };
         NV_ENC_CONFIG encodeConfig = { NV_ENC_CONFIG_VER };
 
@@ -132,32 +162,40 @@ _exit:
 // to-do: datas, linesizes
 extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32_t linesizes[MAX_DATA_NUM], EncodeCallback callback, void* obj)
 {
-    Encoder *e = (Encoder*)encoder;
-    NvEncoderCuda *pEnc = e->pEnc;
-    CUcontext cuContext = e->cuContext;
-    int ret = -1;
-
-    // to-do: linesizes
-    int len = e->height * (linesizes[0] + (linesizes[1] + 1) / 2);
-    uint8_t *pData = datas[0];
-    if (len == pEnc->GetFrameSize())
+    try
     {
-        std::vector<std::vector<uint8_t>> vPacket;
-        const NvEncInputFrame* encoderInputFrame = pEnc->GetNextInputFrame();
-        NvEncoderCuda::CopyToDeviceFrame(cuContext, pData, 0, (CUdeviceptr)encoderInputFrame->inputPtr,
-            (int)encoderInputFrame->pitch,
-            pEnc->GetEncodeWidth(),
-            pEnc->GetEncodeHeight(),
-            CU_MEMORYTYPE_HOST, 
-            encoderInputFrame->bufferFormat,
-            encoderInputFrame->chromaOffsets,
-            encoderInputFrame->numChromaPlanes);
-        pEnc->EncodeFrame(vPacket);
-        for (std::vector<uint8_t> &packet : vPacket)
+        Encoder *e = (Encoder*)encoder;
+        NvEncoderCuda *pEnc = e->pEnc;
+        CUcontext cuContext = e->cuContext;
+        bool encoded = false;
+
+        // to-do: linesizes
+        int len = e->height * (linesizes[0] + (linesizes[1] + 1) / 2);
+        uint8_t *pData = datas[0];
+        if (len == pEnc->GetFrameSize())
         {
-            callback(packet.data(), packet.size(), 0, 0, obj);
-            ret = 0;
+            std::vector<std::vector<uint8_t>> vPacket;
+            const NvEncInputFrame* encoderInputFrame = pEnc->GetNextInputFrame();
+            NvEncoderCuda::CopyToDeviceFrame(e->cuda_dl, cuContext, pData, 0, (CUdeviceptr)encoderInputFrame->inputPtr,
+                (int)encoderInputFrame->pitch,
+                pEnc->GetEncodeWidth(),
+                pEnc->GetEncodeHeight(),
+                CU_MEMORYTYPE_HOST, 
+                encoderInputFrame->bufferFormat,
+                encoderInputFrame->chromaOffsets,
+                encoderInputFrame->numChromaPlanes);
+            pEnc->EncodeFrame(vPacket);
+            for (std::vector<uint8_t> &packet : vPacket)
+            {
+                callback(packet.data(), packet.size(), 0, 0, obj);
+                encoded = true;
+            }
         }
+        return encoded ? 0 : -1;
     }
-    return ret;
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
 }
