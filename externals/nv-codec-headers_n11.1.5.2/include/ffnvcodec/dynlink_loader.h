@@ -157,6 +157,7 @@ typedef struct CudaFunctions {
     tcuMemcpyAsync *cuMemcpyAsync;
     tcuMemcpy2D_v2 *cuMemcpy2D;
     tcuMemcpy2DAsync_v2 *cuMemcpy2DAsync;
+    tcuMemcpy2DUnaligned *cuMemcpy2DUnaligned;
     tcuMemcpyHtoD_v2 *cuMemcpyHtoD;
     tcuMemcpyHtoDAsync_v2 *cuMemcpyHtoDAsync;
     tcuMemcpyDtoH_v2 *cuMemcpyDtoH;
@@ -320,6 +321,7 @@ static inline int cuda_load_functions(CudaFunctions **functions, void *logctx)
     LOAD_SYMBOL(cuMemcpyAsync, tcuMemcpyAsync, "cuMemcpyAsync");
     LOAD_SYMBOL(cuMemcpy2D, tcuMemcpy2D_v2, "cuMemcpy2D_v2");
     LOAD_SYMBOL(cuMemcpy2DAsync, tcuMemcpy2DAsync_v2, "cuMemcpy2DAsync_v2");
+    LOAD_SYMBOL(cuMemcpy2DUnaligned, tcuMemcpy2DUnaligned, "cuMemcpy2DUnaligned");
     LOAD_SYMBOL(cuMemcpyHtoD, tcuMemcpyHtoD_v2, "cuMemcpyHtoD_v2");
     LOAD_SYMBOL(cuMemcpyHtoDAsync, tcuMemcpyHtoDAsync_v2, "cuMemcpyHtoDAsync_v2");
     LOAD_SYMBOL(cuMemcpyDtoH, tcuMemcpyDtoH_v2, "cuMemcpyDtoH_v2");
