@@ -17,6 +17,7 @@ fn main() {
         codec: CodecID::H264,
         width: 2880,
         height: 1800,
+        gpu: 0,
     };
     let de_ctx = DecodeContext {
         driver: DecodeDriver::AMF,

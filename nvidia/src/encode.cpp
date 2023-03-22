@@ -43,7 +43,7 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
     return 0;
 }
 
-extern "C" void* nvidia_new_encoder(int32_t width, int32_t height, CodecID codecID, PixelFormat nformat, int32_t gpu)
+extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat,CodecID codecID, int32_t width, int32_t height, int32_t gpu)
 {
     Encoder * e = NULL;
     try 

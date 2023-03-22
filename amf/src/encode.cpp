@@ -359,7 +359,7 @@ static bool convert_codec(CodecID lhs, amf_wstring& rhs)
 #include "common.cpp"
 
 extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, CodecID codecID,
-                                int32_t width, int32_t height) 
+                                int32_t width, int32_t height, int32_t gpu) 
 {
     try 
     {

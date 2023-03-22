@@ -3,7 +3,7 @@
 
 #include "../../common/src/callback.h"
 
-void* amf_new_encoder(int32_t device, int32_t format, int32_t codecID, int32_t width, int32_t height);
+void* amf_new_encoder(int32_t device, int32_t format, int32_t codecID, int32_t width, int32_t height, int32_t gpu);
 
 int amf_encode(void *e, uint8_t *data[MAX_DATA_NUM], int32_t linesize[MAX_DATA_NUM], EncodeCallback callback, void* obj);
 

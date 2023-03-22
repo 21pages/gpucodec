@@ -44,6 +44,7 @@ impl Encoder {
                 ctx.codec as i32,
                 ctx.width,
                 ctx.height,
+                ctx.gpu,
             );
             if codec.is_null() {
                 return Err(());
@@ -124,6 +125,7 @@ pub struct EncodeContext {
     pub codec: CodecID,
     pub width: i32,
     pub height: i32,
+    pub gpu: i32,
 }
 
 pub struct EncodeFrame {
