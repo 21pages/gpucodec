@@ -14,7 +14,6 @@
 #include <chrono>
 #include <cmath>
 
-#include "../../../Interface/nvcuvid.h"
 #include "NvDecoder/NvDecoder.h"
 
 #define START_TIMER auto start = std::chrono::high_resolution_clock::now();
@@ -28,11 +27,11 @@
 #define CUDA_DRVAPI_CALL( call )                                                                                                 \
     do                                                                                                                           \
     {                                                                                                                            \
-        CUresult err__ = call;                                                                                                   \
+        CUresult err__ = m_cudl->call;                                                                                                   \
         if (err__ != CUDA_SUCCESS)                                                                                               \
         {                                                                                                                        \
             const char *szErrName = NULL;                                                                                        \
-            cuGetErrorName(err__, &szErrName);                                                                                   \
+            m_cudl->cuGetErrorName(err__, &szErrName);                                                                                   \
             std::ostringstream errorLog;                                                                                         \
             errorLog << "CUDA driver API error " << szErrName ;                                                                  \
             throw NVDECException::makeNVDECException(errorLog.str(), err__, __FUNCTION__, __FILE__, __LINE__);                   \
@@ -548,7 +547,7 @@ int NvDecoder::HandlePictureDisplay(CUVIDPARSERDISPINFO *pDispInfo) {
 
     CUVIDGETDECODESTATUS DecodeStatus;
     memset(&DecodeStatus, 0, sizeof(DecodeStatus));
-    CUresult result = cuvidGetDecodeStatus(m_hDecoder, pDispInfo->picture_index, &DecodeStatus);
+    CUresult result = m_cvdl->cuvidGetDecodeStatus(m_hDecoder, pDispInfo->picture_index, &DecodeStatus);
     if (result == CUDA_SUCCESS && (DecodeStatus.decodeStatus == cuvidDecodeStatus_Error || DecodeStatus.decodeStatus == cuvidDecodeStatus_Error_Concealed))
     {
         printf("Decode Error occurred for picture %d\n", m_nPicNumInDecodeOrder[pDispInfo->picture_index]);
@@ -620,11 +619,11 @@ int NvDecoder::HandlePictureDisplay(CUVIDPARSERDISPINFO *pDispInfo) {
     return 1;
 }
 
-NvDecoder::NvDecoder(CUcontext cuContext, bool bUseDeviceFrame, cudaVideoCodec eCodec, bool bLowLatency, 
+NvDecoder::NvDecoder(CudaFunctions *cudl, CuvidFunctions *cvdl, CUcontext cuContext, bool bUseDeviceFrame, cudaVideoCodec eCodec, bool bLowLatency, 
     bool bDeviceFramePitched, const Rect *pCropRect, const Dim *pResizeDim, int maxWidth, int maxHeight, unsigned int clkRate,
     bool force_zero_latency) :
     m_cuContext(cuContext), m_bUseDeviceFrame(bUseDeviceFrame), m_eCodec(eCodec), m_bDeviceFramePitched(bDeviceFramePitched),
-    m_nMaxWidth (maxWidth), m_nMaxHeight(maxHeight), m_bForce_zero_latency(force_zero_latency)
+    m_nMaxWidth (maxWidth), m_nMaxHeight(maxHeight), m_bForce_zero_latency(force_zero_latency), m_cudl(cudl), m_cvdl(cvdl)
 {
     if (pCropRect) m_cropRect = *pCropRect;
     if (pResizeDim) m_resizeDim = *pResizeDim;
@@ -651,11 +650,11 @@ NvDecoder::~NvDecoder() {
     START_TIMER
 
     if (m_hParser) {
-        cuvidDestroyVideoParser(m_hParser);
+        m_cvdl->cuvidDestroyVideoParser(m_hParser);
     }
-    cuCtxPushCurrent(m_cuContext);
+    m_cudl->cuCtxPushCurrent(m_cuContext);
     if (m_hDecoder) {
-        cuvidDestroyDecoder(m_hDecoder);
+        m_cvdl->cuvidDestroyDecoder(m_hDecoder);
     }
 
     std::lock_guard<std::mutex> lock(m_mtxVPFrame);
@@ -664,16 +663,16 @@ NvDecoder::~NvDecoder() {
     {
         if (m_bUseDeviceFrame)
         {
-            cuMemFree((CUdeviceptr)pFrame);
+            m_cudl->cuMemFree((CUdeviceptr)pFrame);
         }
         else
         {
             delete[] pFrame;
         }
     }
-    cuCtxPopCurrent(NULL);
+    m_cudl->cuCtxPopCurrent(NULL);
 
-    cuvidCtxLockDestroy(m_ctxLock);
+    m_cvdl->cuvidCtxLockDestroy(m_ctxLock);
 
     STOP_TIMER("Session Deinitialization Time: ");
 

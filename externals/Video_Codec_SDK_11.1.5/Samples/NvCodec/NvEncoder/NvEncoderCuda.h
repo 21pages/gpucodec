@@ -14,17 +14,18 @@
 #include <vector>
 #include <stdint.h>
 #include <mutex>
-#include <cuda.h>
+#include <dynlink_cuda.h>
+#include <dynlink_loader.h>
 #include "NvEncoder.h"
 
 #define CUDA_DRVAPI_CALL( call )                                                                                                 \
     do                                                                                                                           \
     {                                                                                                                            \
-        CUresult err__ = call;                                                                                                   \
+        CUresult err__ = m_cuda_dl->call;                                                                                                   \
         if (err__ != CUDA_SUCCESS)                                                                                               \
         {                                                                                                                        \
             const char *szErrName = NULL;                                                                                        \
-            cuGetErrorName(err__, &szErrName);                                                                                   \
+            m_cuda_dl->cuGetErrorName(err__, &szErrName);                                                                                   \
             std::ostringstream errorLog;                                                                                         \
             errorLog << "CUDA driver API error " << szErrName ;                                                                  \
             throw NVENCException::makeNVENCException(errorLog.str(), NV_ENC_ERR_GENERIC, __FUNCTION__, __FILE__, __LINE__);      \
@@ -38,7 +39,7 @@
 class NvEncoderCuda : public NvEncoder
 {
 public:
-    NvEncoderCuda(CUcontext cuContext, uint32_t nWidth, uint32_t nHeight, NV_ENC_BUFFER_FORMAT eBufferFormat,
+    NvEncoderCuda(CudaFunctions *cuda_dl, NvencFunctions *nvenc_dl, CUcontext cuContext, uint32_t nWidth, uint32_t nHeight, NV_ENC_BUFFER_FORMAT eBufferFormat,
         uint32_t nExtraOutputDelay = 3, bool bMotionEstimationOnly = false, bool bOPInVideoMemory = false);
     virtual ~NvEncoderCuda();
 
@@ -46,7 +47,7 @@ public:
     *  @brief This is a static function to copy input data from host memory to device memory.
     *  This function assumes YUV plane is a single contiguous memory segment.
     */
-    static void CopyToDeviceFrame(CUcontext device,
+    static void CopyToDeviceFrame(CudaFunctions *m_cuda_dl, CUcontext device,
         void* pSrcFrame,
         uint32_t nSrcPitch,
         CUdeviceptr pDstFrame,
@@ -64,7 +65,7 @@ public:
     *  @brief This is a static function to copy input data from host memory to device memory.
     *  Application must pass a seperate device pointer for each YUV plane.
     */
-    static void CopyToDeviceFrame(CUcontext device,
+    static void CopyToDeviceFrame(CudaFunctions *m_cuda_dl, CUcontext device,
         void* pSrcFrame,
         uint32_t nSrcPitch,
         CUdeviceptr pDstFrame,
@@ -108,4 +109,5 @@ protected:
 
 private:
     size_t m_cudaPitch = 0;
+    CudaFunctions *m_cuda_dl = NULL;
 };

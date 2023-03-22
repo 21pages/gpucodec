@@ -19,6 +19,7 @@
 #include <iostream>
 #include <sstream>
 #include <string.h>
+#include "dynlink_loader.h"
 
 /**
 * @brief Exception class for error reporting from NvEncodeAPI calls.
@@ -259,7 +260,7 @@ protected:
     *  @brief  NvEncoder class constructor.
     *  NvEncoder class constructor cannot be called directly by the application.
     */
-    NvEncoder(NV_ENC_DEVICE_TYPE eDeviceType, void *pDevice, uint32_t nWidth, uint32_t nHeight,
+    NvEncoder(NvencFunctions *nvenc_dl, NV_ENC_DEVICE_TYPE eDeviceType, void *pDevice, uint32_t nWidth, uint32_t nHeight,
         NV_ENC_BUFFER_FORMAT eBufferFormat, uint32_t nOutputDelay, bool bMotionEstimationOnly, bool bOutputInVideoMemory = false, bool bDX12Encode = false);
 
     /**
@@ -426,6 +427,7 @@ protected:
     int32_t m_nOutputDelay = 0;
 
 private:
+    NvencFunctions *m_nvenc_dl = NULL;
     uint32_t m_nWidth;
     uint32_t m_nHeight;
     NV_ENC_BUFFER_FORMAT m_eBufferFormat;

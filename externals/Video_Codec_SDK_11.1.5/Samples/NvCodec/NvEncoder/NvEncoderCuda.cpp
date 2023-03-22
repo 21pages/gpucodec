@@ -12,10 +12,11 @@
 #include "NvEncoder/NvEncoderCuda.h"
 
 
-NvEncoderCuda::NvEncoderCuda(CUcontext cuContext, uint32_t nWidth, uint32_t nHeight, NV_ENC_BUFFER_FORMAT eBufferFormat,
+NvEncoderCuda::NvEncoderCuda(CudaFunctions *cuda_dl, NvencFunctions *nvenc_dl, CUcontext cuContext, uint32_t nWidth, uint32_t nHeight, NV_ENC_BUFFER_FORMAT eBufferFormat,
     uint32_t nExtraOutputDelay, bool bMotionEstimationOnly, bool bOutputInVideoMemory):
-    NvEncoder(NV_ENC_DEVICE_TYPE_CUDA, cuContext, nWidth, nHeight, eBufferFormat, nExtraOutputDelay, bMotionEstimationOnly, bOutputInVideoMemory),
-    m_cuContext(cuContext)
+    NvEncoder(nvenc_dl, NV_ENC_DEVICE_TYPE_CUDA, cuContext, nWidth, nHeight, eBufferFormat, nExtraOutputDelay, bMotionEstimationOnly, bOutputInVideoMemory),
+    m_cuContext(cuContext),
+    m_cuda_dl(cuda_dl)
 {
     if (!m_hEncoder) 
     {
@@ -95,13 +96,13 @@ void NvEncoderCuda::ReleaseCudaResources()
 
     UnregisterInputResources();
 
-    cuCtxPushCurrent(m_cuContext);
+    m_cuda_dl->cuCtxPushCurrent(m_cuContext);
 
     for (uint32_t i = 0; i < m_vInputFrames.size(); ++i)
     {
         if (m_vInputFrames[i].inputPtr)
         {
-            cuMemFree(reinterpret_cast<CUdeviceptr>(m_vInputFrames[i].inputPtr));
+            m_cuda_dl->cuMemFree(reinterpret_cast<CUdeviceptr>(m_vInputFrames[i].inputPtr));
         }
     }
     m_vInputFrames.clear();
@@ -110,16 +111,16 @@ void NvEncoderCuda::ReleaseCudaResources()
     {
         if (m_vReferenceFrames[i].inputPtr)
         {
-            cuMemFree(reinterpret_cast<CUdeviceptr>(m_vReferenceFrames[i].inputPtr));
+            m_cuda_dl->cuMemFree(reinterpret_cast<CUdeviceptr>(m_vReferenceFrames[i].inputPtr));
         }
     }
     m_vReferenceFrames.clear();
 
-    cuCtxPopCurrent(NULL);
+    m_cuda_dl->cuCtxPopCurrent(NULL);
     m_cuContext = nullptr;
 }
 
-void NvEncoderCuda::CopyToDeviceFrame(CUcontext device,
+void NvEncoderCuda::CopyToDeviceFrame(CudaFunctions *m_cuda_dl, CUcontext device,
     void* pSrcFrame,
     uint32_t nSrcPitch,
     CUdeviceptr pDstFrame,
@@ -163,7 +164,14 @@ void NvEncoderCuda::CopyToDeviceFrame(CUcontext device,
     }
     else
     {
-        CUDA_DRVAPI_CALL(stream == NULL? cuMemcpy2D(&m) : cuMemcpy2DAsync(&m, stream));
+        if(stream == NULL)
+        {
+            CUDA_DRVAPI_CALL(cuMemcpy2D(&m));
+        }
+        else
+        {
+            CUDA_DRVAPI_CALL(cuMemcpy2DAsync(&m, stream));
+        }
     }
 
     std::vector<uint32_t> srcChromaOffsets;
@@ -197,14 +205,21 @@ void NvEncoderCuda::CopyToDeviceFrame(CUcontext device,
             }
             else
             {
-                CUDA_DRVAPI_CALL(stream == NULL? cuMemcpy2D(&m) : cuMemcpy2DAsync(&m, stream));
+                if (stream == NULL)
+                {
+                    CUDA_DRVAPI_CALL(cuMemcpy2D(&m));
+                }
+                else
+                {
+                    CUDA_DRVAPI_CALL(cuMemcpy2DAsync(&m, stream));
+                }
             }
         }
     }
     CUDA_DRVAPI_CALL(cuCtxPopCurrent(NULL));
 }
 
-void NvEncoderCuda::CopyToDeviceFrame(CUcontext device,
+void NvEncoderCuda::CopyToDeviceFrame(CudaFunctions *m_cuda_dl, CUcontext device,
     void* pSrcFrame,
     uint32_t nSrcPitch,
     CUdeviceptr pDstFrame,

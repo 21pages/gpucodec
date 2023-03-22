@@ -22,8 +22,9 @@ static inline bool operator!=(const GUID &guid1, const GUID &guid2) {
 }
 #endif
 
-NvEncoder::NvEncoder(NV_ENC_DEVICE_TYPE eDeviceType, void *pDevice, uint32_t nWidth, uint32_t nHeight, NV_ENC_BUFFER_FORMAT eBufferFormat,
+NvEncoder::NvEncoder(NvencFunctions *nvenc_dl, NV_ENC_DEVICE_TYPE eDeviceType, void *pDevice, uint32_t nWidth, uint32_t nHeight, NV_ENC_BUFFER_FORMAT eBufferFormat,
                             uint32_t nExtraOutputDelay, bool bMotionEstimationOnly, bool bOutputInVideoMemory, bool bDX12Encode) :
+    m_nvenc_dl(nvenc_dl),
     m_pDevice(pDevice), 
     m_eDeviceType(eDeviceType),
     m_nWidth(nWidth),
@@ -59,7 +60,7 @@ void NvEncoder::LoadNvEncApi()
 
     uint32_t version = 0;
     uint32_t currentVersion = (NVENCAPI_MAJOR_VERSION << 4) | NVENCAPI_MINOR_VERSION;
-    NVENC_API_CALL(NvEncodeAPIGetMaxSupportedVersion(&version));
+    NVENC_API_CALL(m_nvenc_dl->NvEncodeAPIGetMaxSupportedVersion(&version));
     if (currentVersion > version)
     {
         NVENC_THROW_ERROR("Current Driver Version does not support this NvEncodeAPI version, please upgrade driver", NV_ENC_ERR_INVALID_VERSION);
@@ -67,7 +68,7 @@ void NvEncoder::LoadNvEncApi()
 
 
     m_nvenc = { NV_ENCODE_API_FUNCTION_LIST_VER };
-    NVENC_API_CALL(NvEncodeAPICreateInstance(&m_nvenc));
+    NVENC_API_CALL(m_nvenc_dl->NvEncodeAPICreateInstance(&m_nvenc));
 }
 
 NvEncoder::~NvEncoder()

@@ -19,7 +19,9 @@
 #include <iostream>
 #include <sstream>
 #include <string.h>
-#include "../../../Interface/nvcuvid.h"
+#include <dynlink_cuda.h>
+#include <dynlink_nvcuvid.h>
+#include <dynlink_loader.h>
 #include "../Utils/NvCodecUtils.h"
 #include <map>
 
@@ -62,7 +64,7 @@ inline NVDECException NVDECException::makeNVDECException(const std::string& erro
 #define NVDEC_API_CALL( cuvidAPI )                                                                                 \
     do                                                                                                             \
     {                                                                                                              \
-        CUresult errorCode = cuvidAPI;                                                                             \
+        CUresult errorCode = m_cvdl->cuvidAPI;                                                                             \
         if( errorCode != CUDA_SUCCESS)                                                                             \
         {                                                                                                          \
             std::ostringstream errorLog;                                                                           \
@@ -90,7 +92,7 @@ public:
     *  Application must call this function to initialize the decoder, before
     *  starting to decode any frames.
     */
-    NvDecoder(CUcontext cuContext, bool bUseDeviceFrame, cudaVideoCodec eCodec, bool bLowLatency = false,
+    NvDecoder(CudaFunctions *cudl, CuvidFunctions *cvdl, CUcontext cuContext, bool bUseDeviceFrame, cudaVideoCodec eCodec, bool bLowLatency = false,
               bool bDeviceFramePitched = false, const Rect *pCropRect = NULL, const Dim *pResizeDim = NULL,
               int maxWidth = 0, int maxHeight = 0, unsigned int clkRate = 1000, bool force_zero_latency = false);
     ~NvDecoder();
@@ -288,6 +290,8 @@ private:
     int ReconfigureDecoder(CUVIDEOFORMAT *pVideoFormat);
 
 private:
+    CudaFunctions *m_cudl = NULL;
+    CuvidFunctions *m_cvdl = NULL;
     CUcontext m_cuContext = NULL;
     CUvideoctxlock m_ctxLock;
     CUvideoparser m_hParser = NULL;
