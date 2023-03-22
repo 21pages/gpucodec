@@ -29,31 +29,6 @@ fn main() {
     #[cfg(target_os = "linux")]
     println!("cargo:rustc-link-lib=stdc++");
 
-    // cuda
-    #[cfg(windows)]
-    {
-        let cuda_path = externals_dir.join("CUDA").join("win_v11.6");
-        #[cfg(target_arch = "x86_64")]
-        let arch_dir = "x64";
-        #[cfg(target_arch = "x86")]
-        let arch_dir = "Win32";
-        println!(
-            "cargo:rustc-link-search={}",
-            cuda_path.join("lib").join(arch_dir).display()
-        );
-        println!("cargo:rustc-link-lib=static=cudart_static");
-    }
-    #[cfg(target_os = "linux")]
-    {
-        let cuda_path = externals_dir.join("CUDA").join("linux_v11.6");
-        builder.include(cuda_path.join("include"));
-        println!(
-            "cargo:rustc-link-search={}",
-            cuda_path.join("lib64").display()
-        );
-        println!("cargo:rustc-link-lib=static=cudart_static");
-    }
-
     // ffnvcodec
     let ffnvcodec_path = externals_dir
         .join("nv-codec-headers_n11.1.5.2")
