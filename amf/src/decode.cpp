@@ -33,11 +33,6 @@ public:
     {
         init_result = initialize();
     }
-    
-    ~Decoder()
-    {
-        AMFTraceDebug(AMF_FACILITY, L"~Decoder()");
-    }
 
     AMF_RESULT decode(uint8_t *iData, uint32_t iDataSize, DecodeCallback callback, void *obj)
     {
@@ -127,9 +122,13 @@ private:
         AMF_RESULT res;
 
         res = m_AMFFactory.Init();
-        AMF_RETURN_IF_FAILED(res, L"AMF Failed to initialize");
-
-        m_AMFFactory.GetTrace()->SetWriterLevel(AMF_TRACE_WRITER_DEBUG_OUTPUT, AMF_TRACE_TRACE);
+        if (res != AMF_OK) {
+            std::cerr << "AMF init failed, error code = " <<  res << "\n";
+            return res;
+        }
+        amf::AMFSetCustomTracer(m_AMFFactory.GetTrace());
+        amf::AMFTraceEnableWriter(AMF_TRACE_WRITER_CONSOLE, true);
+        amf::AMFTraceSetWriterLevel(AMF_TRACE_WRITER_CONSOLE, AMF_TRACE_TRACE);
 
         res = m_AMFFactory.GetFactory()->CreateContext(&m_AMFContext); 
         AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateContext");
@@ -204,7 +203,7 @@ static bool convert_codec(CodecID lhs, amf_wstring& rhs)
         rhs = AMFVideoDecoderHW_AV1;
         break;
     default:
-        AMFTraceError(AMF_FACILITY, L"unknown codec: %d\n", lhs);
+        std::cerr << "unsupported codec: " << lhs << "\n";
         return false;
     }
     return true;

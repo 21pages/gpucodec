@@ -92,10 +92,6 @@ public:
         init_result = initialize();
     }
 
-    ~Encoder() {
-        AMFTraceDebug(AMF_FACILITY, L"~Encoder()\n");
-    }
-
     AMF_RESULT encode(struct encoder_frame* frame, EncodeCallback callback, void* obj)
     {
         amf::AMFSurfacePtr surface = NULL;
@@ -200,9 +196,14 @@ private:
         AMF_RESULT res;
         
         res = m_AMFFactory.Init();
-        AMF_RETURN_IF_FAILED(res, L"AMF Failed to initialize");
+        if (res != AMF_OK) {
+            std::cerr << "AMF init failed, error code = " <<  res << "\n";
+            return res;
+        }
+        amf::AMFSetCustomTracer(m_AMFFactory.GetTrace());
         amf::AMFTraceEnableWriter(AMF_TRACE_WRITER_CONSOLE, true);
-        amf::AMFTraceEnableWriter(AMF_TRACE_WRITER_DEBUG_OUTPUT, true);
+        amf::AMFTraceSetWriterLevel(AMF_TRACE_WRITER_CONSOLE, AMF_TRACE_TRACE);
+
         // m_AMFContext
         res = m_AMFFactory.GetFactory()->CreateContext(&m_AMFContext);
         AMF_RETURN_IF_FAILED(res, L"CreateContext() failed");
@@ -350,7 +351,7 @@ static bool convert_codec(CodecID lhs, amf_wstring& rhs)
         rhs = AMFVideoEncoder_AV1;
         break;
     default:
-        AMFTraceError(AMF_FACILITY, L"unknown codec: %d\n", lhs);
+        std::cerr << "unsupported codec: " << lhs << "\n";
         return false;
     }
     return true;
@@ -380,7 +381,6 @@ extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, CodecI
         }
         Encoder *enc = new Encoder(memoryType, surfaceFormat, codecStr, width, height);
         if (enc && enc->init_result != AMF_OK) {
-            AMFTraceError(AMF_FACILITY, L"init error code:%d",  enc->init_result);
             enc->destroy();
             delete enc;
             enc = NULL;

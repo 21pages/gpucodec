@@ -31,7 +31,7 @@ static bool convert_device(HWDeviceType lhs, amf::AMF_MEMORY_TYPE& rhs)
         rhs = amf::AMF_MEMORY_VULKAN;
         break;
     default:
-        AMFTraceError(AMF_FACILITY, L"unknown memory type: %d\n", lhs);
+        std::cerr << "unsupported memory type: " << lhs << "\n";
         return false;
     }
     return true;
@@ -48,7 +48,7 @@ static bool convert_format(PixelFormat lhs, amf::AMF_SURFACE_FORMAT& rhs)
         rhs = amf::AMF_SURFACE_YUV420P;
         break;
     default:
-        AMFTraceError(AMF_FACILITY, L"unknown format: %d\n", lhs);
+        std::cerr << "unsupported format: " << lhs << "\n";
         return false;
     }
     return true;

@@ -50,5 +50,3 @@ fn main() {
         .cpp(false)
         .compile("amf");
 }
-
-// https://www.amd.com/en/support/linux-drivers
