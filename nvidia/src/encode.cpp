@@ -142,6 +142,7 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat,Cod
         initializeParams.encodeConfig->rcParams.lookaheadDepth = 0;
 
         e->pEnc->CreateEncoder(&initializeParams);
+        return e;
     }
     catch (const std::exception &ex)
     {
@@ -149,7 +150,6 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat,Cod
         goto _exit;
     }
     
-    return e;
 _exit:
     if (e)
     {
