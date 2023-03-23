@@ -112,7 +112,8 @@ public:
 
         if (m_AMFCompute != NULL)
         {
-            m_AMFCompute->PutSyncPoint(&pSyncPoint);
+            res = m_AMFCompute->PutSyncPoint(&pSyncPoint);
+            AMF_RETURN_IF_FAILED(res, L"PutSyncPoint() failed");
         }
 
         // copy data
