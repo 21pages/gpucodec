@@ -96,7 +96,7 @@ public:
     AMF_RESULT encode(struct encoder_frame* frame, EncodeCallback callback, void* obj)
     {
         amf::AMFSurfacePtr surface = NULL;
-        amf::AMFComputeSyncPointPtr pSyncPoint;
+        amf::AMFComputeSyncPointPtr pSyncPoint = NULL;
         AMF_RESULT res;
         bool encoded = false;
 
@@ -186,6 +186,10 @@ public:
 
     AMF_RESULT destroy()
     {
+        if (m_AMFCompute)
+        {
+            m_AMFCompute = NULL;
+        }
         if (m_AMFEncoder)
         {
             m_AMFEncoder->Terminate();
