@@ -453,3 +453,22 @@ extern "C" int amf_destroy_encoder(void *e)
     }
     return -1;
 }
+
+extern "C" int amf_driver_support()
+{
+    try
+    {
+        AMFFactoryHelper factory;        
+        AMF_RESULT res = factory.Init();
+        if (res == AMF_OK)
+        {
+            factory.Terminate();
+            return 0;
+        }
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
+}

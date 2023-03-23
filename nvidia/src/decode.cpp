@@ -7,24 +7,49 @@
 #include "common.h"
 #include "callback.h"
 
-static bool codecID_to_cuCodecID(CodecID codecID, cudaVideoCodec &cuda)
+static void load_driver(CudaFunctions **pp_cudl, CuvidFunctions **pp_cvdl)
 {
-    switch (codecID)
+    if (cuda_load_functions(pp_cudl, NULL) < 0)
     {
-    case H264:
-        cuda = cudaVideoCodec_H264;
-        break;
-    case HEVC:
-        cuda = cudaVideoCodec_HEVC;
-        break;
-    case AV1:
-        cuda = cudaVideoCodec_AV1;
-        break;
-    default:
-        return false;
+        NVDEC_THROW_ERROR("cuda_load_functions failed", CUDA_ERROR_UNKNOWN);
     }
-    return true;
+    if (cuvid_load_functions(pp_cvdl, NULL) < 0)
+    {
+        NVDEC_THROW_ERROR("cuvid_load_functions failed", CUDA_ERROR_UNKNOWN);
+    }
 }
+
+static void free_driver(CudaFunctions **pp_cudl, CuvidFunctions **pp_cvdl)
+{
+    if (*pp_cvdl)
+    {
+        cuvid_free_functions(pp_cvdl);
+        *pp_cvdl = NULL;
+    }
+    if (*pp_cudl)
+    {
+        cuda_free_functions(pp_cudl);
+        *pp_cudl = NULL;
+    }
+}
+
+extern "C" int nvidia_decode_driver_support()
+{
+    try
+    {
+        CudaFunctions *cudl = NULL;
+        CuvidFunctions *cvdl = NULL;
+        load_driver(&cudl, &cvdl);
+        free_driver(&cudl, &cvdl);
+        return 0;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
+}
+
 
 struct Decoder
 {
@@ -35,14 +60,7 @@ struct Decoder
 
     Decoder()
     {
-        if (cuda_load_functions(&cudl, NULL) < 0)
-        {
-            NVDEC_THROW_ERROR("cuda_load_functions failed", CUDA_ERROR_UNKNOWN);
-        }
-        if (cuvid_load_functions(&cvdl, NULL) < 0)
-        {
-            NVDEC_THROW_ERROR("cuvid_load_functions failed", CUDA_ERROR_UNKNOWN);
-        }
+        load_driver(&cudl, &cvdl);
     }
 };
 
@@ -61,14 +79,7 @@ extern "C" int nvidia_destroy_decoder(void* decoder)
             {
                 p->cudl->cuCtxDestroy(p->cuContext);
             }
-            if (p->cvdl)
-            {
-                cuvid_free_functions(&p->cvdl);
-            }
-            if (p->cudl)
-            {
-                cuda_free_functions(&p->cudl);
-            }
+            free_driver(&p->cudl, &p->cvdl);
         }
         return 0;
     }
@@ -77,6 +88,25 @@ extern "C" int nvidia_destroy_decoder(void* decoder)
         std::cerr << e.what() << '\n';
     }
     return -1;
+}
+
+static bool codecID_to_cuCodecID(CodecID codecID, cudaVideoCodec &cuda)
+{
+    switch (codecID)
+    {
+    case H264:
+        cuda = cudaVideoCodec_H264;
+        break;
+    case HEVC:
+        cuda = cudaVideoCodec_HEVC;
+        break;
+    case AV1:
+        cuda = cudaVideoCodec_AV1;
+        break;
+    default:
+        return false;
+    }
+    return true;
 }
 
 extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, CodecID codecID, int32_t iGpu) 

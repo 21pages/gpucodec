@@ -12,6 +12,50 @@
 #include "callback.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
+
+static void load_driver(CudaFunctions **pp_cuda_dl, NvencFunctions **pp_nvenc_dl)
+{
+    if (cuda_load_functions(pp_cuda_dl, NULL) < 0)
+    {
+        NVENC_THROW_ERROR("cuda_load_functions failed", NV_ENC_ERR_GENERIC);
+    }
+    if (nvenc_load_functions(pp_nvenc_dl, NULL) < 0)
+    {
+        NVENC_THROW_ERROR("nvenc_load_functions failed", NV_ENC_ERR_GENERIC);
+    }
+}
+
+static void free_driver(CudaFunctions **pp_cuda_dl, NvencFunctions **pp_nvenc_dl)
+{
+    if (*pp_nvenc_dl)
+    {
+        nvenc_free_functions(pp_nvenc_dl);
+        *pp_nvenc_dl = NULL;
+    }
+    if (*pp_cuda_dl)
+    {
+        cuda_free_functions(pp_cuda_dl);
+        *pp_cuda_dl = NULL;
+    }
+}
+
+extern "C" int nvidia_encode_driver_support()
+{
+    try
+    {
+        CudaFunctions *cuda_dl = NULL;
+        NvencFunctions *nvenc_dl = NULL;
+        load_driver(&cuda_dl, &nvenc_dl);
+        free_driver(&cuda_dl, &nvenc_dl);
+        return 0;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
+}
+
 struct Encoder
 {
     CudaFunctions *cuda_dl = NULL;
@@ -27,14 +71,7 @@ struct Encoder
     Encoder(int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format, int32_t gpu):
         width(width), height(height), format(format), gpu(gpu)
     {
-        if (cuda_load_functions(&cuda_dl, NULL) < 0)
-        {
-            NVENC_THROW_ERROR("cuda_load_functions failed", NV_ENC_ERR_GENERIC);
-        }
-        if (nvenc_load_functions(&nvenc_dl, NULL) < 0)
-        {
-            NVENC_THROW_ERROR("nvenc_load_functions failed", NV_ENC_ERR_GENERIC);
-        }
+        load_driver(&cuda_dl, &nvenc_dl);
     }
 };
 
@@ -54,15 +91,7 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
             {
                 e->cuda_dl->cuCtxDestroy(e->cuContext);
             }
-            if (e->nvenc_dl)
-            {
-                nvenc_free_functions(&e->nvenc_dl);
-            }
-            if (e->cuda_dl)
-            {
-                cuda_free_functions(&e->cuda_dl);
-            }
-
+            free_driver(&e->cuda_dl, &e->nvenc_dl);
         }
         return 0;
     }
