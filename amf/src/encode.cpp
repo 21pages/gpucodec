@@ -87,8 +87,8 @@ public:
     Encoder(amf::AMF_MEMORY_TYPE memoryType, amf::AMF_SURFACE_FORMAT surfaceFormat, amf_wstring codec, int32_t width, int32_t height):
         m_AMFMemoryType(memoryType),
         m_AMFSurfaceFormat(surfaceFormat), 
-        m_codec(codec),
-        m_Resolution(width, height) 
+        m_Resolution(width, height),
+        m_codec(codec)
     {
         init_result = initialize();
     }
@@ -170,9 +170,9 @@ public:
                 amf::AMFBufferPtr pBuffer   = amf::AMFBufferPtr(data);
                 struct encoder_packet packet;
                 packet.size = pBuffer->GetSize();
-                if (m_PacketDataBuffer.size() != packet.size) {
+                if (m_PacketDataBuffer.size() < packet.size) {
                     size_t newBufferSize = (size_t)exp2(ceil(log2((double)packet.size)));
-                    m_PacketDataBuffer.resize(packet.size);
+                    m_PacketDataBuffer.resize(newBufferSize);
                 }
                 packet.data = m_PacketDataBuffer.data();
                 std::memcpy(packet.data, pBuffer->GetNative(), packet.size);

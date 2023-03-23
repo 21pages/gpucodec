@@ -107,6 +107,7 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat,Cod
     Encoder * e = NULL;
     try 
     {
+        (void)device;
         if (nformat != NV12)
         {
             goto _exit;

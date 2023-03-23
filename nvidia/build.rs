@@ -71,5 +71,6 @@ fn main() {
         .file("src/encode.cpp")
         .file("src/decode.cpp")
         .cpp(false)
+        .warnings(false)
         .compile("nvidia");
 }

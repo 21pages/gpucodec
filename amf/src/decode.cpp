@@ -215,6 +215,7 @@ extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, CodecI
 {
     try
     {
+        (void)iGpu;
         amf_wstring codecStr;
         if (!convert_codec(codecID, codecStr))
         {

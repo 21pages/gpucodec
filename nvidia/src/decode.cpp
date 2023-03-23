@@ -114,6 +114,7 @@ extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, Cod
     Decoder *p = NULL;
     try
     {
+        (void)device;
         p = new Decoder();
         if (!p)
         {
