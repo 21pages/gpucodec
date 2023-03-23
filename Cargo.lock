@@ -122,7 +122,10 @@ name = "codec"
 version = "0.1.0"
 dependencies = [
  "amf",
+ "bindgen",
+ "cc",
  "common",
+ "env_logger",
  "log",
  "nvidia",
 ]

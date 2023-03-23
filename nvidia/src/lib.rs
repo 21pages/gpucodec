@@ -4,7 +4,7 @@
 
 include!(concat!(env!("OUT_DIR"), "/nvidia_ffi.rs"));
 
-use common::{DecodeCalls, EncodeCalls, InnerEncodeContext};
+use common::{DecodeCalls, EncodeCalls, InnerDecodeContext, InnerEncodeContext};
 
 pub fn encode_calls() -> EncodeCalls {
     EncodeCalls {
@@ -23,6 +23,13 @@ pub fn decode_calls() -> DecodeCalls {
 }
 
 pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
+    if unsafe { nvidia_encode_driver_support() } != 0 {
+        return vec![];
+    }
+    vec![]
+}
+
+pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
     if unsafe { nvidia_encode_driver_support() } != 0 {
         return vec![];
     }

@@ -4,7 +4,9 @@
 
 include!(concat!(env!("OUT_DIR"), "/amf_ffi.rs"));
 
-use common::{CodecID::*, DecodeCalls, EncodeCalls, HWDeviceType::*, InnerEncodeContext};
+use common::{
+    CodecID::*, DecodeCalls, EncodeCalls, HWDeviceType::*, InnerDecodeContext, InnerEncodeContext,
+};
 
 pub fn encode_calls() -> EncodeCalls {
     EncodeCalls {
@@ -29,15 +31,38 @@ pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
     }
     let mut devices = vec![];
     #[cfg(windows)]
-    devices.push(DX11);
+    devices.append(&mut vec![DX9, DX11, OPENCL]);
     #[cfg(target_os = "linux")]
-    devices.push(VULKAN);
+    devices.append(&mut vec![VULKAN]);
     let codecs = vec![H264, HEVC];
 
     let mut v = vec![];
     for device in devices.iter() {
         for codec in codecs.iter() {
             v.push(InnerEncodeContext {
+                device: device.clone(),
+                codec: codec.clone(),
+            });
+        }
+    }
+    v
+}
+
+pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
+    if unsafe { amf_driver_support() } != 0 {
+        return vec![];
+    }
+    let mut devices = vec![];
+    #[cfg(windows)]
+    devices.append(&mut vec![DX9, DX11, DX12, OPENCL, OPENGL, VULKAN]);
+    #[cfg(target_os = "linux")]
+    devices.append(&mut vec![VULKAN]);
+    let codecs = vec![H264, HEVC];
+
+    let mut v = vec![];
+    for device in devices.iter() {
+        for codec in codecs.iter() {
+            v.push(InnerDecodeContext {
                 device: device.clone(),
                 codec: codec.clone(),
             });

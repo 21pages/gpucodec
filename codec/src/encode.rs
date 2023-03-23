@@ -141,21 +141,22 @@ impl Display for EncodeFrame {
     }
 }
 
-pub fn available_encoders() -> Vec<EncodeContext> {
+pub fn available() -> Vec<EncodeContext> {
     use std::sync::Once;
     static mut CACHED: Vec<EncodeContext> = vec![];
     static ONCE: Once = Once::new();
     ONCE.call_once(|| unsafe {
-        CACHED = available_encoders_();
+        CACHED = available_();
     });
     unsafe { CACHED.clone() }
 }
 
-fn available_encoders_() -> Vec<EncodeContext> {
+fn available_() -> Vec<EncodeContext> {
     // to-do: disable log
     let width = 1920;
     let height = 1080;
     let gpu = 0;
+    let format = NV12;
     let mut natives: Vec<_> = nvidia::possible_support_encoders()
         .drain(..)
         .map(|n| (NVENC, n))
@@ -169,16 +170,13 @@ fn available_encoders_() -> Vec<EncodeContext> {
     let inputs = natives.drain(..).map(|(driver, n)| EncodeContext {
         driver,
         device: n.device,
-        format: NV12,
+        format,
         codec: n.codec,
         width,
         height,
         gpu,
     });
-
-    let infos = Arc::new(Mutex::new(Vec::<EncodeContext>::new()));
-    let mut res = vec![];
-
+    let outputs = Arc::new(Mutex::new(Vec::<EncodeContext>::new()));
     let start = Instant::now();
     if let Ok(yuv) = dummy_yuv(width, height) {
         log::debug!("prepare yuv {:?}", start.elapsed());
@@ -186,7 +184,7 @@ fn available_encoders_() -> Vec<EncodeContext> {
         let mut handles = vec![];
         for input in inputs {
             let yuv = yuv.clone();
-            let infos = infos.clone();
+            let outputs = outputs.clone();
             let handle = thread::spawn(move || {
                 let mut linesizes = vec![1920, 1920];
                 linesizes.resize(8, 0);
@@ -200,7 +198,7 @@ fn available_encoders_() -> Vec<EncodeContext> {
                     let start = Instant::now();
                     if let Ok(_) = encoder.encode(yuvs, linesizes.clone()) {
                         log::debug!("{:?} encode {:?}", input, start.elapsed());
-                        infos.lock().unwrap().push(input.clone());
+                        outputs.lock().unwrap().push(input.clone());
                     } else {
                         log::debug!("{:?} encode failed {:?}", input, start.elapsed());
                     }
@@ -213,9 +211,9 @@ fn available_encoders_() -> Vec<EncodeContext> {
         for handle in handles {
             handle.join().ok();
         }
-        res = infos.lock().unwrap().clone();
     }
-    res
+    let x = outputs.lock().unwrap().clone();
+    x
 }
 
 fn dummy_yuv(width: i32, height: i32) -> Result<Vec<u8>, ()> {
