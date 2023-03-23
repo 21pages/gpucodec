@@ -87,7 +87,7 @@ public:
                 for( amf_int32 y = 0; y < height; y++)
                 {
                     amf_uint8 *line = data + (y + offsetY) * pitchH;
-                    std::memcpy(&m_buffer[i][pixelSize * width * y], line, pixelSize * width);
+                    std::memcpy(&m_buffer[i][pixelSize * width * y], line + offsetX * pixelSize, pixelSize * width);
                 }
                 datas[i] = m_buffer[i].data();
                 linesizes[i] = pixelSize * width;
