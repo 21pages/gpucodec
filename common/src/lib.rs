@@ -48,3 +48,8 @@ pub struct DecodeCalls {
     pub decode: DecodeCall,
     pub destroy: DestroyDecoderCall,
 }
+
+pub struct InnerEncodeContext {
+    pub device: HWDeviceType,
+    pub codec: CodecID,
+}

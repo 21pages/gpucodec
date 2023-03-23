@@ -198,7 +198,7 @@ extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32
         CUcontext cuContext = e->cuContext;
         bool encoded = false;
 
-        // to-do: linesizes
+        // to-do: linesizes, wrong calculate
         int len = e->height * (linesizes[0] + (linesizes[1] + 1) / 2);
         uint8_t *pData = datas[0];
         if (len == pEnc->GetFrameSize())
@@ -228,3 +228,8 @@ extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32
     }
     return -1;
 }
+
+// extern "C" int nvidia_encode_linesize(PixelFormat format, int32_t linesizes[MAX_DATA_NUM])
+// {
+
+// }
