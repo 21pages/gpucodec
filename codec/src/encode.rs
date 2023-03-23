@@ -8,7 +8,7 @@ use std::{
     fmt::Display,
     os::raw::{c_int, c_void},
     slice::from_raw_parts,
-    sync::{Arc, Mutex},
+    sync::{Arc, Condvar, Mutex},
     thread,
     time::Instant,
 };
@@ -176,6 +176,10 @@ fn available_() -> Vec<EncodeContext> {
         height,
         gpu,
     });
+    // https://forums.developer.nvidia.com/t/is-there-limit-for-multi-thread-encoder/73187
+    // https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new
+    let max_nv_thread = 1;
+    let nv_cond = Arc::new((Mutex::new(0), Condvar::new()));
     let outputs = Arc::new(Mutex::new(Vec::<EncodeContext>::new()));
     let start = Instant::now();
     if let Ok(yuv) = dummy_yuv(width, height) {
@@ -185,7 +189,15 @@ fn available_() -> Vec<EncodeContext> {
         for input in inputs {
             let yuv = yuv.clone();
             let outputs = outputs.clone();
+            let nv_cond = nv_cond.clone();
             let handle = thread::spawn(move || {
+                let (nv_cnt, nv_cvar) = &*nv_cond;
+                if input.driver == NVENC {
+                    let _guard = nv_cvar
+                        .wait_while(nv_cnt.lock().unwrap(), |cnt| *cnt >= max_nv_thread)
+                        .unwrap();
+                }
+                *nv_cnt.lock().unwrap() += 1;
                 let mut linesizes = vec![1920, 1920];
                 linesizes.resize(8, 0);
                 let ylen = (linesizes[0] * height) as usize;
@@ -204,6 +216,10 @@ fn available_() -> Vec<EncodeContext> {
                     }
                 } else {
                     log::debug!("{:?} new failed {:?}", input, start.elapsed());
+                }
+                if input.driver == NVENC {
+                    *nv_cnt.lock().unwrap() -= 1;
+                    nv_cvar.notify_one();
                 }
             });
             handles.push(handle);

@@ -4,7 +4,9 @@
 
 include!(concat!(env!("OUT_DIR"), "/nvidia_ffi.rs"));
 
-use common::{DecodeCalls, EncodeCalls, InnerDecodeContext, InnerEncodeContext};
+use common::{
+    CodecID::*, DecodeCalls, EncodeCalls, HWDeviceType::*, InnerDecodeContext, InnerEncodeContext,
+};
 
 pub fn encode_calls() -> EncodeCalls {
     EncodeCalls {
@@ -26,12 +28,34 @@ pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
     if unsafe { nvidia_encode_driver_support() } != 0 {
         return vec![];
     }
-    vec![]
+    let devices = vec![CUDA];
+    let codecs = vec![H264, HEVC];
+    let mut v = vec![];
+    for device in devices.iter() {
+        for codec in codecs.iter() {
+            v.push(InnerEncodeContext {
+                device: device.clone(),
+                codec: codec.clone(),
+            });
+        }
+    }
+    v
 }
 
 pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
     if unsafe { nvidia_encode_driver_support() } != 0 {
         return vec![];
     }
-    vec![]
+    let devices = vec![CUDA];
+    let codecs = vec![H264, HEVC];
+    let mut v = vec![];
+    for device in devices.iter() {
+        for codec in codecs.iter() {
+            v.push(InnerDecodeContext {
+                device: device.clone(),
+                codec: codec.clone(),
+            });
+        }
+    }
+    v
 }
