@@ -73,6 +73,7 @@ private:
     amf::AMF_SURFACE_FORMAT m_AMFSurfaceFormat;
     std::pair<int32_t, int32_t> m_Resolution;
     amf_wstring m_codec;
+    bool m_OpenCLSubmission = false; // Possible memory leak
     // const
     AMF_COLOR_BIT_DEPTH_ENUM m_eDepth = AMF_COLOR_BIT_DEPTH_8;
     int m_query_timeout = 50;
@@ -102,6 +103,11 @@ public:
         // alloc surface
         res = m_AMFContext->AllocSurface(m_AMFMemoryType, m_AMFSurfaceFormat, m_Resolution.first,
 										 m_Resolution.second, &surface);
+        if (m_OpenCLSubmission)
+        {
+            res = surface->Convert(amf::AMF_MEMORY_OPENCL);
+            AMF_RETURN_IF_FAILED(res, L"Convert() failed");
+        }
         AMF_RETURN_IF_FAILED(res, L"AllocSurface() failed");
 
         if (m_AMFCompute != NULL)
@@ -140,7 +146,11 @@ public:
 		    res = m_AMFCompute->FinishQueue();
             pSyncPoint->Wait();
 		}
-        // res = surface->Convert(m_AMFMemoryType);
+        if (m_OpenCLSubmission)
+        {
+            res = surface->Convert(m_AMFMemoryType);
+            AMF_RETURN_IF_FAILED(res, L"Convert() failed");
+        }
 
         res = m_AMFEncoder->SubmitInput(surface);
         AMF_RETURN_IF_FAILED(res, L"SubmitInput() failed");
@@ -181,6 +191,7 @@ public:
             m_AMFEncoder->Terminate();
             m_AMFEncoder = NULL;
         }
+        // to-do: Got Possible memory leak detected when use OpenCLSubmission
         if (m_AMFContext)
         {
             m_AMFContext->Terminate();
@@ -202,7 +213,7 @@ private:
         }
         amf::AMFSetCustomTracer(m_AMFFactory.GetTrace());
         amf::AMFTraceEnableWriter(AMF_TRACE_WRITER_CONSOLE, true);
-        amf::AMFTraceSetWriterLevel(AMF_TRACE_WRITER_CONSOLE, AMF_TRACE_TRACE);
+        amf::AMFTraceSetWriterLevel(AMF_TRACE_WRITER_CONSOLE, AMF_TRACE_WARNING);
 
         // m_AMFContext
         res = m_AMFFactory.GetFactory()->CreateContext(&m_AMFContext);
@@ -215,10 +226,12 @@ private:
         case amf::AMF_MEMORY_DX9:
             res = m_AMFContext->InitDX9(NULL); // can be DX9 or DX9Ex device
             AMF_RETURN_IF_FAILED(res, L"InitDX9(NULL) failed");
+            m_OpenCLSubmission = true;
             break;
         case amf::AMF_MEMORY_DX11:
             res = m_AMFContext->InitDX11(NULL); // can be DX11 device
             AMF_RETURN_IF_FAILED(res, L"InitDX11(NULL) failed");
+            // m_OpenCLSubmission = true;
             break;
         #endif
         case amf::AMF_MEMORY_VULKAN:
@@ -233,14 +246,24 @@ private:
             AMFTraceInfo(AMF_FACILITY, L"no init operation\n");
             break;
         }
-
-        if (amf::AMF_MEMORY_DX11 == m_AMFMemoryType || amf::AMF_MEMORY_OPENCL == m_AMFMemoryType)
+        if (m_OpenCLSubmission)
+        {
+            if (m_AMFMemoryType != amf::AMF_MEMORY_OPENCL)
+            {
+                res = m_AMFContext->InitOpenCL(NULL);
+                AMF_RETURN_IF_FAILED(res, L"InitOpenCL(NULL) failed");
+            }
+            res = m_AMFContext->GetCompute(amf::AMF_MEMORY_OPENCL, &m_AMFCompute);
+            AMF_RETURN_IF_FAILED(res, L"OPENCL GetCompute failed, memoryType:%d", m_AMFMemoryType);
+        } 
+        else if (amf::AMF_MEMORY_DX11 == m_AMFMemoryType ||
+            amf::AMF_MEMORY_VULKAN == m_AMFMemoryType ||
+            amf::AMF_MEMORY_OPENCL == m_AMFMemoryType )
         {
             res = m_AMFContext->GetCompute(m_AMFMemoryType, &m_AMFCompute);
             AMF_RETURN_IF_FAILED(res, L"GetCompute failed, memoryType:%d", m_AMFMemoryType);
         }
 
-        AMFTraceDebug(L"Encoder: %s\n", m_codec.c_str());
         // component: encoder
         res = m_AMFFactory.GetFactory()->CreateComponent(m_AMFContext, m_codec.c_str(), &m_AMFEncoder);
         AMF_RETURN_IF_FAILED(res, L"CreateComponent(%s) failed", m_codec.c_str());

@@ -128,7 +128,7 @@ private:
         }
         amf::AMFSetCustomTracer(m_AMFFactory.GetTrace());
         amf::AMFTraceEnableWriter(AMF_TRACE_WRITER_CONSOLE, true);
-        amf::AMFTraceSetWriterLevel(AMF_TRACE_WRITER_CONSOLE, AMF_TRACE_TRACE);
+        amf::AMFTraceSetWriterLevel(AMF_TRACE_WRITER_CONSOLE, AMF_TRACE_WARNING);
 
         res = m_AMFFactory.GetFactory()->CreateContext(&m_AMFContext); 
         AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateContext");
