@@ -93,21 +93,7 @@ impl Decoder {
             key: key != 0,
         };
 
-        if format == PixelFormat::YUV420P as c_int {
-            let y = from_raw_parts(datas[0], (linesizes[0] * height) as usize).to_vec();
-            let u = from_raw_parts(datas[1], (linesizes[1] * height / 2) as usize).to_vec();
-            let v = from_raw_parts(datas[2], (linesizes[2] * height / 2) as usize).to_vec();
-
-            frame.data.push(y);
-            frame.data.push(u);
-            frame.data.push(v);
-
-            frame.linesize.push(linesizes[0]);
-            frame.linesize.push(linesizes[1]);
-            frame.linesize.push(linesizes[2]);
-
-            frames.push(frame);
-        } else if format == PixelFormat::NV12 as c_int {
+        if format == PixelFormat::NV12 as c_int {
             let y = from_raw_parts(datas[0], (linesizes[0] * height) as usize).to_vec();
             let uv = from_raw_parts(datas[1], (linesizes[1] * height / 2) as usize).to_vec();
 
@@ -223,37 +209,37 @@ fn available_() -> Vec<DecodeContext> {
     }
     let buf264 = Arc::new(buf264);
     let buf265 = Arc::new(buf265);
-    let mut handles = vec![];
+    // let mut handles = vec![];
     for ctx in inputs {
         let outputs = outputs.clone();
         let buf264 = buf264.clone();
         let buf265 = buf265.clone();
-        let handle = thread::spawn(move || {
+        // let handle = thread::spawn(move || {
+        let start = Instant::now();
+        if let Ok(mut decoder) = Decoder::new(ctx.clone()) {
+            log::debug!("{:?} new:{:?}", ctx, start.elapsed());
+            let data = match ctx.codec {
+                H264 => &buf264[..],
+                HEVC => &buf265[..],
+                _ => continue,
+            };
             let start = Instant::now();
-            if let Ok(mut decoder) = Decoder::new(ctx.clone()) {
-                log::debug!("{:?} new:{:?}", ctx, start.elapsed());
-                let data = match ctx.codec {
-                    H264 => &buf264[..],
-                    HEVC => &buf265[..],
-                    _ => return,
-                };
-                let start = Instant::now();
-                if let Ok(_) = decoder.decode(data) {
-                    log::debug!("{:?} decode:{:?}", ctx, start.elapsed());
-                    outputs.lock().unwrap().push(ctx);
-                } else {
-                    log::debug!("{:?} decode failed:{:?}", ctx, start.elapsed());
-                }
+            if let Ok(_) = decoder.decode(data) {
+                log::debug!("{:?} decode:{:?}", ctx, start.elapsed());
+                outputs.lock().unwrap().push(ctx);
             } else {
-                log::debug!("{:?} new failed:{:?}", ctx, start.elapsed());
+                log::debug!("{:?} decode failed:{:?}", ctx, start.elapsed());
             }
-        });
+        } else {
+            log::debug!("{:?} new failed:{:?}", ctx, start.elapsed());
+        }
+        // });
 
-        handles.push(handle);
+        // handles.push(handle);
     }
-    for handle in handles {
-        handle.join().ok();
-    }
+    // for handle in handles {
+    //     handle.join().ok();
+    // }
     let x = outputs.lock().unwrap().clone();
     x
 }

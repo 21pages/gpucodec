@@ -60,7 +60,9 @@ public:
             amf::AMFSurfacePtr surface(oData);
             AMF_RETURN_IF_INVALID_POINTER(surface, L"surface is NULL");
             amf_size count = surface->GetPlanesCount();
-            amf::AMF_SURFACE_FORMAT format =  surface->GetFormat();
+            PixelFormat pixfmt;
+            res = amf_pixfmt_to_common_pixfmt(surface->GetFormat(), pixfmt);
+            AMF_RETURN_IF_FAILED(res, L"Convert failed");
             uint8_t * datas[MAX_DATA_NUM] = {NULL};
             int32_t linesizes[MAX_DATA_NUM] = {0};
             int y_width = 0, y_height = 0;
@@ -92,7 +94,7 @@ public:
                 datas[i] = m_buffer[i].data();
                 linesizes[i] = pixelSize * width;
             }
-            callback(datas, linesizes, format, y_width, y_height, obj, 0);
+            callback(datas, linesizes, pixfmt, y_width, y_height, obj, 0);
             decoded = true;
             surface = NULL;
         }
@@ -182,6 +184,19 @@ private:
         AMF_RETURN_IF_FAILED(res, L"SetProperty AMF_TIMESTAMP_MODE to AMF_TS_DECODE failed");
         res = m_AMFDecoder->SetProperty(AMF_VIDEO_DECODER_REORDER_MODE, amf_int64(AMF_VIDEO_DECODER_MODE_LOW_LATENCY));
         AMF_RETURN_IF_FAILED(res, L"SetProperty AMF_VIDEO_DECODER_REORDER_MODE to AMF_VIDEO_DECODER_MODE_LOW_LATENCY failed");
+        return AMF_OK;
+    }
+
+    AMF_RESULT amf_pixfmt_to_common_pixfmt(amf::AMF_SURFACE_FORMAT lhs, PixelFormat &rhs)
+    {
+        switch (lhs)
+        {
+        case amf::AMF_SURFACE_NV12:
+            rhs = NV12;
+            break;
+        default:
+            return AMF_INVALID_FORMAT;
+        }
         return AMF_OK;
     }
 };

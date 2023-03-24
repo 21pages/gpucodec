@@ -44,9 +44,6 @@ static bool convert_format(PixelFormat lhs, amf::AMF_SURFACE_FORMAT& rhs)
     case NV12:
         rhs = amf::AMF_SURFACE_NV12;
         break;
-    case YUV420P:
-        rhs = amf::AMF_SURFACE_YUV420P;
-        break;
     default:
         std::cerr << "unsupported format: " << lhs << "\n";
         return false;
