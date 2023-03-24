@@ -42,7 +42,7 @@ impl Encoder {
             length.resize(1, 0);
             let codec = (calls.new)(
                 ctx.device as i32,
-                ctx.format as i32,
+                ctx.pixfmt as i32,
                 ctx.codec as i32,
                 ctx.width,
                 ctx.height,
@@ -122,7 +122,7 @@ pub enum EncodeDriver {
 pub struct EncodeContext {
     pub driver: EncodeDriver,
     pub device: HWDeviceType,
-    pub format: PixelFormat,
+    pub pixfmt: PixelFormat,
     pub codec: CodecID,
     pub width: i32,
     pub height: i32,
@@ -170,7 +170,7 @@ fn available_() -> Vec<EncodeContext> {
     let inputs = natives.drain(..).map(|(driver, n)| EncodeContext {
         driver,
         device: n.device,
-        format,
+        pixfmt: format,
         codec: n.codec,
         width,
         height,

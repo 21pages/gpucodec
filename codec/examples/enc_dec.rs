@@ -13,7 +13,7 @@ fn main() {
     let en_ctx = EncodeContext {
         driver: EncodeDriver::AMF,
         device: HWDeviceType::DX11,
-        format: PixelFormat::NV12,
+        pixfmt: PixelFormat::NV12,
         codec: CodecID::H264,
         width: 2880,
         height: 1800,
@@ -22,7 +22,7 @@ fn main() {
     let de_ctx = DecodeContext {
         driver: DecodeDriver::AMF,
         device: HWDeviceType::DX11,
-        format: PixelFormat::NV12,
+        pixfmt: PixelFormat::NV12,
         codec: CodecID::H264,
         gpu: 0,
     };

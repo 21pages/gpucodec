@@ -35,7 +35,7 @@ impl Decoder {
         unsafe {
             let codec = (calls.new)(
                 ctx.device as i32,
-                ctx.format as i32,
+                ctx.pixfmt as i32,
                 ctx.codec as i32,
                 ctx.gpu,
             );
@@ -85,7 +85,7 @@ impl Decoder {
         let linesizes = from_raw_parts(linesizes, MAX_DATA_NUM as _);
 
         let mut frame = DecodeFrame {
-            format: std::mem::transmute(format),
+            pixfmt: std::mem::transmute(format),
             width,
             height,
             data: vec![],
@@ -144,13 +144,13 @@ pub enum DecodeDriver {
 pub struct DecodeContext {
     pub driver: DecodeDriver,
     pub device: HWDeviceType,
-    pub format: PixelFormat,
+    pub pixfmt: PixelFormat,
     pub codec: CodecID,
     pub gpu: i32,
 }
 
 pub struct DecodeFrame {
-    pub format: PixelFormat,
+    pub pixfmt: PixelFormat,
     pub width: i32,
     pub height: i32,
     pub data: Vec<Vec<u8>>,
@@ -172,7 +172,7 @@ impl std::fmt::Display for DecodeFrame {
         write!(
             f,
             "surface_format:{:?}, width:{}, height:{},key:{}, {}",
-            self.format, self.width, self.height, self.key, s,
+            self.pixfmt, self.width, self.height, self.key, s,
         )
     }
 }
@@ -204,7 +204,7 @@ fn available_() -> Vec<DecodeContext> {
     let inputs = natives.drain(..).map(|(driver, n)| DecodeContext {
         driver,
         device: n.device,
-        format,
+        pixfmt: format,
         codec: n.codec,
         gpu,
     });
