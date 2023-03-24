@@ -18,5 +18,5 @@ fn main() {
         .file("src/utils.c")
         .file("src/data.c")
         .cpp(false)
-        .compile("codec");
+        .compile("hwcodec");
 }
