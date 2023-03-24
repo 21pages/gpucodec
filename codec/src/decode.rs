@@ -1,6 +1,6 @@
 use crate::get_bin_file;
 use common::{
-    CodecID::{self, *},
+    DataFormat::{self, *},
     DecodeCalls, HWDeviceType, PixelFormat,
     PixelFormat::NV12,
     MAX_DATA_NUM,
@@ -36,7 +36,7 @@ impl Decoder {
             let codec = (calls.new)(
                 ctx.device as i32,
                 ctx.pixfmt as i32,
-                ctx.codec as i32,
+                ctx.dataFormat as i32,
                 ctx.gpu,
             );
             if codec.is_null() {
@@ -131,7 +131,7 @@ pub struct DecodeContext {
     pub driver: DecodeDriver,
     pub device: HWDeviceType,
     pub pixfmt: PixelFormat,
-    pub codec: CodecID,
+    pub dataFormat: DataFormat,
     pub gpu: i32,
 }
 
@@ -191,7 +191,7 @@ fn available_() -> Vec<DecodeContext> {
         driver,
         device: n.device,
         pixfmt: format,
-        codec: n.codec,
+        dataFormat: n.codec,
         gpu,
     });
     let outputs = Arc::new(Mutex::new(Vec::<DecodeContext>::new()));
@@ -209,37 +209,61 @@ fn available_() -> Vec<DecodeContext> {
     }
     let buf264 = Arc::new(buf264);
     let buf265 = Arc::new(buf265);
-    // let mut handles = vec![];
+    let mut handles = vec![];
     for ctx in inputs {
         let outputs = outputs.clone();
         let buf264 = buf264.clone();
         let buf265 = buf265.clone();
-        // let handle = thread::spawn(move || {
-        let start = Instant::now();
-        if let Ok(mut decoder) = Decoder::new(ctx.clone()) {
-            log::debug!("{:?} new:{:?}", ctx, start.elapsed());
-            let data = match ctx.codec {
-                H264 => &buf264[..],
-                HEVC => &buf265[..],
-                _ => continue,
-            };
+        let handle = thread::spawn(move || {
             let start = Instant::now();
-            if let Ok(_) = decoder.decode(data) {
-                log::debug!("{:?} decode:{:?}", ctx, start.elapsed());
-                outputs.lock().unwrap().push(ctx);
+            if let Ok(mut decoder) = Decoder::new(ctx.clone()) {
+                log::debug!("{:?} new:{:?}", ctx, start.elapsed());
+                let data = match ctx.dataFormat {
+                    H264 => &buf264[..],
+                    HEVC => &buf265[..],
+                    _ => return,
+                };
+                let start = Instant::now();
+                if let Ok(_) = decoder.decode(data) {
+                    log::debug!("{:?} decode:{:?}", ctx, start.elapsed());
+                    outputs.lock().unwrap().push(ctx);
+                } else {
+                    log::debug!("{:?} decode failed:{:?}", ctx, start.elapsed());
+                }
             } else {
-                log::debug!("{:?} decode failed:{:?}", ctx, start.elapsed());
+                log::debug!("{:?} new failed:{:?}", ctx, start.elapsed());
             }
-        } else {
-            log::debug!("{:?} new failed:{:?}", ctx, start.elapsed());
-        }
-        // });
+        });
 
-        // handles.push(handle);
+        handles.push(handle);
     }
-    // for handle in handles {
-    //     handle.join().ok();
-    // }
+    for handle in handles {
+        handle.join().ok();
+    }
     let x = outputs.lock().unwrap().clone();
     x
+}
+
+pub struct Best {
+    pub h264: Option<DecodeContext>,
+    pub hevc: Option<DecodeContext>,
+}
+
+impl Best {
+    pub fn new(decoders: Vec<DecodeContext>) -> Self {
+        let h264s: Vec<_> = decoders
+            .iter()
+            .filter(|e| e.dataFormat == H264)
+            .map(|e| e.to_owned())
+            .collect();
+        let hevcs: Vec<_> = decoders
+            .iter()
+            .filter(|e| e.dataFormat == HEVC)
+            .map(|e| e.to_owned())
+            .collect();
+        Self {
+            h264: h264s.first().cloned(),
+            hevc: hevcs.first().cloned(),
+        }
+    }
 }

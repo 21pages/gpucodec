@@ -102,7 +102,7 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
     return -1;
 }
 
-extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat,CodecID codecID, int32_t width, int32_t height, int32_t gpu)
+extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, DataFormat dataFormat, int32_t width, int32_t height, int32_t gpu)
 {
     Encoder * e = NULL;
     try 
@@ -113,12 +113,12 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat,Cod
             goto _exit;
         }
         NV_ENC_BUFFER_FORMAT format = NV_ENC_BUFFER_FORMAT_NV12;
-        if (codecID != H264 && codecID != HEVC)
+        if (dataFormat != H264 && dataFormat != HEVC)
         {
             goto _exit;
         }
         GUID guidCodec = NV_ENC_CODEC_H264_GUID;
-        if (HEVC == codecID)
+        if (HEVC == dataFormat)
         {
             guidCodec = NV_ENC_CODEC_HEVC_GUID;
         }
@@ -200,7 +200,7 @@ extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32
         bool encoded = false;
 
         // to-do: linesizes, wrong calculate
-        int len = e->height * (linesizes[0] + (linesizes[1] + 1) / 2);
+        int len = e->height * (linesizes[0] + linesizes[1] / 2);
         uint8_t *pData = datas[0];
         if (len == pEnc->GetFrameSize())
         {
@@ -220,6 +220,10 @@ extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32
                 callback(packet.data(), packet.size(), 0, 0, obj);
                 encoded = true;
             }
+        }
+        else
+        {
+             std::cerr << len << " != " << pEnc->GetFrameSize()  << '\n';
         }
         return encoded ? 0 : -1;
     }

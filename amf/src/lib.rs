@@ -5,7 +5,8 @@
 include!(concat!(env!("OUT_DIR"), "/amf_ffi.rs"));
 
 use common::{
-    CodecID::*, DecodeCalls, EncodeCalls, HWDeviceType::*, InnerDecodeContext, InnerEncodeContext,
+    DataFormat::*, DecodeCalls, EncodeCalls, HWDeviceType::*, InnerDecodeContext,
+    InnerEncodeContext,
 };
 
 pub fn encode_calls() -> EncodeCalls {

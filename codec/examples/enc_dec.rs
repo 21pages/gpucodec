@@ -1,4 +1,4 @@
-use common::{CodecID, HWDeviceType, PixelFormat};
+use common::{DataFormat, HWDeviceType, PixelFormat};
 use hwcodec::{
     decode::{DecodeContext, DecodeDriver, Decoder},
     encode::{EncodeContext, EncodeDriver, Encoder},
@@ -14,7 +14,7 @@ fn main() {
         driver: EncodeDriver::AMF,
         device: HWDeviceType::DX11,
         pixfmt: PixelFormat::NV12,
-        codec: CodecID::H264,
+        dataFormat: DataFormat::H264,
         width: 2880,
         height: 1800,
         gpu: 0,
@@ -23,7 +23,7 @@ fn main() {
         driver: DecodeDriver::AMF,
         device: HWDeviceType::DX11,
         pixfmt: PixelFormat::NV12,
-        codec: CodecID::H264,
+        dataFormat: DataFormat::H264,
         gpu: 0,
     };
     let mut encoder = Encoder::new(en_ctx.clone()).unwrap();

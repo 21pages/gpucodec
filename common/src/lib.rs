@@ -51,10 +51,10 @@ pub struct DecodeCalls {
 
 pub struct InnerEncodeContext {
     pub device: HWDeviceType,
-    pub codec: CodecID,
+    pub codec: DataFormat,
 }
 
 pub struct InnerDecodeContext {
     pub device: HWDeviceType,
-    pub codec: CodecID,
+    pub codec: DataFormat,
 }

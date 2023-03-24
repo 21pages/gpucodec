@@ -201,7 +201,7 @@ private:
     }
 };
 
-static bool convert_codec(CodecID lhs, amf_wstring& rhs)
+static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 {
     switch (lhs)
     {
@@ -226,13 +226,13 @@ static bool convert_codec(CodecID lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, CodecID codecID, int32_t iGpu)
+extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat, int32_t iGpu)
 {
     try
     {
         (void)iGpu;
         amf_wstring codecStr;
-        if (!convert_codec(codecID, codecStr))
+        if (!convert_codec(dataFormat, codecStr))
         {
             return NULL;
         }

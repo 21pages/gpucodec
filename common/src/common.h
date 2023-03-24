@@ -5,7 +5,7 @@
 
 #define MAX_DATA_NUM    8
 
-enum CodecID
+enum DataFormat
 {
     H264,
     HEVC,

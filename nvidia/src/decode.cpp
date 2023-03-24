@@ -90,9 +90,9 @@ extern "C" int nvidia_destroy_decoder(void* decoder)
     return -1;
 }
 
-static bool codecID_to_cuCodecID(CodecID codecID, cudaVideoCodec &cuda)
+static bool dataFormat_to_cuCodecID(DataFormat dataFormat, cudaVideoCodec &cuda)
 {
-    switch (codecID)
+    switch (dataFormat)
     {
     case H264:
         cuda = cudaVideoCodec_H264;
@@ -109,7 +109,7 @@ static bool codecID_to_cuCodecID(CodecID codecID, cudaVideoCodec &cuda)
     return true;
 }
 
-extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, CodecID codecID, int32_t iGpu) 
+extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat, int32_t iGpu) 
 {
     Decoder *p = NULL;
     try
@@ -152,7 +152,7 @@ extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, Cod
         }
 
         cudaVideoCodec cudaCodecID;
-        if (!codecID_to_cuCodecID(codecID, cudaCodecID))
+        if (!dataFormat_to_cuCodecID(dataFormat, cudaCodecID))
         {
             goto _exit;
         }

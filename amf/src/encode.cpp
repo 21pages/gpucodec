@@ -100,15 +100,8 @@ public:
         AMF_RESULT res;
         bool encoded = false;
 
-        // alloc surface
-        res = m_AMFContext->AllocSurface(m_AMFMemoryType, m_AMFSurfaceFormat, m_Resolution.first,
-										 m_Resolution.second, &surface);
-        if (m_OpenCLSubmission)
-        {
-            res = surface->Convert(amf::AMF_MEMORY_OPENCL);
-            AMF_RETURN_IF_FAILED(res, L"Convert() failed");
-        }
-        AMF_RETURN_IF_FAILED(res, L"AllocSurface() failed");
+        res = allocate_surface(surface);
+        AMF_RETURN_IF_FAILED(res, L"allocate_surface() failed");
 
         if (m_AMFCompute != NULL)
         {
@@ -181,6 +174,7 @@ public:
                 pBuffer = NULL;
         }
         data = NULL;
+        pSyncPoint = NULL;
         surface = NULL;
         return encoded ? AMF_OK : AMF_FAIL;
     }
@@ -283,6 +277,19 @@ private:
     }
 
 
+    AMF_RESULT allocate_surface(amf::AMFSurfacePtr &surface)
+    {
+        AMF_RESULT res = m_AMFContext->AllocSurface(m_AMFMemoryType, m_AMFSurfaceFormat, m_Resolution.first,
+										 m_Resolution.second, &surface);
+        AMF_RETURN_IF_FAILED(res, L"AllocSurface() failed");
+        if (m_OpenCLSubmission)
+        {
+            res = surface->Convert(amf::AMF_MEMORY_OPENCL);
+            AMF_RETURN_IF_FAILED(res, L"Convert() failed");
+        }
+        return AMF_OK;
+    }
+
     AMF_RESULT SetParams(const  amf_wstring& codecStr)
     {
         AMF_RESULT res;
@@ -365,7 +372,7 @@ private:
 
 };
 
-static bool convert_codec(CodecID lhs, amf_wstring& rhs)
+static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 {
     switch (lhs)
     {
@@ -387,13 +394,13 @@ static bool convert_codec(CodecID lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, CodecID codecID,
+extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat,
                                 int32_t width, int32_t height, int32_t gpu) 
 {
     try 
     {
         amf_wstring codecStr;
-        if (!convert_codec(codecID, codecStr))
+        if (!convert_codec(dataFormat, codecStr))
         {
             return NULL;
         }
