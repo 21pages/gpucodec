@@ -1,60 +1,41 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
-
-use std::os::raw::{c_int, c_void};
-
+use serde_derive::{Deserialize, Serialize};
 include!(concat!(env!("OUT_DIR"), "/common_ffi.rs"));
 
-pub type NewEncoderCall = unsafe extern "C" fn(
-    device: i32,
-    format: i32,
-    codecID: i32,
-    width: i32,
-    height: i32,
-    gpu: i32,
-) -> *mut c_void;
+pub mod inner;
+pub use serde;
+pub use serde_derive;
 
-pub type EncodeCall = unsafe extern "C" fn(
-    encoder: *mut c_void,
-    data: *mut *mut u8,
-    linesize: *mut i32,
-    callback: EncodeCallback,
-    obj: *mut c_void,
-) -> c_int;
-
-pub type DestroyEncoderCall = unsafe extern "C" fn(encoder: *mut c_void) -> c_int;
-
-pub type NewDecoderCall =
-    unsafe extern "C" fn(device: i32, format: i32, codecID: i32, gpu: i32) -> *mut c_void;
-
-pub type DecodeCall = unsafe extern "C" fn(
-    decoder: *mut ::std::os::raw::c_void,
-    data: *mut u8,
-    length: i32,
-    callback: DecodeCallback,
-    obj: *mut ::std::os::raw::c_void,
-) -> c_int;
-
-pub type DestroyDecoderCall = unsafe extern "C" fn(decoder: *mut c_void) -> c_int;
-
-pub struct EncodeCalls {
-    pub new: NewEncoderCall,
-    pub encode: EncodeCall,
-    pub destroy: DestroyEncoderCall,
-}
-pub struct DecodeCalls {
-    pub new: NewDecoderCall,
-    pub decode: DecodeCall,
-    pub destroy: DestroyDecoderCall,
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub enum EncodeDriver {
+    NVENC,
+    AMF,
 }
 
-pub struct InnerEncodeContext {
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub enum DecodeDriver {
+    CUVID,
+    AMF,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct EncodeContext {
+    pub driver: EncodeDriver,
     pub device: HWDeviceType,
-    pub codec: DataFormat,
+    pub pixfmt: PixelFormat,
+    pub dataFormat: DataFormat,
+    pub width: i32,
+    pub height: i32,
+    pub gpu: i32,
 }
 
-pub struct InnerDecodeContext {
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct DecodeContext {
+    pub driver: DecodeDriver,
     pub device: HWDeviceType,
-    pub codec: DataFormat,
+    pub pixfmt: PixelFormat,
+    pub dataFormat: DataFormat,
+    pub gpu: i32,
 }

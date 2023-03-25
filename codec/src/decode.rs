@@ -1,11 +1,13 @@
 use crate::get_bin_file;
 use codec_common::{
-    DataFormat::{self, *},
-    DecodeCalls, HWDeviceType, PixelFormat,
-    PixelFormat::NV12,
+    inner::DecodeCalls,
+    DataFormat::*,
+    DecodeContext, DecodeDriver,
+    PixelFormat::{self, NV12},
     MAX_DATA_NUM,
 };
 use log::{error, trace};
+use serde_derive::{Deserialize, Serialize};
 use std::{
     ffi::c_void,
     os::raw::c_int,
@@ -120,21 +122,6 @@ impl Drop for Decoder {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum DecodeDriver {
-    CUVID,
-    AMF,
-}
-
-#[derive(Debug, Clone)]
-pub struct DecodeContext {
-    pub driver: DecodeDriver,
-    pub device: HWDeviceType,
-    pub pixfmt: PixelFormat,
-    pub dataFormat: DataFormat,
-    pub gpu: i32,
-}
-
 pub struct DecodeFrame {
     pub pixfmt: PixelFormat,
     pub width: i32,
@@ -191,7 +178,7 @@ fn available_() -> Vec<DecodeContext> {
         driver,
         device: n.device,
         pixfmt: format,
-        dataFormat: n.codec,
+        dataFormat: n.dataFormat,
         gpu,
     });
     let outputs = Arc::new(Mutex::new(Vec::<DecodeContext>::new()));
@@ -244,6 +231,7 @@ fn available_() -> Vec<DecodeContext> {
     x
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Best {
     pub h264: Option<DecodeContext>,
     pub hevc: Option<DecodeContext>,
@@ -264,6 +252,20 @@ impl Best {
         Self {
             h264: h264s.first().cloned(),
             hevc: hevcs.first().cloned(),
+        }
+    }
+
+    pub fn serialize(&self) -> Result<String, ()> {
+        match serde_json::to_string_pretty(self) {
+            Ok(s) => Ok(s),
+            Err(_) => Err(()),
+        }
+    }
+
+    pub fn deserialize(s: &str) -> Result<Self, ()> {
+        match serde_json::from_str(s) {
+            Ok(c) => Ok(c),
+            Err(_) => Err(()),
         }
     }
 }

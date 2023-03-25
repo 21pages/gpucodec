@@ -5,8 +5,9 @@
 include!(concat!(env!("OUT_DIR"), "/amf_ffi.rs"));
 
 use codec_common::{
-    DataFormat::*, DecodeCalls, EncodeCalls, HWDeviceType::*, InnerDecodeContext,
-    InnerEncodeContext,
+    inner::{DecodeCalls, EncodeCalls, InnerDecodeContext, InnerEncodeContext},
+    DataFormat::*,
+    HWDeviceType::*,
 };
 
 pub fn encode_calls() -> EncodeCalls {
@@ -42,7 +43,7 @@ pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
         for codec in codecs.iter() {
             v.push(InnerEncodeContext {
                 device: device.clone(),
-                codec: codec.clone(),
+                format: codec.clone(),
             });
         }
     }
@@ -65,7 +66,7 @@ pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
         for codec in codecs.iter() {
             v.push(InnerDecodeContext {
                 device: device.clone(),
-                codec: codec.clone(),
+                dataFormat: codec.clone(),
             });
         }
     }

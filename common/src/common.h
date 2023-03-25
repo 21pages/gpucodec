@@ -30,6 +30,7 @@ enum HWDeviceType
 enum PixelFormat
 {
     NV12,
+    I420,
 };
 
 

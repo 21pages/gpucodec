@@ -1,8 +1,7 @@
-use codec_common::{DataFormat, HWDeviceType, PixelFormat};
-use hwcodec::{
-    decode::{DecodeContext, DecodeDriver, Decoder},
-    encode::{EncodeContext, EncodeDriver, Encoder},
+use codec_common::{
+    DataFormat, DecodeContext, DecodeDriver, EncodeContext, EncodeDriver, HWDeviceType, PixelFormat,
 };
+use hwcodec::{decode::Decoder, encode::Encoder};
 use std::{
     io::{Read, Write},
     path::PathBuf,

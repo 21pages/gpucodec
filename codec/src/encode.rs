@@ -1,10 +1,9 @@
 use codec_common::{
-    DataFormat::{self, *},
-    EncodeCalls, HWDeviceType,
-    PixelFormat::{self, NV12},
+    inner::EncodeCalls, DataFormat::*, EncodeContext, EncodeDriver::*, PixelFormat::NV12,
     MAX_DATA_NUM,
 };
 use log::trace;
+use serde_derive::{Deserialize, Serialize};
 use std::{
     fmt::Display,
     os::raw::{c_int, c_void},
@@ -13,7 +12,6 @@ use std::{
     thread,
     time::Instant,
 };
-use EncodeDriver::*;
 
 pub struct Encoder {
     calls: EncodeCalls,
@@ -101,23 +99,6 @@ impl Drop for Encoder {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum EncodeDriver {
-    NVENC,
-    AMF,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct EncodeContext {
-    pub driver: EncodeDriver,
-    pub device: HWDeviceType,
-    pub pixfmt: PixelFormat,
-    pub dataFormat: DataFormat,
-    pub width: i32,
-    pub height: i32,
-    pub gpu: i32,
-}
-
 pub struct EncodeFrame {
     pub data: Vec<u8>,
     pub pts: i64,
@@ -160,7 +141,7 @@ fn available_() -> Vec<EncodeContext> {
         driver,
         device: n.device,
         pixfmt: format,
-        dataFormat: n.codec,
+        dataFormat: n.format,
         width,
         height,
         gpu,
@@ -220,6 +201,7 @@ fn available_() -> Vec<EncodeContext> {
     x
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Best {
     pub h264: Option<EncodeContext>,
     pub hevc: Option<EncodeContext>,
@@ -240,6 +222,20 @@ impl Best {
         Self {
             h264: h264s.first().cloned(),
             hevc: hevcs.first().cloned(),
+        }
+    }
+
+    pub fn serialize(&self) -> Result<String, ()> {
+        match serde_json::to_string_pretty(self) {
+            Ok(s) => Ok(s),
+            Err(_) => Err(()),
+        }
+    }
+
+    pub fn deserialize(s: &str) -> Result<Self, ()> {
+        match serde_json::from_str(s) {
+            Ok(c) => Ok(c),
+            Err(_) => Err(()),
         }
     }
 }
