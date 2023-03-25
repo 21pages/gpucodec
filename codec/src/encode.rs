@@ -1,4 +1,4 @@
-use common::{
+use codec_common::{
     DataFormat::{self, *},
     EncodeCalls, HWDeviceType,
     PixelFormat::{self, NV12},

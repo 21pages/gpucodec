@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 log = "0.4"
-common = { path = "../common" }
+codec_common = { path = "../common" }
 amf = { path = "../amf" }
 nvidia = { path = "../nvidia" }
 

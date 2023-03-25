@@ -1,4 +1,4 @@
-use common::{DataFormat, HWDeviceType, PixelFormat};
+use codec_common::{DataFormat, HWDeviceType, PixelFormat};
 use hwcodec::{
     decode::{DecodeContext, DecodeDriver, Decoder},
     encode::{EncodeContext, EncodeDriver, Encoder},

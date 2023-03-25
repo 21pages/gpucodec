@@ -17,7 +17,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen",
  "cc",
- "common",
+ "codec_common",
  "log",
 ]
 
@@ -118,7 +118,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "common"
+name = "codec_common"
 version = "0.1.0"
 dependencies = [
  "bindgen",
@@ -173,7 +173,7 @@ dependencies = [
  "amf",
  "bindgen",
  "cc",
- "common",
+ "codec_common",
  "env_logger",
  "log",
  "nvidia",
@@ -244,7 +244,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen",
  "cc",
- "common",
+ "codec_common",
  "log",
 ]
 

@@ -1,5 +1,5 @@
 use crate::get_bin_file;
-use common::{
+use codec_common::{
     DataFormat::{self, *},
     DecodeCalls, HWDeviceType, PixelFormat,
     PixelFormat::NV12,

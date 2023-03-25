@@ -4,7 +4,7 @@
 
 include!(concat!(env!("OUT_DIR"), "/amf_ffi.rs"));
 
-use common::{
+use codec_common::{
     DataFormat::*, DecodeCalls, EncodeCalls, HWDeviceType::*, InnerDecodeContext,
     InnerEncodeContext,
 };
