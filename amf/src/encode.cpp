@@ -63,12 +63,13 @@ class Encoder {
 
 public:
     AMF_RESULT init_result = AMF_FAIL;
+    DataFormat m_dataFormat;
+    amf::AMFComponentPtr m_AMFEncoder = NULL;
 private:
     // AMF Internals
     AMFFactoryHelper m_AMFFactory;
     amf::AMFContextPtr m_AMFContext = NULL;
     amf::AMFComputePtr m_AMFCompute = NULL;
-    amf::AMFComponentPtr m_AMFEncoder = NULL;
     amf::AMF_MEMORY_TYPE    m_AMFMemoryType;
     amf::AMF_SURFACE_FORMAT m_AMFSurfaceFormat;
     std::pair<int32_t, int32_t> m_Resolution;
@@ -84,7 +85,8 @@ private:
 	std::vector<uint8_t> m_PacketDataBuffer;
 
 public:
-    Encoder(amf::AMF_MEMORY_TYPE memoryType, amf::AMF_SURFACE_FORMAT surfaceFormat, amf_wstring codec, int32_t width, int32_t height):
+    Encoder(amf::AMF_MEMORY_TYPE memoryType, amf::AMF_SURFACE_FORMAT surfaceFormat, amf_wstring codec, int32_t width, int32_t height, DataFormat dataFormat):
+        m_dataFormat(dataFormat),
         m_AMFMemoryType(memoryType),
         m_AMFSurfaceFormat(surfaceFormat), 
         m_Resolution(width, height),
@@ -429,7 +431,7 @@ extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, DataFo
         {
             return NULL;
         }
-        Encoder *enc = new Encoder(memoryType, surfaceFormat, codecStr, width, height);
+        Encoder *enc = new Encoder(memoryType, surfaceFormat, codecStr, width, height, dataFormat);
         if (enc && enc->init_result != AMF_OK) {
             enc->destroy();
             delete enc;
@@ -494,4 +496,53 @@ extern "C" int amf_driver_support()
         std::cerr << e.what() << '\n';
     }
     return -1;
+}
+
+extern "C" int amf_set_bitrate(void *e, int64_t bitrate)
+{
+    try
+    {
+        Encoder *enc = (Encoder*)e;
+        AMF_RESULT res = AMF_FAIL;
+        switch (enc->m_dataFormat)
+        {
+        case H264:
+            res = enc->m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_TARGET_BITRATE, bitrate);
+            break;
+        case H265:
+            res = enc->m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE, bitrate);
+            break;
+        }
+        return res == AMF_OK ? 0 : -1;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;    
+}
+
+extern "C" int amf_set_framerate(void *e, int32_t v)
+{
+    try
+    {
+        Encoder *enc = (Encoder*)e;
+        AMF_RESULT res = AMF_FAIL;
+        AMFRate rate = ::AMFConstructRate(v, 1);
+        switch (enc->m_dataFormat)
+        {
+        case H264:
+            res = enc->m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_FRAMERATE, rate);
+            break;
+        case H265:
+            res = enc->m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMERATE, rate);
+            break;
+        }
+        return res == AMF_OK ? 0 : -1;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;    
 }
