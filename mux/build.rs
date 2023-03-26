@@ -21,16 +21,14 @@ fn main() {
 
     // system
     #[cfg(target_os = "windows")]
-    ["User32", "bcrypt", "ole32", "advapi32"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
-    #[cfg(target_os = "linux")]
-    ["va", "va-drm", "va-x11", "vdpau", "X11", "z"]
-        .map(|lib| println!("cargo:rustc-link-lib={}", lib));
+    ["User32", "bcrypt", "ole32"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
 
     // ffmpeg
-    #[cfg(target_os = "windows")]
-    let ffmpeg_path = externals_dir.join("ffmpeg").join("windows");
+    let ffmpeg_dir = externals_dir.join("ffmpeg");
+    #[cfg(windows)]
+    let ffmpeg_path = ffmpeg_dir.join("windows").join("x86");
     #[cfg(target_os = "linux")]
-    let ffmpeg_path = externals_dir.join("ffmpeg").join("linux");
+    let ffmpeg_path = ffmpeg_dir.join("linux").join("x86");
     builder.include(ffmpeg_path.join("include"));
     println!(
         "cargo:rustc-link-search=native={}",
