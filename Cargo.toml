@@ -1,2 +1,2 @@
 [workspace]
-members = ["codec", "amf", "nvidia", "common"]
+members = ["codec", "amf", "nvidia", "common", "mux"]
