@@ -385,7 +385,7 @@ void NvEncoder::MapResources(uint32_t bfrIdx)
     }
 }
 
-void NvEncoder::EncodeFrame(std::vector<std::vector<uint8_t>> &vPacket, NV_ENC_PIC_PARAMS *pPicParams)
+void NvEncoder::EncodeFrame(std::vector<NvPacket> &vPacket, NV_ENC_PIC_PARAMS *pPicParams)
 {
     vPacket.clear();
     if (!IsHWEncoderInitialized())
@@ -427,13 +427,13 @@ void NvEncoder::RunMotionEstimation(std::vector<uint8_t> &mvData)
     if (nvStatus == NV_ENC_SUCCESS)
     {
         m_iToSend++;
-        std::vector<std::vector<uint8_t>> vPacket;
+        std::vector<NvPacket> vPacket;
         GetEncodedPacket(m_vMVDataOutputBuffer, vPacket, true);
         if (vPacket.size() != 1)
         {
             NVENC_THROW_ERROR("GetEncodedPacket() doesn't return one (and only one) MVData", NV_ENC_ERR_GENERIC);
         }
-        mvData = vPacket[0];
+        mvData = vPacket[0].data;
     }
     else
     {
@@ -485,7 +485,7 @@ void NvEncoder::SendEOS()
     NVENC_API_CALL(m_nvenc.nvEncEncodePicture(m_hEncoder, &picParams));
 }
 
-void NvEncoder::EndEncode(std::vector<std::vector<uint8_t>> &vPacket)
+void NvEncoder::EndEncode(std::vector<NvPacket> &vPacket)
 {
     vPacket.clear();
     if (!IsHWEncoderInitialized())
@@ -498,7 +498,7 @@ void NvEncoder::EndEncode(std::vector<std::vector<uint8_t>> &vPacket)
     GetEncodedPacket(m_vBitstreamOutputBuffer, vPacket, false);
 }
 
-void NvEncoder::GetEncodedPacket(std::vector<NV_ENC_OUTPUT_PTR> &vOutputBuffer, std::vector<std::vector<uint8_t>> &vPacket, bool bOutputDelay)
+void NvEncoder::GetEncodedPacket(std::vector<NV_ENC_OUTPUT_PTR> &vOutputBuffer, std::vector<NvPacket> &vPacket, bool bOutputDelay)
 {
     unsigned i = 0;
     int iEnd = bOutputDelay ? m_iToSend - m_nOutputDelay : m_iToSend;
@@ -513,10 +513,11 @@ void NvEncoder::GetEncodedPacket(std::vector<NV_ENC_OUTPUT_PTR> &vOutputBuffer, 
         uint8_t *pData = (uint8_t *)lockBitstreamData.bitstreamBufferPtr;
         if (vPacket.size() < i + 1)
         {
-            vPacket.push_back(std::vector<uint8_t>());
+            vPacket.push_back(NvPacket());
         }
-        vPacket[i].clear();
-        vPacket[i].insert(vPacket[i].end(), &pData[0], &pData[lockBitstreamData.bitstreamSizeInBytes]);
+        vPacket[i].data.clear();
+        vPacket[i].data.insert(vPacket[i].data.end(), &pData[0], &pData[lockBitstreamData.bitstreamSizeInBytes]);
+        vPacket[i].pictureType = lockBitstreamData.pictureType;
         i++;
 
         NVENC_API_CALL(m_nvenc.nvEncUnlockBitstream(m_hEncoder, lockBitstreamData.outputBitstream));
@@ -616,7 +617,7 @@ void NvEncoder::FlushEncoder()
         // flush the encoder queue and then unmapped it if any surface is still mapped
         try
         {
-            std::vector<std::vector<uint8_t>> vPacket;
+            std::vector<NvPacket> vPacket;
             EndEncode(vPacket);
         }
         catch (...)

@@ -21,6 +21,19 @@
 #include <string.h>
 #include "dynlink_loader.h"
 
+struct NvPacket
+{
+    std::vector<uint8_t> data;
+    NV_ENC_PIC_TYPE pictureType;
+
+    NvPacket(std::vector<uint8_t> data, NV_ENC_PIC_TYPE pictureType): 
+        data(data), pictureType(pictureType)
+    {}
+
+    NvPacket(): data(std::vector<uint8_t>()), pictureType(NV_ENC_PIC_TYPE_UNKNOWN)
+    {}
+};
+
 /**
 * @brief Exception class for error reporting from NvEncodeAPI calls.
 */
@@ -124,7 +137,7 @@ public:
     *  data, which has been copied to an input buffer obtained from the
     *  GetNextInputFrame() function.
     */
-    virtual void EncodeFrame(std::vector<std::vector<uint8_t>> &vPacket, NV_ENC_PIC_PARAMS *pPicParams = nullptr);
+    virtual void EncodeFrame(std::vector<NvPacket> &vPacket, NV_ENC_PIC_PARAMS *pPicParams = nullptr);
 
     /**
     *  @brief  This function to flush the encoder queue.
@@ -133,7 +146,7 @@ public:
     *  from the encoder. The application must call this function before destroying
     *  an encoder session.
     */
-    virtual void EndEncode(std::vector<std::vector<uint8_t>> &vPacket);
+    virtual void EndEncode(std::vector<NvPacket> &vPacket);
 
     /**
     *  @brief  This function is used to query hardware encoder capabilities.
@@ -358,7 +371,7 @@ private:
     *  This is called by DoEncode() function. If there is buffering enabled,
     *  this may return without any output data.
     */
-    void GetEncodedPacket(std::vector<NV_ENC_OUTPUT_PTR> &vOutputBuffer, std::vector<std::vector<uint8_t>> &vPacket, bool bOutputDelay);
+    void GetEncodedPacket(std::vector<NV_ENC_OUTPUT_PTR> &vOutputBuffer, std::vector<NvPacket> &vPacket, bool bOutputDelay);
 
     /**
     *  @brief This is a private function which is used to initialize the bitstream buffers.
