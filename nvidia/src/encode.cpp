@@ -113,12 +113,12 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
             goto _exit;
         }
         NV_ENC_BUFFER_FORMAT format = NV_ENC_BUFFER_FORMAT_NV12;
-        if (dataFormat != H264 && dataFormat != HEVC)
+        if (dataFormat != H264 && dataFormat != H265)
         {
             goto _exit;
         }
         GUID guidCodec = NV_ENC_CODEC_H264_GUID;
-        if (HEVC == dataFormat)
+        if (H265 == dataFormat)
         {
             guidCodec = NV_ENC_CODEC_HEVC_GUID;
         }

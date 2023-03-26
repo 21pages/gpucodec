@@ -31,7 +31,7 @@ pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
         return vec![];
     }
     let devices = vec![CUDA];
-    let dataFormats = vec![H264, HEVC];
+    let dataFormats = vec![H264, H265];
     let mut v = vec![];
     for device in devices.iter() {
         for dataFormat in dataFormats.iter() {
@@ -49,7 +49,7 @@ pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
         return vec![];
     }
     let devices = vec![CUDA];
-    let dataFormats = vec![H264, HEVC];
+    let dataFormats = vec![H264, H265];
     let mut v = vec![];
     for device in devices.iter() {
         for dataFormat in dataFormats.iter() {

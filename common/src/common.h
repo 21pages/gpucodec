@@ -8,7 +8,7 @@
 enum DataFormat
 {
     H264,
-    HEVC,
+    H265,
     VP8,
     VP9,
     AV1,

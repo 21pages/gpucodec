@@ -207,7 +207,7 @@ fn available_() -> Vec<DecodeContext> {
                 log::debug!("{:?} new:{:?}", ctx, start.elapsed());
                 let data = match ctx.dataFormat {
                     H264 => &buf264[..],
-                    HEVC => &buf265[..],
+                    H265 => &buf265[..],
                     _ => return,
                 };
                 let start = Instant::now();
@@ -234,7 +234,7 @@ fn available_() -> Vec<DecodeContext> {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Best {
     pub h264: Option<DecodeContext>,
-    pub hevc: Option<DecodeContext>,
+    pub h265: Option<DecodeContext>,
 }
 
 impl Best {
@@ -244,14 +244,14 @@ impl Best {
             .filter(|e| e.dataFormat == H264)
             .map(|e| e.to_owned())
             .collect();
-        let hevcs: Vec<_> = decoders
+        let h265s: Vec<_> = decoders
             .iter()
-            .filter(|e| e.dataFormat == HEVC)
+            .filter(|e| e.dataFormat == H265)
             .map(|e| e.to_owned())
             .collect();
         Self {
             h264: h264s.first().cloned(),
-            hevc: hevcs.first().cloned(),
+            h265: h265s.first().cloned(),
         }
     }
 

@@ -204,7 +204,7 @@ fn available_() -> Vec<EncodeContext> {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Best {
     pub h264: Option<EncodeContext>,
-    pub hevc: Option<EncodeContext>,
+    pub h265: Option<EncodeContext>,
 }
 
 impl Best {
@@ -214,14 +214,14 @@ impl Best {
             .filter(|e| e.dataFormat == H264)
             .map(|e| e.to_owned())
             .collect();
-        let hevcs: Vec<_> = encoders
+        let h265s: Vec<_> = encoders
             .iter()
-            .filter(|e| e.dataFormat == HEVC)
+            .filter(|e| e.dataFormat == H265)
             .map(|e| e.to_owned())
             .collect();
         Self {
             h264: h264s.first().cloned(),
-            hevc: hevcs.first().cloned(),
+            h265: h265s.first().cloned(),
         }
     }
 

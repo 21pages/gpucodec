@@ -208,7 +208,7 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
     case H264:
         rhs = AMFVideoDecoderUVD_H264_AVC;
         break;
-    case HEVC:
+    case H265:
         rhs = AMFVideoDecoderHW_H265_HEVC;
         break;
     case VP9:

@@ -97,7 +97,7 @@ static bool dataFormat_to_cuCodecID(DataFormat dataFormat, cudaVideoCodec &cuda)
     case H264:
         cuda = cudaVideoCodec_H264;
         break;
-    case HEVC:
+    case H265:
         cuda = cudaVideoCodec_HEVC;
         break;
     case AV1:
