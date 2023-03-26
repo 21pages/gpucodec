@@ -160,8 +160,9 @@ public:
         } while (res == AMF_REPEAT);
         if (res == AMF_OK && data != NULL)
         {
-                amf::AMFBufferPtr pBuffer   = amf::AMFBufferPtr(data);
                 struct encoder_packet packet;
+                PacketKeyframe(data, &packet);
+                amf::AMFBufferPtr pBuffer   = amf::AMFBufferPtr(data);
                 packet.size = pBuffer->GetSize();
                 if (m_PacketDataBuffer.size() < packet.size) {
                     size_t newBufferSize = (size_t)exp2(ceil(log2((double)packet.size)));
@@ -169,7 +170,7 @@ public:
                 }
                 packet.data = m_PacketDataBuffer.data();
                 std::memcpy(packet.data, pBuffer->GetNative(), packet.size);
-                callback(packet.data, packet.size, 0, 0, obj);
+                callback(packet.data, packet.size, 0, packet.keyframe, obj);
                 encoded = true;
                 pBuffer = NULL;
         }
@@ -369,6 +370,21 @@ private:
         return AMF_OK;
     }
 
+    void PacketKeyframe(amf::AMFDataPtr& pData, struct encoder_packet* packet)
+    {
+        if (AMFVideoEncoderVCE_AVC == m_codec)
+        {
+            uint64_t pktType;
+            pData->GetProperty(AMF_VIDEO_ENCODER_OUTPUT_DATA_TYPE, &pktType);
+            packet->keyframe = AMF_VIDEO_ENCODER_OUTPUT_DATA_TYPE_IDR == pktType;
+        }
+        else if (AMFVideoEncoder_HEVC == m_codec)
+        {
+            uint64_t pktType;
+            pData->GetProperty(AMF_VIDEO_ENCODER_HEVC_OUTPUT_DATA_TYPE, &pktType);
+            packet->keyframe = AMF_VIDEO_ENCODER_HEVC_OUTPUT_DATA_TYPE_IDR == pktType;
+        }
+    }
 };
 
 static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
