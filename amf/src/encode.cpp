@@ -190,7 +190,6 @@ public:
             m_AMFEncoder->Terminate();
             m_AMFEncoder = NULL;
         }
-        // to-do: Got Possible memory leak detected when use OpenCLSubmission
         if (m_AMFContext)
         {
             m_AMFContext->Terminate();
@@ -230,7 +229,7 @@ private:
         case amf::AMF_MEMORY_DX11:
             res = m_AMFContext->InitDX11(NULL); // can be DX11 device
             AMF_RETURN_IF_FAILED(res, L"InitDX11(NULL) failed");
-            // m_OpenCLSubmission = true;
+            m_OpenCLSubmission = true;
             break;
         #endif
         case amf::AMF_MEMORY_VULKAN:
