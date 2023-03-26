@@ -204,7 +204,7 @@ extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32
         uint8_t *pData = datas[0];
         if (len == pEnc->GetFrameSize())
         {
-            std::vector<std::vector<uint8_t>> vPacket;
+            std::vector<NvPacket> vPacket;
             const NvEncInputFrame* encoderInputFrame = pEnc->GetNextInputFrame();
             NvEncoderCuda::CopyToDeviceFrame(e->cuda_dl, cuContext, pData, 0, (CUdeviceptr)encoderInputFrame->inputPtr,
                 (int)encoderInputFrame->pitch,
@@ -215,9 +215,10 @@ extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32
                 encoderInputFrame->chromaOffsets,
                 encoderInputFrame->numChromaPlanes);
             pEnc->EncodeFrame(vPacket);
-            for (std::vector<uint8_t> &packet : vPacket)
+            for (NvPacket &packet : vPacket)
             {
-                callback(packet.data(), packet.size(), 0, 0, obj);
+                int32_t key = packet.pictureType == NV_ENC_PIC_TYPE_IDR ? 1 : 0;
+                callback(packet.data.data(), packet.data.size(), 0, key, obj);
                 encoded = true;
             }
         }
