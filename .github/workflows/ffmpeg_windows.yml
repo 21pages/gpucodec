@@ -1,0 +1,91 @@
+name: ffmpeg_windows
+
+on:
+  workflow_dispatch:
+
+env:
+  TAG_NAME: "dev"
+
+permissions:
+  contents: write
+
+jobs:
+
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+
+    - uses: actions/checkout@v2
+    - uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Msys2
+      uses: msys2/setup-msys2@v2
+      with:
+        path-type: inherit
+        update: true
+        install: >-
+          git
+          base-devel
+          diffutils
+          make
+          cmake
+          pkg-config
+          yasm
+          nasm
+
+    - name: Source FFmpeg
+      run: |
+        git clone --depth=1 https://github.com/FFmpeg/FFmpeg.git
+    
+    - name: Configure
+      working-directory: ${{github.workspace}}/FFmpeg
+      shell: msys2 {0}
+      run: |
+        CC=cl.exe \
+        ./configure  \
+        --toolchain=msvc \
+        --prefix=../windows \
+        --disable-shared \
+        --disable-all \
+        --disable-runtime-cpudetect \
+        --disable-autodetect  \
+        --disable-network \
+        --disable-doc \
+        --disable-htmlpages \
+        --disable-manpages \
+        --disable-podpages \
+        --disable-txtpages \
+        --disable-debug \
+        --enable-avformat \
+        --enable-avcodec \
+        --enable-muxer=mp4 \
+        --enable-protocol=file
+
+    - name: Build
+      working-directory: FFmpeg
+      shell: msys2 {0}
+      run: |
+        make -j32 && make install
+    
+    - name: Create Archive
+      uses: thedoctor0/zip-release@0.7.1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        type: 'zip'
+        filename: 'ffmpeg_windows_x86_64.zip'
+        path: 'windows'
+    
+    - name: Publish
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        prerelease: true
+        tag_name: ${{ env.TAG_NAME }}
+        files: | 
+          ./ffmpeg_windows_x86_64.zip
+
+

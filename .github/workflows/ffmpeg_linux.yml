@@ -1,0 +1,73 @@
+name: ffmpeg_linux
+
+on:
+  workflow_dispatch:
+
+env:
+  TAG_NAME: "dev"
+
+permissions:
+  contents: write
+
+jobs:
+
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+
+    - uses: actions/checkout@v2
+
+    - name: tools
+      run: |
+        sudo apt-get -y install yasm pkg-config
+
+    - name: Source FFmpeg
+      run: |
+        git clone --depth=1 https://github.com/FFmpeg/FFmpeg.git
+    
+    - name: Configure
+      working-directory: ${{github.workspace}}/FFmpeg
+      run: |
+        CC=gcc \
+        ./configure  \
+        --prefix=../linux \
+        --disable-shared \
+        --disable-all \
+        --disable-runtime-cpudetect \
+        --disable-autodetect  \
+        --disable-network \
+        --disable-doc \
+        --disable-htmlpages \
+        --disable-manpages \
+        --disable-podpages \
+        --disable-txtpages \
+        --disable-debug \
+        --enable-avformat \
+        --enable-avcodec \
+        --enable-muxer=mp4 \
+        --enable-protocol=file
+
+    - name: Build
+      working-directory: FFmpeg
+      run: |
+        make -j32 && make install
+    
+    - name: Create Archive
+      uses: thedoctor0/zip-release@0.7.1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        type: 'zip'
+        filename: 'ffmpeg_linux_x86_64.zip'
+        path: 'linux'
+    
+    - name: Publish
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        prerelease: true
+        tag_name: ${{ env.TAG_NAME }}
+        files: | 
+          ./ffmpeg_linux_x86_64.zip
+
+
