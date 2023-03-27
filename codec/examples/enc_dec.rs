@@ -34,7 +34,14 @@ fn main() {
     let input_dir = PathBuf::from("D:\\tmp\\input");
     let output_dir = PathBuf::from("D:\\tmp");
     let yuv_file_name = input_dir.join("2880x1800_nv12.yuv");
-    let encoded_file_name = output_dir.join("2880x1800_encoded.264");
+    let encoded_file_name = output_dir.join(format!(
+        "2880x1800_encoded.{}",
+        if en_ctx.dataFormat == DataFormat::H264 {
+            "264"
+        } else {
+            "265"
+        }
+    ));
     let decoded_file_name = output_dir.join("2880x1800_nv12_decoded.yuv");
     let mut yuv_file = std::fs::File::open(yuv_file_name).unwrap();
     let mut encoded_file = std::fs::File::create(encoded_file_name).unwrap();

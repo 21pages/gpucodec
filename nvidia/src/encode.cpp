@@ -106,6 +106,10 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
     Encoder * e = NULL;
     try 
     {
+        if (width % 2 != 0 || height % 2 != 0)
+        {
+            goto _exit;
+        }
         (void)device;
         if (nformat != NV12)
         {

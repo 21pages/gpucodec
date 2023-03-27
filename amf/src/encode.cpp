@@ -416,6 +416,10 @@ extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, DataFo
 {
     try 
     {
+        if (width % 2 != 0 || height % 2 != 0)
+        {
+            return NULL;
+        }
         amf_wstring codecStr;
         if (!convert_codec(dataFormat, codecStr))
         {
