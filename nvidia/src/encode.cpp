@@ -64,7 +64,6 @@ struct Encoder
     int32_t height;
     NV_ENC_BUFFER_FORMAT format;
     int gpu;
-    NvEncoderInitParam initParam;
     NvEncoderCuda *pEnc = NULL;
     CUcontext cuContext = NULL;
 
@@ -129,7 +128,6 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
             std::cout << "failed to new Encoder" << std::endl;
             goto _exit;
         }
-        NvEncoderInitParam initParam;
         if(!ck(e->cuda_dl->cuInit(0)))
         {
             goto _exit;
@@ -161,8 +159,8 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
         }
 
         e->pEnc = new NvEncoderCuda(e->cuda_dl, e->nvenc_dl, e->cuContext, e->width, e->height, e->format, 0); // no delay
-        NV_ENC_INITIALIZE_PARAMS initializeParams = { NV_ENC_INITIALIZE_PARAMS_VER };
-        NV_ENC_CONFIG encodeConfig = { NV_ENC_CONFIG_VER };
+        NV_ENC_INITIALIZE_PARAMS initializeParams = { 0 };
+        NV_ENC_CONFIG encodeConfig = { 0 };
 
         initializeParams.encodeConfig = &encodeConfig;
         e->pEnc->CreateDefaultEncoderParams(&initializeParams, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P3_GUID, NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY);
@@ -235,7 +233,49 @@ extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32
     return -1;
 }
 
-// extern "C" int nvidia_encode_linesize(PixelFormat format, int32_t linesizes[MAX_DATA_NUM])
-// {
+#define RECONFIGURE_HEAD                            \
+Encoder *enc = (Encoder*)e;                         \
+NV_ENC_CONFIG sEncodeConfig = { 0 };                \
+NV_ENC_INITIALIZE_PARAMS sInitializeParams = { 0 }; \
+sInitializeParams.encodeConfig = &sEncodeConfig;    \
+enc->pEnc->GetInitializeParams(&sInitializeParams); \
+NV_ENC_RECONFIGURE_PARAMS params = { 0 };           \
+params.version = NV_ENC_RECONFIGURE_PARAMS_VER;     \
+params.reInitEncodeParams = sInitializeParams;
 
-// }
+#define RECONFIGURE_TAIL                            \
+if (enc->pEnc->Reconfigure(&params))                \
+{                                                   \
+    return 0;                                       \
+}                                                   \
+
+extern "C" int nvidia_set_bitrate(void *e, int32_t bitrate)
+{
+    try
+    {
+        RECONFIGURE_HEAD
+        params.reInitEncodeParams.encodeConfig->rcParams.averageBitRate = bitrate;
+        RECONFIGURE_TAIL
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;    
+}
+
+extern "C" int nvidia_set_framerate(void *e, int32_t framerate)
+{
+    try
+    {
+        RECONFIGURE_HEAD
+        params.reInitEncodeParams.frameRateNum = framerate;
+        params.reInitEncodeParams.frameRateDen = 1;
+        RECONFIGURE_TAIL
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;    
+}

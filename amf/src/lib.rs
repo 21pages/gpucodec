@@ -15,6 +15,8 @@ pub fn encode_calls() -> EncodeCalls {
         new: amf_new_encoder,
         encode: amf_encode,
         destroy: amf_destroy_encoder,
+        set_bitrate: amf_set_bitrate,
+        set_framerate: amf_set_framerate,
     }
 }
 
@@ -35,7 +37,7 @@ pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
     #[cfg(windows)]
     devices.append(&mut vec![DX9, DX11, OPENCL]);
     #[cfg(target_os = "linux")]
-    devices.append(&mut vec![VULKAN]);
+    devices.append(&mut vec![VULKAN, OPENCL, OPENGL]);
     let codecs = vec![H264, H265];
 
     let mut v = vec![];
@@ -58,7 +60,7 @@ pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
     #[cfg(windows)]
     devices.append(&mut vec![DX9, DX11, DX12, OPENCL, OPENGL, VULKAN]);
     #[cfg(target_os = "linux")]
-    devices.append(&mut vec![VULKAN]);
+    devices.append(&mut vec![VULKAN, OPENCL, OPENGL]);
     let codecs = vec![H264, H265];
 
     let mut v = vec![];

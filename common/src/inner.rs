@@ -18,30 +18,32 @@ pub type EncodeCall = unsafe extern "C" fn(
     obj: *mut c_void,
 ) -> c_int;
 
-pub type DestroyEncoderCall = unsafe extern "C" fn(encoder: *mut c_void) -> c_int;
-
 pub type NewDecoderCall =
     unsafe extern "C" fn(device: i32, format: i32, codecID: i32, gpu: i32) -> *mut c_void;
 
 pub type DecodeCall = unsafe extern "C" fn(
-    decoder: *mut ::std::os::raw::c_void,
+    decoder: *mut c_void,
     data: *mut u8,
     length: i32,
     callback: DecodeCallback,
-    obj: *mut ::std::os::raw::c_void,
+    obj: *mut c_void,
 ) -> c_int;
 
-pub type DestroyDecoderCall = unsafe extern "C" fn(decoder: *mut c_void) -> c_int;
+pub type IVCall = unsafe extern "C" fn(v: *mut c_void) -> c_int;
+
+pub type IVICall = unsafe extern "C" fn(v: *mut c_void, v: i32) -> c_int;
 
 pub struct EncodeCalls {
     pub new: NewEncoderCall,
     pub encode: EncodeCall,
-    pub destroy: DestroyEncoderCall,
+    pub destroy: IVCall,
+    pub set_bitrate: IVICall,
+    pub set_framerate: IVICall,
 }
 pub struct DecodeCalls {
     pub new: NewDecoderCall,
     pub decode: DecodeCall,
-    pub destroy: DestroyDecoderCall,
+    pub destroy: IVCall,
 }
 
 pub struct InnerEncodeContext {

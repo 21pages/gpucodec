@@ -87,6 +87,24 @@ impl Encoder {
             });
         }
     }
+
+    pub fn set_bitrate(&mut self, bitrate: i32) -> Result<(), i32> {
+        unsafe {
+            match (self.calls.set_bitrate)(&mut *self.codec, bitrate) {
+                0 => Ok(()),
+                err => Err(err),
+            }
+        }
+    }
+
+    pub fn set_framerate(&mut self, framerate: i32) -> Result<(), i32> {
+        unsafe {
+            match (self.calls.set_framerate)(&mut *self.codec, framerate) {
+                0 => Ok(()),
+                err => Err(err),
+            }
+        }
+    }
 }
 
 impl Drop for Encoder {

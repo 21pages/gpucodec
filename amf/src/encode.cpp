@@ -498,7 +498,7 @@ extern "C" int amf_driver_support()
     return -1;
 }
 
-extern "C" int amf_set_bitrate(void *e, int64_t bitrate)
+extern "C" int amf_set_bitrate(void *e, int32_t bitrate)
 {
     try
     {
@@ -522,13 +522,13 @@ extern "C" int amf_set_bitrate(void *e, int64_t bitrate)
     return -1;    
 }
 
-extern "C" int amf_set_framerate(void *e, int32_t v)
+extern "C" int amf_set_framerate(void *e, int32_t framerate)
 {
     try
     {
         Encoder *enc = (Encoder*)e;
         AMF_RESULT res = AMF_FAIL;
-        AMFRate rate = ::AMFConstructRate(v, 1);
+        AMFRate rate = ::AMFConstructRate(framerate, 1);
         switch (enc->m_dataFormat)
         {
         case H264:

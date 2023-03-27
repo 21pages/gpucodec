@@ -15,6 +15,8 @@ pub fn encode_calls() -> EncodeCalls {
         new: nvidia_new_encoder,
         encode: nvidia_encode,
         destroy: nvidia_destroy_encoder,
+        set_bitrate: nvidia_set_bitrate,
+        set_framerate: nvidia_set_framerate,
     }
 }
 

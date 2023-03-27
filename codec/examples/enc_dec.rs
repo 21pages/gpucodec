@@ -13,7 +13,7 @@ fn main() {
         driver: EncodeDriver::AMF,
         device: HWDeviceType::DX11,
         pixfmt: PixelFormat::NV12,
-        dataFormat: DataFormat::H264,
+        dataFormat: DataFormat::H265,
         width: 2880,
         height: 1800,
         gpu: 0,
@@ -22,11 +22,14 @@ fn main() {
         driver: DecodeDriver::AMF,
         device: HWDeviceType::DX11,
         pixfmt: PixelFormat::NV12,
-        dataFormat: DataFormat::H264,
+        dataFormat: DataFormat::H265,
         gpu: 0,
     };
     let mut encoder = Encoder::new(en_ctx.clone()).unwrap();
     let mut decoder = Decoder::new(de_ctx.clone()).unwrap();
+
+    encoder.set_bitrate(5_000_000).unwrap();
+    encoder.set_framerate(30).unwrap();
 
     let input_dir = PathBuf::from("D:\\tmp\\input");
     let output_dir = PathBuf::from("D:\\tmp");
