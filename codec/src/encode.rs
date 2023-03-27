@@ -88,9 +88,9 @@ impl Encoder {
         }
     }
 
-    pub fn set_bitrate(&mut self, bitrate: i32) -> Result<(), i32> {
+    pub fn set_bitrate(&mut self, kbitrate: i32) -> Result<(), i32> {
         unsafe {
-            match (self.calls.set_bitrate)(&mut *self.codec, bitrate) {
+            match (self.calls.set_bitrate)(&mut *self.codec, kbitrate * 1000) {
                 0 => Ok(()),
                 err => Err(err),
             }
