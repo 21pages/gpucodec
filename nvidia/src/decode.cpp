@@ -1,3 +1,6 @@
+#define FFNV_LOG_FUNC
+#define FFNV_DEBUG_LOG_FUNC
+
 #include <iostream>
 #include <algorithm>
 #include <thread>
@@ -45,7 +48,6 @@ extern "C" int nvidia_decode_driver_support()
     }
     catch(const std::exception& e)
     {
-        std::cerr << e.what() << '\n';
     }
     return -1;
 }

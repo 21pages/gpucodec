@@ -497,7 +497,6 @@ extern "C" int amf_driver_support()
     }
     catch(const std::exception& e)
     {
-        std::cerr << e.what() << '\n';
     }
     return -1;
 }
