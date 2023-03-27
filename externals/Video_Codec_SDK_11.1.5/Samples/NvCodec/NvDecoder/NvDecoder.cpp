@@ -451,11 +451,11 @@ int NvDecoder::ReconfigureDecoder(CUVIDEOFORMAT *pVideoFormat)
 
     reconfigParams.ulNumDecodeSurfaces = nDecodeSurface;
 
-    START_TIMER
+    // START_TIMER
     CUDA_DRVAPI_CALL(cuCtxPushCurrent(m_cuContext));
     NVDEC_API_CALL(cuvidReconfigureDecoder(m_hDecoder, &reconfigParams));
     CUDA_DRVAPI_CALL(cuCtxPopCurrent(NULL));
-    STOP_TIMER("Session Reconfigure Time: ");
+    // STOP_TIMER("Session Reconfigure Time: ");
 
     return nDecodeSurface;
 }

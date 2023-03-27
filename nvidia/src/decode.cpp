@@ -145,7 +145,6 @@ extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, Dat
         {
             goto _exit;
         }
-        std::cout << "GPU in use: " << szDeviceName << std::endl;
         if (!ck(p->cudl->cuCtxCreate(&p->cuContext, 0, cuDevice)))
         {
             goto _exit;
