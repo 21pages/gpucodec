@@ -149,6 +149,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ffmpeg"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "cc",
+ "codec_common",
+ "env_logger",
+ "hwcodec",
+ "log",
+]
+
+[[package]]
 name = "glob"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -239,18 +251,6 @@ name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
-
-[[package]]
-name = "mux"
-version = "0.1.0"
-dependencies = [
- "bindgen",
- "cc",
- "codec_common",
- "env_logger",
- "hwcodec",
- "log",
-]
 
 [[package]]
 name = "nom"

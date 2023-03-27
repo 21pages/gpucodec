@@ -1,7 +1,7 @@
 use codec_common::{DataFormat, EncodeContext, EncodeDriver, HWDeviceType, PixelFormat};
 use env_logger::{init_from_env, Env, DEFAULT_FILTER_ENV};
+use ffmpeg::mux::{MuxContext, Muxer};
 use hwcodec::encode::Encoder;
-use mux::mux::{MuxContext, Muxer};
 use std::{io::Read, path::PathBuf, time::Instant};
 
 fn main() {
