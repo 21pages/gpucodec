@@ -16,10 +16,15 @@ fn main() {
 #[derive(Debug)]
 struct MyCallbacks;
 impl bindgen::callbacks::ParseCallbacks for MyCallbacks {
-    fn add_derives(&self, _name: &str) -> Vec<String> {
-        vec!["Serialize", "Deserialize"]
-            .drain(..)
-            .map(|s| s.to_string())
-            .collect()
+    fn add_derives(&self, name: &str) -> Vec<String> {
+        let names = vec!["DataFormat", "HWDeviceType", "PixelFormat"];
+        if names.contains(&name) {
+            vec!["Serialize", "Deserialize"]
+                .drain(..)
+                .map(|s| s.to_string())
+                .collect()
+        } else {
+            vec![]
+        }
     }
 }
