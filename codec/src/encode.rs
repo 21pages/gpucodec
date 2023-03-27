@@ -6,7 +6,6 @@ use log::trace;
 use serde_derive::{Deserialize, Serialize};
 use std::{
     fmt::Display,
-    ops::Index,
     os::raw::{c_int, c_void},
     slice::from_raw_parts,
     sync::{Arc, Condvar, Mutex},
