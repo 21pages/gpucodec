@@ -3,6 +3,7 @@ use codec_common::{
     inner::DecodeCalls,
     DataFormat::*,
     DecodeContext, DecodeDriver,
+    HWDeviceType::*,
     PixelFormat::{self, NV12},
     MAX_DATA_NUM,
 };
@@ -239,16 +240,36 @@ pub struct Best {
 
 impl Best {
     pub fn new(decoders: Vec<DecodeContext>) -> Self {
-        let h264s: Vec<_> = decoders
+        let mut h264s: Vec<_> = decoders
             .iter()
             .filter(|e| e.dataFormat == H264)
             .map(|e| e.to_owned())
             .collect();
-        let h265s: Vec<_> = decoders
+        let mut h265s: Vec<_> = decoders
             .iter()
             .filter(|e| e.dataFormat == H265)
             .map(|e| e.to_owned())
             .collect();
+        let sort = |h26xs: &mut Vec<DecodeContext>| {
+            let device_order = vec![CUDA, VULKAN, DX11, DX12, DX9, OPENCL, OPENGL, DX10, HOST];
+            h26xs.sort_by(|a, b| {
+                let mut index_a = device_order.len();
+                let mut index_b = device_order.len();
+                for i in 0..device_order.len() {
+                    if a.device == device_order[i] {
+                        index_a = i;
+                    }
+                    if b.device == device_order[i] {
+                        index_b = i;
+                    }
+                }
+                index_a
+                    .partial_cmp(&index_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        };
+        sort(&mut h264s);
+        sort(&mut h265s);
         Self {
             h264: h264s.first().cloned(),
             h265: h265s.first().cloned(),

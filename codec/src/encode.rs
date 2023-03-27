@@ -1,11 +1,12 @@
 use codec_common::{
-    inner::EncodeCalls, DataFormat::*, EncodeContext, EncodeDriver::*, PixelFormat::NV12,
-    MAX_DATA_NUM,
+    inner::EncodeCalls, DataFormat::*, EncodeContext, EncodeDriver::*, HWDeviceType::*,
+    PixelFormat::NV12, MAX_DATA_NUM,
 };
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
 use std::{
     fmt::Display,
+    ops::Index,
     os::raw::{c_int, c_void},
     slice::from_raw_parts,
     sync::{Arc, Condvar, Mutex},
@@ -209,16 +210,36 @@ pub struct Best {
 
 impl Best {
     pub fn new(encoders: Vec<EncodeContext>) -> Self {
-        let h264s: Vec<_> = encoders
+        let mut h264s: Vec<_> = encoders
             .iter()
             .filter(|e| e.dataFormat == H264)
             .map(|e| e.to_owned())
             .collect();
-        let h265s: Vec<_> = encoders
+        let mut h265s: Vec<_> = encoders
             .iter()
             .filter(|e| e.dataFormat == H265)
             .map(|e| e.to_owned())
             .collect();
+        let sort = |h26xs: &mut Vec<EncodeContext>| {
+            let device_order = vec![CUDA, DX11, DX12, DX9, VULKAN, OPENGL, OPENCL, DX10, HOST];
+            h26xs.sort_by(|a, b| {
+                let mut index_a = device_order.len();
+                let mut index_b = device_order.len();
+                for i in 0..device_order.len() {
+                    if a.device == device_order[i] {
+                        index_a = i;
+                    }
+                    if b.device == device_order[i] {
+                        index_b = i;
+                    }
+                }
+                index_a
+                    .partial_cmp(&index_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        };
+        sort(&mut h264s);
+        sort(&mut h265s);
         Self {
             h264: h264s.first().cloned(),
             h265: h265s.first().cloned(),
