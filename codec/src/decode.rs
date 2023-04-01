@@ -251,7 +251,7 @@ impl Best {
             .map(|e| e.to_owned())
             .collect();
         let sort = |h26xs: &mut Vec<DecodeContext>| {
-            let device_order = vec![CUDA, VULKAN, DX11, DX12, DX9, OPENCL, OPENGL, DX10, HOST];
+            let device_order = vec![CUDA, DX11, DX12, DX9, OPENCL, OPENGL, VULKAN, DX10, HOST];
             h26xs.sort_by(|a, b| {
                 let mut index_a = device_order.len();
                 let mut index_b = device_order.len();
