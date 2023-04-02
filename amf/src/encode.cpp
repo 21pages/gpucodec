@@ -65,6 +65,7 @@ public:
     AMF_RESULT init_result = AMF_FAIL;
     DataFormat m_dataFormat;
     amf::AMFComponentPtr m_AMFEncoder = NULL;
+    int32_t m_pitchs[MAX_DATA_NUM] = { 0 };
 private:
     // AMF Internals
     AMFFactoryHelper m_AMFFactory;
@@ -134,7 +135,9 @@ public:
                 const amf_size        l_size[]   = {(amf_size)width, (amf_size)height, 1};
                 res = m_AMFCompute->CopyPlaneFromHost(frame->data[i], l_origin, l_size, frame->linesize[i],
                                                     plane, false);
+                AMF_RETURN_IF_FAILED(res, L"CopyPlaneFromHost() failed");
             }
+            plane = NULL;
         }
 
         if (m_AMFCompute != NULL)
@@ -275,6 +278,17 @@ private:
         res = m_AMFEncoder->Init(m_AMFSurfaceFormat, m_Resolution.first, m_Resolution.second);
         AMF_RETURN_IF_FAILED(res, L"encoder->Init() failed");
 
+        amf::AMFSurfacePtr surface = NULL;
+        res = allocate_surface(surface);
+        AMF_RETURN_IF_FAILED(res, L"allocate_surface() failed");
+        amf::AMFPlanePtr plane_y = surface->GetPlane(amf::AMF_PLANE_Y);
+        m_pitchs[0] = plane_y->GetHPitch();
+        plane_y = NULL;
+        amf::AMFPlanePtr plane_uv = surface->GetPlane(amf::AMF_PLANE_UV);
+        m_pitchs[1] = plane_uv->GetHPitch();
+        plane_uv = NULL;
+        surface = NULL;
+
         return AMF_OK;
     }
 
@@ -412,7 +426,8 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 #include "common.cpp"
 
 extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat,
-                                int32_t width, int32_t height, int32_t gpu) 
+                                int32_t width, int32_t height, int32_t gpu,
+                                int32_t pitchs[MAX_DATA_NUM]) 
 {
     try 
     {
@@ -441,6 +456,8 @@ extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, DataFo
             delete enc;
             enc = NULL;
         }
+        pitchs[0] = enc->m_pitchs[0];
+        pitchs[1] = enc->m_pitchs[1];
         return enc;
     } 
     catch(const std::exception& e)

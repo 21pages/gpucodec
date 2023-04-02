@@ -103,7 +103,7 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
     return -1;
 }
 
-extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, DataFormat dataFormat, int32_t width, int32_t height, int32_t gpu)
+extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, DataFormat dataFormat, int32_t width, int32_t height, int32_t gpu, int32_t pitchs[MAX_DATA_NUM])
 {
     Encoder * e = NULL;
     try 
@@ -175,6 +175,11 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
         initializeParams.encodeConfig->rcParams.lookaheadDepth = 0;
 
         e->pEnc->CreateEncoder(&initializeParams);
+
+        const NvEncInputFrame* frame = e->pEnc->GetNextInputFrame();
+        pitchs[0] = frame->pitch;
+        pitchs[1] = frame->chromaPitch;
+
         return e;
     }
     catch (const std::exception &ex)
@@ -202,32 +207,26 @@ extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32
         CUcontext cuContext = e->cuContext;
         bool encoded = false;
 
-        // to-do: linesizes, wrong calculate
-        int len = e->height * (linesizes[0] + linesizes[1] / 2);
+        // Memory needs to be contiguous
         uint8_t *pData = datas[0];
-        if (len == pEnc->GetFrameSize())
+        // NV12 in SDK: srcChromaPitch = srcPitch
+        uint32_t srcPitch = linesizes[0];
+        std::vector<NvPacket> vPacket;
+        const NvEncInputFrame* encoderInputFrame = pEnc->GetNextInputFrame();
+        NvEncoderCuda::CopyToDeviceFrame(e->cuda_dl, cuContext, pData, srcPitch, (CUdeviceptr)encoderInputFrame->inputPtr,
+            (int)encoderInputFrame->pitch,
+            pEnc->GetEncodeWidth(),
+            pEnc->GetEncodeHeight(),
+            CU_MEMORYTYPE_HOST, 
+            encoderInputFrame->bufferFormat,
+            encoderInputFrame->chromaOffsets,
+            encoderInputFrame->numChromaPlanes);
+        pEnc->EncodeFrame(vPacket);
+        for (NvPacket &packet : vPacket)
         {
-            std::vector<NvPacket> vPacket;
-            const NvEncInputFrame* encoderInputFrame = pEnc->GetNextInputFrame();
-            NvEncoderCuda::CopyToDeviceFrame(e->cuda_dl, cuContext, pData, 0, (CUdeviceptr)encoderInputFrame->inputPtr,
-                (int)encoderInputFrame->pitch,
-                pEnc->GetEncodeWidth(),
-                pEnc->GetEncodeHeight(),
-                CU_MEMORYTYPE_HOST, 
-                encoderInputFrame->bufferFormat,
-                encoderInputFrame->chromaOffsets,
-                encoderInputFrame->numChromaPlanes);
-            pEnc->EncodeFrame(vPacket);
-            for (NvPacket &packet : vPacket)
-            {
-                int32_t key = packet.pictureType == NV_ENC_PIC_TYPE_IDR ? 1 : 0;
-                callback(packet.data.data(), packet.data.size(), 0, key, obj);
-                encoded = true;
-            }
-        }
-        else
-        {
-             std::cerr << len << " != " << pEnc->GetFrameSize()  << '\n';
+            int32_t key = packet.pictureType == NV_ENC_PIC_TYPE_IDR ? 1 : 0;
+            callback(packet.data.data(), packet.data.size(), 0, key, obj);
+            encoded = true;
         }
         return encoded ? 0 : -1;
     }

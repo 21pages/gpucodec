@@ -28,6 +28,8 @@ fn main() {
     let mut encoder = Encoder::new(en_ctx.clone()).unwrap();
     let mut decoder = Decoder::new(de_ctx.clone()).unwrap();
 
+    println!("pitchs:{:?}", encoder.pitchs);
+
     encoder.set_bitrate(5_000).unwrap();
     encoder.set_framerate(30).unwrap();
 
