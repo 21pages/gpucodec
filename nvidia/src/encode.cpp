@@ -65,12 +65,11 @@ struct Encoder
     int32_t width;
     int32_t height;
     NV_ENC_BUFFER_FORMAT format;
-    int gpu;
     NvEncoderCuda *pEnc = NULL;
     CUcontext cuContext = NULL;
 
-    Encoder(int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format, int32_t gpu):
-        width(width), height(height), format(format), gpu(gpu)
+    Encoder(int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format):
+        width(width), height(height), format(format)
     {
         load_driver(&cuda_dl, &nvenc_dl);
     }
@@ -103,7 +102,7 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
     return -1;
 }
 
-extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, DataFormat dataFormat, int32_t width, int32_t height, int32_t gpu, int32_t pitchs[MAX_DATA_NUM])
+extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, DataFormat dataFormat, int32_t width, int32_t height, int32_t pitchs[MAX_DATA_NUM])
 {
     Encoder * e = NULL;
     try 
@@ -128,7 +127,7 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
             guidCodec = NV_ENC_CODEC_HEVC_GUID;
         }
 
-        e = new Encoder(width, height, format, gpu);
+        e = new Encoder(width, height, format);
         if (!e)
         {
             std::cout << "failed to new Encoder" << std::endl;
@@ -138,12 +137,12 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
         {
             goto _exit;
         }
-        int nGpu = 0;
+        int nGpu = 0, gpu = 0;
         if (!ck(e->cuda_dl->cuDeviceGetCount(&nGpu)))
         {
             goto _exit;
         }
-        if (gpu < 0 || gpu >= nGpu)
+        if (gpu >= nGpu)
         {
             std::cout << "GPU ordinal out of range. Should be within [" << 0 << ", " << nGpu - 1 << "]" << std::endl;
             goto _exit;

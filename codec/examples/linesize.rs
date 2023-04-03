@@ -18,14 +18,12 @@ fn main() {
         dataFormat: DataFormat::H264,
         width,
         height,
-        gpu: 0,
     };
     let de_ctx = DecodeContext {
         driver: DecodeDriver::AMF,
         device: HWDeviceType::DX11,
         pixfmt: PixelFormat::NV12,
         dataFormat: en_ctx.dataFormat,
-        gpu: 0,
     };
     let mut encoder = Encoder::new(en_ctx.clone()).unwrap();
     let mut decoder = Decoder::new(de_ctx.clone()).unwrap();

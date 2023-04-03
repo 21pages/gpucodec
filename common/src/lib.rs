@@ -28,7 +28,6 @@ pub struct EncodeContext {
     pub dataFormat: DataFormat,
     pub width: i32,
     pub height: i32,
-    pub gpu: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -37,5 +36,4 @@ pub struct DecodeContext {
     pub device: HWDeviceType,
     pub pixfmt: PixelFormat,
     pub dataFormat: DataFormat,
-    pub gpu: i32,
 }

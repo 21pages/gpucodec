@@ -41,7 +41,6 @@ impl Encoder {
                 ctx.dataFormat as i32,
                 ctx.width,
                 ctx.height,
-                ctx.gpu,
                 pitchs.as_mut_ptr(),
             );
             if codec.is_null() {
@@ -150,7 +149,6 @@ fn available_() -> Vec<EncodeContext> {
     // to-do: disable log
     let width = 1920;
     let height = 1080;
-    let gpu = 0;
     let format = NV12;
     let mut natives: Vec<_> = nvidia::possible_support_encoders()
         .drain(..)
@@ -169,7 +167,6 @@ fn available_() -> Vec<EncodeContext> {
         dataFormat: n.format,
         width,
         height,
-        gpu,
     });
     // https://forums.developer.nvidia.com/t/is-there-limit-for-multi-thread-encoder/73187
     // https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new

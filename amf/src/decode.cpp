@@ -226,11 +226,10 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat, int32_t iGpu)
+extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat)
 {
     try
     {
-        (void)iGpu;
         amf_wstring codecStr;
         if (!convert_codec(dataFormat, codecStr))
         {

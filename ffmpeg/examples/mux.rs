@@ -17,7 +17,6 @@ fn main() {
         dataFormat: DataFormat::H265,
         width: 2880,
         height: 1800,
-        gpu: 0,
     };
     let mut_ctx = MuxContext {
         filename: output_dir.join("output.mp4").to_string_lossy().to_string(),

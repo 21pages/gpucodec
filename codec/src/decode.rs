@@ -36,12 +36,7 @@ impl Decoder {
             AMF => amf::decode_calls(),
         };
         unsafe {
-            let codec = (calls.new)(
-                ctx.device as i32,
-                ctx.pixfmt as i32,
-                ctx.dataFormat as i32,
-                ctx.gpu,
-            );
+            let codec = (calls.new)(ctx.device as i32, ctx.pixfmt as i32, ctx.dataFormat as i32);
             if codec.is_null() {
                 return Err(());
             }
@@ -163,7 +158,6 @@ pub fn available() -> Vec<DecodeContext> {
 
 fn available_() -> Vec<DecodeContext> {
     // to-do: log control
-    let gpu = 0;
     let format = NV12;
     let mut natives: Vec<_> = nvidia::possible_support_decoders()
         .drain(..)
@@ -180,7 +174,6 @@ fn available_() -> Vec<DecodeContext> {
         device: n.device,
         pixfmt: format,
         dataFormat: n.dataFormat,
-        gpu,
     });
     let outputs = Arc::new(Mutex::new(Vec::<DecodeContext>::new()));
     let mut p_bin_264: *mut u8 = std::ptr::null_mut();

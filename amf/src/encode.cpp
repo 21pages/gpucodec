@@ -426,8 +426,7 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 #include "common.cpp"
 
 extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat,
-                                int32_t width, int32_t height, int32_t gpu,
-                                int32_t pitchs[MAX_DATA_NUM]) 
+                                int32_t width, int32_t height, int32_t pitchs[MAX_DATA_NUM]) 
 {
     try 
     {

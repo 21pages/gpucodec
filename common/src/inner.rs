@@ -7,7 +7,6 @@ pub type NewEncoderCall = unsafe extern "C" fn(
     codecID: i32,
     width: i32,
     height: i32,
-    gpu: i32,
     pitchs: *mut i32,
 ) -> *mut c_void;
 
@@ -20,7 +19,7 @@ pub type EncodeCall = unsafe extern "C" fn(
 ) -> c_int;
 
 pub type NewDecoderCall =
-    unsafe extern "C" fn(device: i32, format: i32, codecID: i32, gpu: i32) -> *mut c_void;
+    unsafe extern "C" fn(device: i32, format: i32, codecID: i32) -> *mut c_void;
 
 pub type DecodeCall = unsafe extern "C" fn(
     decoder: *mut c_void,

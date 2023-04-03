@@ -111,7 +111,7 @@ static bool dataFormat_to_cuCodecID(DataFormat dataFormat, cudaVideoCodec &cuda)
     return true;
 }
 
-extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat, int32_t iGpu) 
+extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat) 
 {
     Decoder *p = NULL;
     try
@@ -130,15 +130,15 @@ extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, Dat
         {
             goto _exit;
         }
-        int nGpu = 0;
+        int nGpu = 0, gpu = 0;
         ck(p->cudl->cuDeviceGetCount(&nGpu));
-        if (iGpu < 0 || iGpu >= nGpu) {
+        if (gpu >= nGpu) {
             std::cout << "GPU ordinal out of range. Should be within [" << 0 << ", " << nGpu - 1 << "]" << std::endl;
             goto _exit;
         }
 
         CUdevice cuDevice = 0;
-        if (!ck(p->cudl->cuDeviceGet(&cuDevice, iGpu)))
+        if (!ck(p->cudl->cuDeviceGet(&cuDevice, gpu)))
         {
             goto _exit;
         }
