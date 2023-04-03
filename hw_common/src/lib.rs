@@ -21,13 +21,25 @@ pub enum DecodeDriver {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct EncodeContext {
+pub struct StaticContext {
     pub driver: EncodeDriver,
     pub device: HWDeviceType,
     pub pixfmt: PixelFormat,
     pub dataFormat: DataFormat,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+pub struct DynamicContext {
     pub width: i32,
     pub height: i32,
+    pub kbitrate: i32,
+    pub framerate: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct EncodeContext {
+    pub s: StaticContext,
+    pub d: DynamicContext,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
