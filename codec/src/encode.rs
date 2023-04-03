@@ -26,6 +26,9 @@ unsafe impl Sync for Encoder {}
 
 impl Encoder {
     pub fn new(ctx: EncodeContext) -> Result<Self, ()> {
+        if ctx.width % 2 == 1 || ctx.height % 2 == 1 {
+            return Err(());
+        }
         let calls = match ctx.driver {
             NVENC => nvidia::encode_calls(),
             AMF => amf::encode_calls(),
