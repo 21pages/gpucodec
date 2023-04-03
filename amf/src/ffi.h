@@ -1,7 +1,7 @@
 #ifndef AMF_FFI_H
 #define AMF_FFI_H
 
-#include "../../common/src/callback.h"
+#include "../../hw_common/src/callback.h"
 
 int amf_driver_support();
 

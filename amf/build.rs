@@ -44,7 +44,7 @@ fn main() {
 
     // crate
     builder
-        .include(manifest_dir.parent().unwrap().join("common").join("src"))
+        .include(manifest_dir.parent().unwrap().join("hw_common").join("src"))
         .file("src/encode.cpp")
         .file("src/decode.cpp")
         .cpp(false)

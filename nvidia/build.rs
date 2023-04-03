@@ -66,7 +66,7 @@ fn main() {
     }
 
     // crate
-    builder.include("../common/src");
+    builder.include("../hw_common/src");
     builder
         .file("src/encode.cpp")
         .file("src/decode.cpp")

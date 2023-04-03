@@ -1,2 +1,2 @@
 [workspace]
-members = ["hwcodec", "amf", "nvidia", "common", "ffmpeg"]
+members = ["hwcodec", "amf", "nvidia", "hw_common", "ffmpeg"]

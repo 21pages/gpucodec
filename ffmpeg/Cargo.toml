@@ -14,5 +14,5 @@ bindgen = "0.59"
 
 [dev-dependencies]
 env_logger = "0.9"
-codec_common = { path = "../common" }
+hw_common = { path = "../hw_common" }
 hwcodec = { path = "../hwcodec" }
