@@ -1,6 +1,6 @@
 use hw_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
-    FeatureContext, HWDeviceType, PixelFormat, PresetContext,
+    FeatureContext, HWDeviceType, PixelFormat,
 };
 use hwcodec::{decode::Decoder, encode::Encoder};
 use std::{io::Write, path::PathBuf};
@@ -19,11 +19,9 @@ fn main() {
             pixfmt: PixelFormat::NV12,
             dataFormat: DataFormat::H264,
         },
-        p: PresetContext {
+        d: DynamicContext {
             width: 2880,
             height: 1800,
-        },
-        d: DynamicContext {
             kbitrate: 5000,
             framerate: 30,
         },

@@ -1,6 +1,6 @@
 use hw_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
-    FeatureContext, HWDeviceType, PixelFormat, PresetContext,
+    FeatureContext, HWDeviceType, PixelFormat,
 };
 use hwcodec::{decode::Decoder, encode::Encoder};
 use std::{
@@ -17,11 +17,9 @@ fn main() {
             pixfmt: PixelFormat::NV12,
             dataFormat: DataFormat::H264,
         },
-        p: PresetContext {
+        d: DynamicContext {
             width: 2880,
             height: 1800,
-        },
-        d: DynamicContext {
             kbitrate: 5000,
             framerate: 30,
         },
@@ -56,7 +54,7 @@ fn main() {
     let mut encoded_file = std::fs::File::create(encoded_file_name).unwrap();
     let mut decoded_file = std::fs::File::create(decoded_file_name).unwrap();
 
-    let yuv_len = (en_ctx.p.width * en_ctx.p.height * 3 / 2) as usize;
+    let yuv_len = (en_ctx.d.width * en_ctx.d.height * 3 / 2) as usize;
     let mut yuv = vec![0u8; yuv_len];
     let mut enc_sum = Duration::ZERO;
     let mut dec_sum = Duration::ZERO;
@@ -65,8 +63,8 @@ fn main() {
     for _ in 0..100 {
         yuv_file.read(&mut yuv).unwrap();
         let start = Instant::now();
-        let linesizes: Vec<i32> = vec![en_ctx.p.width, en_ctx.p.width];
-        let ysize = (linesizes[0] * en_ctx.p.height) as usize;
+        let linesizes: Vec<i32> = vec![en_ctx.d.width, en_ctx.d.width];
+        let ysize = (linesizes[0] * en_ctx.d.height) as usize;
         let y = &yuv[0..ysize];
         let uv = &yuv[ysize..];
         let datas = vec![y, uv];

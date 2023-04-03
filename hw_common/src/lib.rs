@@ -29,13 +29,9 @@ pub struct FeatureContext {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-pub struct PresetContext {
+pub struct DynamicContext {
     pub width: i32,
     pub height: i32,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-pub struct DynamicContext {
     pub kbitrate: i32,
     pub framerate: i32,
 }
@@ -43,7 +39,6 @@ pub struct DynamicContext {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct EncodeContext {
     pub f: FeatureContext,
-    pub p: PresetContext,
     pub d: DynamicContext,
 }
 
