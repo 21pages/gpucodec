@@ -1,6 +1,6 @@
 use hw_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
-    HWDeviceType, PixelFormat, StaticContext,
+    FeatureContext, HWDeviceType, PixelFormat, PresetContext,
 };
 use hwcodec::{decode::Decoder, encode::Encoder};
 use std::{
@@ -11,15 +11,17 @@ use std::{
 
 fn main() {
     let en_ctx = EncodeContext {
-        s: StaticContext {
+        f: FeatureContext {
             driver: EncodeDriver::AMF,
             device: HWDeviceType::DX11,
             pixfmt: PixelFormat::NV12,
             dataFormat: DataFormat::H264,
         },
-        d: DynamicContext {
+        p: PresetContext {
             width: 2880,
             height: 1800,
+        },
+        d: DynamicContext {
             kbitrate: 5000,
             framerate: 30,
         },
@@ -28,7 +30,7 @@ fn main() {
         driver: DecodeDriver::AMF,
         device: HWDeviceType::DX11,
         pixfmt: PixelFormat::NV12,
-        dataFormat: en_ctx.s.dataFormat,
+        dataFormat: en_ctx.f.dataFormat,
     };
     let mut encoder = Encoder::new(en_ctx.clone()).unwrap();
     let mut decoder = Decoder::new(de_ctx.clone()).unwrap();
@@ -43,7 +45,7 @@ fn main() {
     let yuv_file_name = input_dir.join("2880x1800_nv12.yuv");
     let encoded_file_name = output_dir.join(format!(
         "2880x1800_encoded.{}",
-        if en_ctx.s.dataFormat == DataFormat::H264 {
+        if en_ctx.f.dataFormat == DataFormat::H264 {
             "264"
         } else {
             "265"
@@ -54,7 +56,7 @@ fn main() {
     let mut encoded_file = std::fs::File::create(encoded_file_name).unwrap();
     let mut decoded_file = std::fs::File::create(decoded_file_name).unwrap();
 
-    let yuv_len = (en_ctx.d.width * en_ctx.d.height * 3 / 2) as usize;
+    let yuv_len = (en_ctx.p.width * en_ctx.p.height * 3 / 2) as usize;
     let mut yuv = vec![0u8; yuv_len];
     let mut enc_sum = Duration::ZERO;
     let mut dec_sum = Duration::ZERO;
@@ -63,8 +65,8 @@ fn main() {
     for _ in 0..100 {
         yuv_file.read(&mut yuv).unwrap();
         let start = Instant::now();
-        let linesizes: Vec<i32> = vec![en_ctx.d.width, en_ctx.d.width];
-        let ysize = (linesizes[0] * en_ctx.d.height) as usize;
+        let linesizes: Vec<i32> = vec![en_ctx.p.width, en_ctx.p.width];
+        let ysize = (linesizes[0] * en_ctx.p.height) as usize;
         let y = &yuv[0..ysize];
         let uv = &yuv[ysize..];
         let datas = vec![y, uv];

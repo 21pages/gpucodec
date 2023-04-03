@@ -1,6 +1,6 @@
 use hw_common::{
     inner::EncodeCalls, DataFormat::*, DynamicContext, EncodeContext, EncodeDriver::*,
-    HWDeviceType::*, PixelFormat::NV12, StaticContext, MAX_DATA_NUM,
+    FeatureContext, HWDeviceType::*, PixelFormat::NV12, PresetContext, MAX_DATA_NUM,
 };
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
@@ -26,21 +26,21 @@ unsafe impl Sync for Encoder {}
 
 impl Encoder {
     pub fn new(ctx: EncodeContext) -> Result<Self, ()> {
-        if ctx.d.width % 2 == 1 || ctx.d.height % 2 == 1 {
+        if ctx.p.width % 2 == 1 || ctx.p.height % 2 == 1 {
             return Err(());
         }
-        let calls = match ctx.s.driver {
+        let calls = match ctx.f.driver {
             NVENC => nvidia::encode_calls(),
             AMF => amf::encode_calls(),
         };
         let mut pitchs = vec![0; MAX_DATA_NUM as usize];
         unsafe {
             let codec = (calls.new)(
-                ctx.s.device as i32,
-                ctx.s.pixfmt as i32,
-                ctx.s.dataFormat as i32,
-                ctx.d.width,
-                ctx.d.height,
+                ctx.f.device as i32,
+                ctx.f.pixfmt as i32,
+                ctx.f.dataFormat as i32,
+                ctx.p.width,
+                ctx.p.height,
                 pitchs.as_mut_ptr(),
             );
             if codec.is_null() {
@@ -135,19 +135,19 @@ impl Display for EncodeFrame {
     }
 }
 
-pub fn available(d: DynamicContext) -> Vec<EncodeContext> {
+pub fn available(p: PresetContext, d: DynamicContext) -> Vec<EncodeContext> {
     static mut CACHED: Vec<EncodeContext> = vec![];
-    static mut CACHED_CTX: Option<DynamicContext> = None;
+    static mut CACHED_INPUT: Option<(PresetContext, DynamicContext)> = None;
     unsafe {
-        if CACHED_CTX.clone().take() != Some(d.clone()) {
-            CACHED_CTX = Some(d.clone());
-            CACHED = available_(d);
+        if CACHED_INPUT.clone().take() != Some((p.clone(), d.clone())) {
+            CACHED_INPUT = Some((p.clone(), d.clone()));
+            CACHED = available_(p, d);
         }
     }
     unsafe { CACHED.clone() }
 }
 
-fn available_(d: DynamicContext) -> Vec<EncodeContext> {
+fn available_(p: PresetContext, d: DynamicContext) -> Vec<EncodeContext> {
     // to-do: disable log
     let format = NV12;
     let mut natives: Vec<_> = nvidia::possible_support_encoders()
@@ -161,12 +161,13 @@ fn available_(d: DynamicContext) -> Vec<EncodeContext> {
             .collect(),
     );
     let inputs = natives.drain(..).map(|(driver, n)| EncodeContext {
-        s: StaticContext {
+        f: FeatureContext {
             driver,
             device: n.device,
             pixfmt: format,
             dataFormat: n.format,
         },
+        p,
         d,
     });
     // https://forums.developer.nvidia.com/t/is-there-limit-for-multi-thread-encoder/73187
@@ -175,7 +176,7 @@ fn available_(d: DynamicContext) -> Vec<EncodeContext> {
     let nv_cond = Arc::new((Mutex::new(0), Condvar::new()));
     let outputs = Arc::new(Mutex::new(Vec::<EncodeContext>::new()));
     let start = Instant::now();
-    let yuv = vec![0u8; (d.height * d.width * 3 / 2) as usize]; // to-do
+    let yuv = vec![0u8; (p.height * p.width * 3 / 2) as usize]; // to-do
     log::debug!("prepare yuv {:?}", start.elapsed());
     let yuv = Arc::new(yuv);
     let mut handles = vec![];
@@ -185,15 +186,15 @@ fn available_(d: DynamicContext) -> Vec<EncodeContext> {
         let nv_cond = nv_cond.clone();
         let handle = thread::spawn(move || {
             let (nv_cnt, nv_cvar) = &*nv_cond;
-            if input.s.driver == NVENC {
+            if input.f.driver == NVENC {
                 let _guard = nv_cvar
                     .wait_while(nv_cnt.lock().unwrap(), |cnt| *cnt >= max_nv_thread)
                     .unwrap();
             }
             *nv_cnt.lock().unwrap() += 1;
-            let mut linesizes = vec![d.width, d.width]; // to-do
+            let mut linesizes = vec![p.width, p.width]; // to-do
             linesizes.resize(8, 0);
-            let ylen = (linesizes[0] * d.height) as usize;
+            let ylen = (linesizes[0] * p.height) as usize;
             let y = &yuv[0..ylen];
             let uv = &yuv[ylen..];
             let yuvs = vec![y, uv];
@@ -210,7 +211,7 @@ fn available_(d: DynamicContext) -> Vec<EncodeContext> {
             } else {
                 log::debug!("{:?} new failed {:?}", input, start.elapsed());
             }
-            if input.s.driver == NVENC {
+            if input.f.driver == NVENC {
                 *nv_cnt.lock().unwrap() -= 1;
                 nv_cvar.notify_one();
             }
@@ -234,12 +235,12 @@ impl Best {
     pub fn new(encoders: Vec<EncodeContext>) -> Self {
         let mut h264s: Vec<_> = encoders
             .iter()
-            .filter(|e| e.s.dataFormat == H264)
+            .filter(|e| e.f.dataFormat == H264)
             .map(|e| e.to_owned())
             .collect();
         let mut h265s: Vec<_> = encoders
             .iter()
-            .filter(|e| e.s.dataFormat == H265)
+            .filter(|e| e.f.dataFormat == H265)
             .map(|e| e.to_owned())
             .collect();
         let sort = |h26xs: &mut Vec<EncodeContext>| {
@@ -248,10 +249,10 @@ impl Best {
                 let mut index_a = device_order.len();
                 let mut index_b = device_order.len();
                 for i in 0..device_order.len() {
-                    if a.s.device == device_order[i] {
+                    if a.f.device == device_order[i] {
                         index_a = i;
                     }
-                    if b.s.device == device_order[i] {
+                    if b.f.device == device_order[i] {
                         index_b = i;
                     }
                 }

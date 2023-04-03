@@ -1,6 +1,6 @@
 use hw_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
-    HWDeviceType, PixelFormat, StaticContext,
+    FeatureContext, HWDeviceType, PixelFormat, PresetContext,
 };
 use hwcodec::{decode::Decoder, encode::Encoder};
 use std::{io::Write, path::PathBuf};
@@ -13,15 +13,17 @@ fn main() {
     let max = 1;
 
     let en_ctx = EncodeContext {
-        s: StaticContext {
+        f: FeatureContext {
             driver: EncodeDriver::AMF,
             device: HWDeviceType::DX11,
             pixfmt: PixelFormat::NV12,
             dataFormat: DataFormat::H264,
         },
-        d: DynamicContext {
+        p: PresetContext {
             width: 2880,
             height: 1800,
+        },
+        d: DynamicContext {
             kbitrate: 5000,
             framerate: 30,
         },
@@ -30,7 +32,7 @@ fn main() {
         driver: DecodeDriver::AMF,
         device: HWDeviceType::DX11,
         pixfmt: PixelFormat::NV12,
-        dataFormat: en_ctx.s.dataFormat,
+        dataFormat: en_ctx.f.dataFormat,
     };
     let mut encoder = Encoder::new(en_ctx.clone()).unwrap();
     let mut decoder = Decoder::new(de_ctx.clone()).unwrap();
@@ -41,7 +43,7 @@ fn main() {
     let output_dir = PathBuf::from("D:\\tmp");
     let encoded_file_name = output_dir.join(format!(
         "2880x1800_encoded.{}",
-        if en_ctx.s.dataFormat == DataFormat::H264 {
+        if en_ctx.f.dataFormat == DataFormat::H264 {
             "264"
         } else {
             "265"
