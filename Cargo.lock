@@ -186,6 +186,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "intel"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "cc",
+ "hw_common",
+ "log",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
