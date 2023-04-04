@@ -138,8 +138,8 @@ impl Display for EncodeFrame {
     }
 }
 
-pub fn available(d: DynamicContext) -> Vec<EncodeContext> {
-    static mut CACHED: Vec<EncodeContext> = vec![];
+pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
+    static mut CACHED: Vec<FeatureContext> = vec![];
     static mut CACHED_INPUT: Option<DynamicContext> = None;
     unsafe {
         if CACHED_INPUT.clone().take() != Some(d.clone()) {
@@ -150,7 +150,7 @@ pub fn available(d: DynamicContext) -> Vec<EncodeContext> {
     unsafe { CACHED.clone() }
 }
 
-fn available_(d: DynamicContext) -> Vec<EncodeContext> {
+fn available_(d: DynamicContext) -> Vec<FeatureContext> {
     // to-do: disable log
     let format = NV12;
     let mut natives: Vec<_> = nvidia::possible_support_encoders()
@@ -223,38 +223,38 @@ fn available_(d: DynamicContext) -> Vec<EncodeContext> {
     for handle in handles {
         handle.join().ok();
     }
-    let x = outputs.lock().unwrap().clone();
-    x
+    let mut x = outputs.lock().unwrap().clone();
+    x.drain(..).map(|e| e.f).collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Best {
-    pub h264: Option<EncodeContext>,
-    pub h265: Option<EncodeContext>,
+    pub h264: Option<FeatureContext>,
+    pub h265: Option<FeatureContext>,
 }
 
 impl Best {
-    pub fn new(encoders: Vec<EncodeContext>) -> Self {
+    pub fn new(encoders: Vec<FeatureContext>) -> Self {
         let mut h264s: Vec<_> = encoders
             .iter()
-            .filter(|e| e.f.dataFormat == H264)
+            .filter(|e| e.dataFormat == H264)
             .map(|e| e.to_owned())
             .collect();
         let mut h265s: Vec<_> = encoders
             .iter()
-            .filter(|e| e.f.dataFormat == H265)
+            .filter(|e| e.dataFormat == H265)
             .map(|e| e.to_owned())
             .collect();
-        let sort = |h26xs: &mut Vec<EncodeContext>| {
+        let sort = |h26xs: &mut Vec<FeatureContext>| {
             let device_order = vec![CUDA, DX11, DX12, DX9, VULKAN, OPENGL, OPENCL, DX10, HOST];
             h26xs.sort_by(|a, b| {
                 let mut index_a = device_order.len();
                 let mut index_b = device_order.len();
                 for i in 0..device_order.len() {
-                    if a.f.device == device_order[i] {
+                    if a.device == device_order[i] {
                         index_a = i;
                     }
-                    if b.f.device == device_order[i] {
+                    if b.device == device_order[i] {
                         index_b = i;
                     }
                 }
