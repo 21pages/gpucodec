@@ -4,6 +4,8 @@
 #include <stdint.h>
 
 #define MAX_DATA_NUM    8
+#define MAX_GOP         0xFFFF
+
 
 enum DataFormat
 {
@@ -33,5 +35,17 @@ enum PixelFormat
     I420,
 };
 
+enum Usage {
+    ULTRA_LOW_LATENCY,
+    LOW_LATENCY,
+    LOW_LATENCY_HIGH_QUALITY,
+};
+
+enum Preset
+{
+    BALANCED,
+    SPEED,
+    QUALITY
+};
 
 #endif // COMMON_H

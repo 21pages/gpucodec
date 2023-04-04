@@ -34,6 +34,7 @@ pub struct DynamicContext {
     pub height: i32,
     pub kbitrate: i32,
     pub framerate: i32,
+    pub gop: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

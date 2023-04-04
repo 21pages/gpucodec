@@ -1,6 +1,6 @@
 use hw_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
-    FeatureContext, HWDeviceType, PixelFormat,
+    FeatureContext, HWDeviceType, PixelFormat, MAX_GOP,
 };
 use hwcodec::{decode::Decoder, encode::Encoder};
 use std::{
@@ -22,6 +22,7 @@ fn main() {
             height: 1800,
             kbitrate: 5000,
             framerate: 30,
+            gop: MAX_GOP as _,
         },
     };
     let de_ctx = DecodeContext {

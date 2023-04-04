@@ -78,21 +78,31 @@ private:
     bool m_OpenCLSubmission = false; // Possible memory leak
     // const
     AMF_COLOR_BIT_DEPTH_ENUM m_eDepth = AMF_COLOR_BIT_DEPTH_8;
-    int m_query_timeout = 50;
-    int m_frameRate = 30;
-    amf_int64 m_bitRateIn = 5000000L;
+    int m_query_timeout = 500;
+    int32_t m_bitRateIn;
+    int32_t m_frameRate;
+    int32_t m_gop;
 
     // Buffers
 	std::vector<uint8_t> m_PacketDataBuffer;
 
 public:
-    Encoder(amf::AMF_MEMORY_TYPE memoryType, amf::AMF_SURFACE_FORMAT surfaceFormat, amf_wstring codec, int32_t width, int32_t height, DataFormat dataFormat):
+    Encoder(amf::AMF_MEMORY_TYPE memoryType, amf::AMF_SURFACE_FORMAT surfaceFormat, amf_wstring codec, 
+            DataFormat dataFormat,int32_t width, int32_t height, 
+            int32_t bitrate, int32_t framerate, int32_t gop):
         m_dataFormat(dataFormat),
         m_AMFMemoryType(memoryType),
         m_AMFSurfaceFormat(surfaceFormat), 
         m_Resolution(width, height),
-        m_codec(codec)
+        m_codec(codec),
+        m_bitRateIn(bitrate),
+        m_frameRate(framerate),
+        m_gop(gop)
     {
+        if (m_gop == MAX_GOP)
+        {
+            m_gop = MAX_GOP;
+        }
         init_result = initialize();
     }
 
@@ -333,7 +343,9 @@ private:
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_TARGET_BITRATE, m_bitRateIn);
             AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_TARGET_BITRATE, %" LPRId64 L") failed", m_bitRateIn);
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_FRAMERATE, ::AMFConstructRate(m_frameRate, 1));
-            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_FRAMERATE, %d) failed", m_frameRate, 1);
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_FRAMERATE, %d) failed", m_frameRate);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_IDR_PERIOD, m_gop);
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_IDR_PERIOD, %d) failed", m_gop);
         }
         else if (codecStr == amf_wstring(AMFVideoEncoder_HEVC))
         {
@@ -357,7 +369,9 @@ private:
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE, m_bitRateIn);
             AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE, %" LPRId64 L") failed", m_bitRateIn);
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMERATE, ::AMFConstructRate(m_frameRate, 1));
-            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMERATE, %d) failed", m_frameRate, 1);
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMERATE, %d) failed", m_frameRate);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_GOP_SIZE, m_gop); // todo
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_GOP_SIZE, %d) failed", m_gop);
         }
         else if (codecStr == amf_wstring(AMFVideoEncoder_AV1))
         {
@@ -381,7 +395,9 @@ private:
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_AV1_TARGET_BITRATE, m_bitRateIn);
             AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_AV1_TARGET_BITRATE, %" LPRId64 L") failed", m_bitRateIn);
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_AV1_FRAMERATE, ::AMFConstructRate(m_frameRate, 1));
-            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_AV1_FRAMERATE, %d) failed", m_frameRate, 1);
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_AV1_FRAMERATE, %d) failed", m_frameRate);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_AV1_GOP_SIZE, m_gop);
+            AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_AV1_GOP_SIZE, %d) failed", m_gop);
         }   
         return AMF_OK;
     }
@@ -426,7 +442,9 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 #include "common.cpp"
 
 extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat,
-                                int32_t width, int32_t height, int32_t pitchs[MAX_DATA_NUM]) 
+                                int32_t width, int32_t height,
+                                int32_t bitrate, int32_t framerate, int32_t gop, 
+                                int32_t pitchs[MAX_DATA_NUM]) 
 {
     try 
     {
@@ -449,7 +467,9 @@ extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, DataFo
         {
             return NULL;
         }
-        Encoder *enc = new Encoder(memoryType, surfaceFormat, codecStr, width, height, dataFormat);
+        Encoder *enc = new Encoder(memoryType, surfaceFormat, codecStr, dataFormat,
+                                    width, height,
+                                    bitrate, framerate, gop);
         if (enc && enc->init_result != AMF_OK) {
             enc->destroy();
             delete enc;

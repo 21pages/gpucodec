@@ -102,7 +102,10 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
     return -1;
 }
 
-extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, DataFormat dataFormat, int32_t width, int32_t height, int32_t pitchs[MAX_DATA_NUM])
+extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, DataFormat dataFormat, 
+                                    int32_t width, int32_t height, 
+                                    int32_t bitrate, int32_t framerate, int32_t gop,
+                                    int32_t pitchs[MAX_DATA_NUM])
 {
     Encoder * e = NULL;
     try 
@@ -172,6 +175,19 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
         // no delay
         initializeParams.encodeConfig->frameIntervalP = 1;
         initializeParams.encodeConfig->rcParams.lookaheadDepth = 0;
+
+        //bitrate
+        initializeParams.encodeConfig->rcParams.averageBitRate = bitrate;
+        //framerate
+        initializeParams.frameRateNum = framerate;
+        initializeParams.frameRateDen = 1;
+        // gop
+        if (gop == MAX_GOP)
+        {
+            gop = NVENC_INFINITE_GOPLENGTH;
+        }
+        initializeParams.encodeConfig->gopLength = gop;
+
 
         e->pEnc->CreateEncoder(&initializeParams);
 

@@ -7,6 +7,9 @@ pub type NewEncoderCall = unsafe extern "C" fn(
     codecID: i32,
     width: i32,
     height: i32,
+    bitrate: i32,
+    framerate: i32,
+    gop: i32,
     pitchs: *mut i32,
 ) -> *mut c_void;
 

@@ -41,6 +41,9 @@ impl Encoder {
                 ctx.f.dataFormat as i32,
                 ctx.d.width,
                 ctx.d.height,
+                ctx.d.kbitrate * 1000,
+                ctx.d.framerate,
+                ctx.d.gop,
                 pitchs.as_mut_ptr(),
             );
             if codec.is_null() {
