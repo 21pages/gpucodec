@@ -16,6 +16,11 @@ struct Encoder
     mfxBitstream mfxBS;
 };
 
+extern "C" int intel_driver_support()
+{
+    return 0;
+}
+
 extern "C" int intel_destroy_encoder(void *encoder)
 {
     Encoder *p = (Encoder*)encoder;
@@ -215,14 +220,14 @@ static bool fill_nv12_surface(mfxFrameSurface1 *pSurf, uint8_t* datas[MAX_DATA_N
     // Y
     ptr = pData->Y + pInfo->CropX + pInfo->CropY * pData->Pitch;
     for (mfxU16 i = 0; i < h; i++) {
-        std::memcpy(ptr + i * pitch, datas[0] + linesizes[0] * h, w);
+        std::memcpy(ptr + i * pitch, datas[0] + linesizes[0] * i, w);
     }
     // UV
     h /= 2;
     ptr = pData->UV + pInfo->CropX + (pInfo->CropY / 2) * pitch;
     for(mfxU16 i = 0; i < h; i++)
     {
-        std::memcpy(ptr + i * pitch, datas[1] + linesizes[1] * h, w);
+        std::memcpy(ptr + i * pitch, datas[1] + linesizes[1] * i, w);
     }
 }
 

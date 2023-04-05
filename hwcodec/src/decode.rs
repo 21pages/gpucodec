@@ -34,7 +34,7 @@ impl Decoder {
         let calls = match ctx.driver {
             CUVID => nvidia::decode_calls(),
             AMF => amf::decode_calls(),
-            MAX => intel::decode_calls(),
+            MFX => intel::decode_calls(),
         };
         unsafe {
             let codec = (calls.new)(ctx.device as i32, ctx.pixfmt as i32, ctx.dataFormat as i32);

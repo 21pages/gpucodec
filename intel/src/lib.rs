@@ -29,7 +29,7 @@ pub fn decode_calls() -> DecodeCalls {
 }
 
 pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
-    if unsafe { intel_encode_driver_support() } != 0 {
+    if unsafe { intel_driver_support() } != 0 {
         return vec![];
     }
     let devices = vec![CUDA];
@@ -47,7 +47,7 @@ pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
 }
 
 pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
-    if unsafe { intel_encode_driver_support() } != 0 {
+    if unsafe { intel_driver_support() } != 0 {
         return vec![];
     }
     let devices = vec![CUDA];

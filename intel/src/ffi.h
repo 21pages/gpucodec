@@ -3,9 +3,7 @@
 
 #include "../../hw_common/src/callback.h"
 
-int intel_encode_driver_support();
-
-int intel_decode_driver_support();
+int intel_driver_support();
 
 void* intel_new_encoder(int32_t device, int32_t format, int32_t codecID,
                         int32_t width, int32_t height, 
