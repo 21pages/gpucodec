@@ -81,6 +81,7 @@ fn main() {
     builder
         .include("../hw_common/src")
         .file("src/encode.cpp")
+        .file("src/decode.cpp")
         .cpp(false)
         .warnings(false)
         .define("NOMINMAX", "1")

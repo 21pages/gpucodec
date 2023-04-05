@@ -1,282 +1,292 @@
-#include "common_utils.h"
-#include "cmd_options.h"
+#include <cstring>
+#include <common_utils.h>
+#include "common.h"
+#include "callback.h"
 
-static void usage(CmdOptionsCtx* ctx)
+#define NEW_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return NULL;}}
+#define ENCODE_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
+#define ENCODE_CHECK_ERROR(P, X, ERR)     {if ((X) == (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
+struct Encoder
 {
-    printf(
-        "Encodes INPUT and optionally writes OUTPUT. If INPUT is not specified\n"
-        "simulates input with empty frames filled with the color.\n"
-        "\n"
-        "Usage: %s [options] [INPUT] [OUTPUT]\n", ctx->program);
+    MFXVideoSession session;
+    MFXVideoENCODE *mfxENC = NULL;
+    std::vector<mfxFrameSurface1> pEncSurfaces;
+    std::vector<mfxU8> surfaceBuffersData;
+    std::vector<mfxU8> bstData;
+    mfxBitstream mfxBS;
+};
+
+extern "C" int intel_destroy_encoder(void *encoder)
+{
+    Encoder *p = (Encoder*)encoder;
+    if (p)
+    {
+        if (p->mfxENC)
+        {
+            //  - It is recommended to close Media SDK components first, before releasing allocated surfaces, since
+            //    some surfaces may still be locked by internal Media SDK resources.
+            p->mfxENC->Close();
+            delete p->mfxENC;
+        }
+        Release();
+        // session closed automatically on destruction
+    }
+    return 0;
 }
 
-extern "C" int encode_main(int argc, char** argv)
+static bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId)
+{
+    switch (dataFormat)
+    {
+    case H264: 
+        CodecId = MFX_CODEC_AVC;
+        return true;
+    case H265:
+        CodecId = MFX_CODEC_HEVC;
+        return true;
+    }
+    return false;
+}
+
+static bool convert_pixfmt(PixelFormat pixfmt, mfxU32 &fourCC)
+{
+    switch (pixfmt)
+    {
+    case NV12:
+        fourCC = MFX_FOURCC_NV12;
+        return true;
+    }
+    return false;
+}
+
+extern "C" void* intel_new_encoder(HWDeviceType device, PixelFormat pixfmt, DataFormat dataFormat,
+                        int32_t w, int32_t h, 
+                        int32_t bitrate, int32_t framerate, int32_t gop,
+                        int32_t pitchs[MAX_DATA_NUM])
 {
     mfxStatus sts = MFX_ERR_NONE;
-    bool bEnableInput;  // if true, removes all YUV file reading (which is replaced by pre-initialized surface data). Workload runs for 1000 frames.
-    bool bEnableOutput; // if true, removes all output bitsteam file writing and printing the progress
-    CmdOptions options;
-
-    // =====================================================================
-    // Intel Media SDK encode pipeline setup
-    // - In this example we are encoding an AVC (H.264) stream
-    // - For simplistic memory management, system memory surfaces are used to store the raw frames
-    //   (Note that when using HW acceleration video surfaces are prefered, for better performance)
-    //
-
-    // Read options from the command line (if any is given)
-    memset(&options, 0, sizeof(CmdOptions));
-    options.ctx.options = OPTIONS_ENCODE;
-    options.ctx.usage = usage;
-    // Set default values:
-    options.values.impl = MFX_IMPL_AUTO_ANY;
-
-    // here we parse options
-    ParseOptions(argc, argv, &options);
-
-    if (!options.values.Width || !options.values.Height) {
-        printf("error: input video geometry not set (mandatory)\n");
-        return -1;
-    }
-    if (!options.values.Bitrate) {
-        printf("error: bitrate not set (mandatory)\n");
-        return -1;
-    }
-    if (!options.values.FrameRateN || !options.values.FrameRateD) {
-        printf("error: framerate not set (mandatory)\n");
-        return -1;
-    }
-
-    bEnableInput = (options.values.SourceName[0] != '\0');
-    bEnableOutput = (options.values.SinkName[0] != '\0');
-    // Open input YV12 YUV file
-    fileUniPtr fSource(nullptr, &CloseFile);
-    if (bEnableInput) {
-        fSource.reset(OpenFile(options.values.SourceName, "rb"));
-        MSDK_CHECK_POINTER(fSource, MFX_ERR_NULL_PTR);
-    }
-    // Create output elementary stream (ES) H.264 file
-    fileUniPtr fSink(nullptr, &CloseFile);
-    if (bEnableOutput) {
-        fSink.reset(OpenFile(options.values.SinkName, "wb"));
-        MSDK_CHECK_POINTER(fSink, MFX_ERR_NULL_PTR);
-    }
-
-    // Initialize Intel Media SDK session
-    // - MFX_IMPL_AUTO_ANY selects HW acceleration if available (on any adapter)
-    // - Version 1.0 is selected for greatest backwards compatibility.
-    // OS specific notes
-    // - On Windows both SW and HW libraries may present
-    // - On Linux only HW library only is available
-    //   If more recent API features are needed, change the version accordingly
-    mfxIMPL impl = options.values.impl;
+    mfxIMPL impl = MFX_IMPL_HARDWARE_ANY;
     mfxVersion ver = { { 0, 1 } };
-    MFXVideoSession session;
-
-    sts = Initialize(impl, ver, &session, NULL);
-    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-    // Create Media SDK encoder
-    MFXVideoENCODE mfxENC(session);
-
-    // Set required video parameters for encode
-    // - In this example we are encoding an AVC (H.264) stream
     mfxVideoParam mfxEncParams;
     memset(&mfxEncParams, 0, sizeof(mfxEncParams));
+    mfxFrameAllocRequest EncRequest;
+    memset(&EncRequest, 0, sizeof(EncRequest));
+    mfxU16 nEncSurfNum;
+    mfxU16 width, height;
+    mfxU8 bitsPerPixel = 12; // NV12 
+    mfxU32 surfaceSize;
+    mfxU8* surfaceBuffers;
+    mfxVideoParam par;
+    memset(&par, 0, sizeof(par));
 
-    mfxEncParams.mfx.CodecId = MFX_CODEC_AVC;
+    if (!convert_codec(dataFormat, mfxEncParams.mfx.CodecId))
+    {
+        return NULL;
+    }
+    if (!convert_pixfmt(pixfmt, mfxEncParams.mfx.FrameInfo.FourCC))
+    {
+        return NULL;
+    }
     mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
-    mfxEncParams.mfx.TargetKbps = options.values.Bitrate;
-    mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_VBR;
-    mfxEncParams.mfx.FrameInfo.FrameRateExtN = options.values.FrameRateN;
-    mfxEncParams.mfx.FrameInfo.FrameRateExtD = options.values.FrameRateD;
-    mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
+    mfxEncParams.mfx.TargetKbps = bitrate * 1000;
+    mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
+    mfxEncParams.mfx.FrameInfo.FrameRateExtN = framerate;
+    mfxEncParams.mfx.FrameInfo.FrameRateExtD = 1;
     mfxEncParams.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
     mfxEncParams.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
     mfxEncParams.mfx.FrameInfo.CropX = 0;
     mfxEncParams.mfx.FrameInfo.CropY = 0;
-    mfxEncParams.mfx.FrameInfo.CropW = options.values.Width;
-    mfxEncParams.mfx.FrameInfo.CropH = options.values.Height;
+    mfxEncParams.mfx.FrameInfo.CropW = w;
+    mfxEncParams.mfx.FrameInfo.CropH = h;
     // Width must be a multiple of 16
     // Height must be a multiple of 16 in case of frame picture and a multiple of 32 in case of field picture
-    mfxEncParams.mfx.FrameInfo.Width = MSDK_ALIGN16(options.values.Width);
+    mfxEncParams.mfx.FrameInfo.Width = MSDK_ALIGN16(w); // todo
     mfxEncParams.mfx.FrameInfo.Height =
         (MFX_PICSTRUCT_PROGRESSIVE == mfxEncParams.mfx.FrameInfo.PicStruct) ?
-        MSDK_ALIGN16(options.values.Height) :
-        MSDK_ALIGN32(options.values.Height);
+        MSDK_ALIGN16(h) :
+        MSDK_ALIGN32(h);
 
     mfxEncParams.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY;
 
+    // Configuration for low latency
+    mfxEncParams.AsyncDepth = 1;        //1 is best for low latency
+    mfxEncParams.mfx.GopRefDist = 1;    //1 is best for low latency, I and P frames only
 
+    Encoder *p = new Encoder();
+    if (!p)
+    {
+        goto _exit;
+    }
+
+    sts = Initialize(impl, ver, &p->session, NULL);
+    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+
+    // Create Media SDK encoder
+    p->mfxENC = new MFXVideoENCODE(p->session);
+    if (!p->mfxENC)
+    {
+        goto _exit;
+    }
 
     // Validate video encode parameters (optional)
     // - In this example the validation result is written to same structure
     // - MFX_WRN_INCOMPATIBLE_VIDEO_PARAM is returned if some of the video parameters are not supported,
     //   instead the encoder will select suitable parameters closest matching the requested configuration
-    sts = mfxENC.Query(&mfxEncParams, &mfxEncParams);
+    sts = p->mfxENC->Query(&mfxEncParams, &mfxEncParams);
     MSDK_IGNORE_MFX_STS(sts, MFX_WRN_INCOMPATIBLE_VIDEO_PARAM);
-    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
-    // Query number of required surfaces for encoder
-    mfxFrameAllocRequest EncRequest;
-    memset(&EncRequest, 0, sizeof(EncRequest));
-    sts = mfxENC.QueryIOSurf(&mfxEncParams, &EncRequest);
-    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    sts = p->mfxENC->QueryIOSurf(&mfxEncParams, &EncRequest);
+    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
-    mfxU16 nEncSurfNum = EncRequest.NumFrameSuggested;
+    nEncSurfNum = EncRequest.NumFrameSuggested;
 
-    // Allocate surfaces for encoder
     // - Width and height of buffer must be aligned, a multiple of 32
-    // - Frame surface array keeps pointers all surface planes and general frame info
-    mfxU16 width = (mfxU16) MSDK_ALIGN32(EncRequest.Info.Width);
-    mfxU16 height = (mfxU16) MSDK_ALIGN32(EncRequest.Info.Height);
-    mfxU8 bitsPerPixel = 12;        // NV12 format is a 12 bits per pixel format
-    mfxU32 surfaceSize = width * height * bitsPerPixel / 8;
-    std::vector<mfxU8> surfaceBuffersData(surfaceSize * nEncSurfNum);
-    mfxU8* surfaceBuffers = surfaceBuffersData.data();
+    width = (mfxU16) MSDK_ALIGN32(EncRequest.Info.Width); // todo
+    height = (mfxU16) MSDK_ALIGN32(EncRequest.Info.Height);
+    surfaceSize = width * height * bitsPerPixel / 8;
+    p->surfaceBuffersData.resize(surfaceSize * nEncSurfNum);
+    surfaceBuffers = p->surfaceBuffersData.data();
 
     // Allocate surface headers (mfxFrameSurface1) for encoder
-    std::vector<mfxFrameSurface1> pEncSurfaces(nEncSurfNum);
+    p->pEncSurfaces.resize(nEncSurfNum);
     for (int i = 0; i < nEncSurfNum; i++) {
-        memset(&pEncSurfaces[i], 0, sizeof(mfxFrameSurface1));
-        pEncSurfaces[i].Info = mfxEncParams.mfx.FrameInfo;
-        pEncSurfaces[i].Data.Y = &surfaceBuffers[surfaceSize * i];
-        pEncSurfaces[i].Data.U = pEncSurfaces[i].Data.Y + width * height;
-        pEncSurfaces[i].Data.V = pEncSurfaces[i].Data.U + 1;
-        pEncSurfaces[i].Data.Pitch = width;
-        if (!bEnableInput) {
-            ClearYUVSurfaceSysMem(&pEncSurfaces[i], width, height);
-        }
+        memset(&p->pEncSurfaces[i], 0, sizeof(mfxFrameSurface1));
+        p->pEncSurfaces[i].Info = mfxEncParams.mfx.FrameInfo;
+        p->pEncSurfaces[i].Data.Y = &surfaceBuffers[surfaceSize * i];
+        p->pEncSurfaces[i].Data.U = p->pEncSurfaces[i].Data.Y + width * height;
+        p->pEncSurfaces[i].Data.V = p->pEncSurfaces[i].Data.U + 1;
+        p->pEncSurfaces[i].Data.Pitch = width;
+        ClearYUVSurfaceSysMem(&p->pEncSurfaces[i], width, height);
     }
 
     // Initialize the Media SDK encoder
-    sts = mfxENC.Init(&mfxEncParams);
+    sts = p->mfxENC->Init(&mfxEncParams);
     MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
-    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     // Retrieve video parameters selected by encoder.
     // - BufferSizeInKB parameter is required to set bit stream buffer size
-    mfxVideoParam par;
-    memset(&par, 0, sizeof(par));
-    sts = mfxENC.GetVideoParam(&par);
-    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    sts = p->mfxENC->GetVideoParam(&par);
+    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     // Prepare Media SDK bit stream buffer
-    mfxBitstream mfxBS;
-    memset(&mfxBS, 0, sizeof(mfxBS));
-    mfxBS.MaxLength = par.mfx.BufferSizeInKB * 1000;
-    std::vector<mfxU8> bstData(mfxBS.MaxLength);
-    mfxBS.Data = bstData.data();
+    memset(&p->mfxBS, 0, sizeof(p->mfxBS));
+    p->mfxBS.MaxLength = par.mfx.BufferSizeInKB * 1000;
+    p->bstData.resize(p->mfxBS.MaxLength);
+    p->mfxBS.Data = p->bstData.data();
 
+    return p;
+_exit:
+    if (p)
+    {
+        intel_destroy_encoder(p);
+        delete p;
+    }
+    return NULL;
+}
 
-    // ===================================
-    // Start encoding the frames
-    //
+static bool fill_nv12_surface(mfxFrameSurface1 *pSurf, uint8_t* datas[MAX_DATA_NUM], int32_t linesizes[MAX_DATA_NUM])
+{
+    mfxFrameInfo* pInfo = &pSurf->Info;
+    mfxFrameData* pData = &pSurf->Data;
+    mfxStatus sts = MFX_ERR_NONE;
+    mfxU32 w, h;
+    mfxU8* ptr;
 
-    mfxTime tStart, tEnd;
-    mfxGetTime(&tStart);
+    if (pInfo->CropH > 0 && pInfo->CropW > 0)
+    {
+        w = pInfo->CropW;
+        h = pInfo->CropH;
+    }
+    else
+    {
+        w = pInfo->Width;
+        h = pInfo->Height;
+    }
+    mfxU16 pitch = pData->Pitch;
+    mfxU32 shiftSizeLuma   = 16 - pInfo->BitDepthLuma;
+    mfxU32 shiftSizeChroma = 16 - pInfo->BitDepthChroma;
+    if (linesizes[0] < w || linesizes[1] < w)
+    {
+        return false;
+    }
 
+    // Y
+    ptr = pData->Y + pInfo->CropX + pInfo->CropY * pData->Pitch;
+    for (mfxU16 i = 0; i < h; i++) {
+        std::memcpy(ptr + i * pitch, datas[0] + linesizes[0] * h, w);
+    }
+    // UV
+    h /= 2;
+    ptr = pData->UV + pInfo->CropX + (pInfo->CropY / 2) * pitch;
+    for(mfxU16 i = 0; i < h; i++)
+    {
+        std::memcpy(ptr + i * pitch, datas[1] + linesizes[1] * h, w);
+    }
+}
+
+extern "C" int intel_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32_t linesizes[MAX_DATA_NUM], 
+                            EncodeCallback callback, void* obj)
+{
+    mfxStatus sts = MFX_ERR_NONE;
+    bool encoded = false;
+    Encoder *p = (Encoder*)encoder;
     int nEncSurfIdx = 0;
     mfxSyncPoint syncp;
-    mfxU32 nFrame = 0;
 
-    //
-    // Stage 1: Main encoding loop
-    //
-    while (MFX_ERR_NONE <= sts || MFX_ERR_MORE_DATA == sts) {
-        nEncSurfIdx = GetFreeSurfaceIndex(pEncSurfaces);   // Find free frame surface
-        MSDK_CHECK_ERROR(MFX_ERR_NOT_FOUND, nEncSurfIdx, MFX_ERR_MEMORY_ALLOC);
+    p->mfxBS.DataLength = 0;
+    p->mfxBS.DataOffset = 0;
 
-        sts = LoadRawFrame(&pEncSurfaces[nEncSurfIdx], fSource.get());
-        MSDK_BREAK_ON_ERROR(sts);
+    nEncSurfIdx = GetFreeSurfaceIndex(p->pEncSurfaces);   // Find free frame surface
+    ENCODE_CHECK_ERROR(MFX_ERR_NOT_FOUND, nEncSurfIdx, MFX_ERR_MEMORY_ALLOC);
 
-        for (;;) {
-            // Encode a frame asychronously (returns immediately)
-            sts = mfxENC.EncodeFrameAsync(NULL, &pEncSurfaces[nEncSurfIdx], &mfxBS, &syncp);
+    if (!fill_nv12_surface(&p->pEncSurfaces[nEncSurfIdx], datas, linesizes))
+    {
+        return -1;
+    }
 
-            if (MFX_ERR_NONE < sts && !syncp) {     // Repeat the call if warning and no output
-                if (MFX_WRN_DEVICE_BUSY == sts)
-                    MSDK_SLEEP(1);  // Wait if device is busy, then repeat the same call
-            } else if (MFX_ERR_NONE < sts && syncp) {
-                sts = MFX_ERR_NONE;     // Ignore warnings if output is available
-                break;
-            } else if (MFX_ERR_NOT_ENOUGH_BUFFER == sts) {
-                // Allocate more bitstream buffer memory here if needed...
-                break;
-            } else
-                break;
-        }
+    for (;;) {
+        // Encode a frame asychronously (returns immediately)
+        sts = p->mfxENC->EncodeFrameAsync(NULL, &p->pEncSurfaces[nEncSurfIdx], &p->mfxBS, &syncp);
 
-        if (MFX_ERR_NONE == sts) {
-            sts = session.SyncOperation(syncp, 60000);      // Synchronize. Wait until encoded frame is ready
-            MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+        if (MFX_ERR_NONE < sts && !syncp) {     // Repeat the call if warning and no output
+            if (MFX_WRN_DEVICE_BUSY == sts)
+                MSDK_SLEEP(1);  // Wait if device is busy, then repeat the same call
+        } else if (MFX_ERR_NONE < sts && syncp) {
+            sts = MFX_ERR_NONE;     // Ignore warnings if output is available
+            break;
+        } else if (MFX_ERR_NOT_ENOUGH_BUFFER == sts) {
+            // Allocate more bitstream buffer memory here if needed...
+            break;
+        } else
+            break;
+    }
 
-            sts = WriteBitStreamFrame(&mfxBS, fSink.get());
-            MSDK_BREAK_ON_ERROR(sts);
-
-            ++nFrame;
-            if (bEnableOutput) {
-                printf("Frame number: %d\r", nFrame);
-                fflush(stdout);
-            }
+    if (MFX_ERR_NONE == sts) {
+        sts = p->session.SyncOperation(syncp, 60000);      // Synchronize. Wait until encoded frame is ready
+        ENCODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+        if (p->mfxBS.DataLength > 0)
+        {
+            callback(p->mfxBS.Data + p->mfxBS.DataOffset, p->mfxBS.DataLength, 0, 0, obj);
+            encoded = true;
         }
     }
 
     // MFX_ERR_MORE_DATA means that the input file has ended, need to go to buffering loop, exit in case of other errors
     MSDK_IGNORE_MFX_STS(sts, MFX_ERR_MORE_DATA);
-    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    ENCODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    return encoded ? 0 : -1;
 
-    //
-    // Stage 2: Retrieve the buffered encoded frames
-    //
-    while (MFX_ERR_NONE <= sts) {
-        for (;;) {
-            // Encode a frame asychronously (returns immediately)
-            sts = mfxENC.EncodeFrameAsync(NULL, NULL, &mfxBS, &syncp);
+}
 
-            if (MFX_ERR_NONE < sts && !syncp) {     // Repeat the call if warning and no output
-                if (MFX_WRN_DEVICE_BUSY == sts)
-                    MSDK_SLEEP(1);  // Wait if device is busy, then repeat the same call
-            } else if (MFX_ERR_NONE < sts && syncp) {
-                sts = MFX_ERR_NONE;     // Ignore warnings if output is available
-                break;
-            } else
-                break;
-        }
 
-        if (MFX_ERR_NONE == sts) {
-            sts = session.SyncOperation(syncp, 60000);      // Synchronize. Wait until encoded frame is ready
-            MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+extern "C" int intel_set_bitrate(void *e, int32_t bitrate)
+{
+    return -1;
+}
 
-            sts = WriteBitStreamFrame(&mfxBS, fSink.get());
-            MSDK_BREAK_ON_ERROR(sts);
-
-            ++nFrame;
-            if (bEnableOutput) {
-                printf("Frame number: %d\r", nFrame);
-                fflush(stdout);
-            }
-        }
-    }
-
-    // MFX_ERR_MORE_DATA indicates that there are no more buffered frames, exit in case of other errors
-    MSDK_IGNORE_MFX_STS(sts, MFX_ERR_MORE_DATA);
-    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-    mfxGetTime(&tEnd);
-    double elapsed = TimeDiffMsec(tEnd, tStart) / 1000;
-    double fps = ((double)nFrame / elapsed);
-    printf("\nExecution time: %3.2f s (%3.2f fps)\n", elapsed, fps);
-
-    // ===================================================================
-    // Clean up resources
-    //  - It is recommended to close Media SDK components first, before releasing allocated surfaces, since
-    //    some surfaces may still be locked by internal Media SDK resources.
-
-    mfxENC.Close();
-    // session closed automatically on destruction
-
-    Release();
-
-    return 0;
+extern "C" int intel_set_framerate(void *e, int32_t framerate)
+{
+    return -1;
 }

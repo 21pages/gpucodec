@@ -178,6 +178,7 @@ dependencies = [
  "cc",
  "env_logger",
  "hw_common",
+ "intel",
  "log",
  "nvidia",
  "serde",
