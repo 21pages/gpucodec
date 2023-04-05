@@ -5,6 +5,7 @@
 
 #define NEW_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); goto _exit;}}
 #define DECODE_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
+#define DECODE_CHECK_ERROR(P, X, ERR)     {if ((X) == (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
 
 struct Decoder
 {
@@ -13,6 +14,7 @@ struct Decoder
     std::vector<mfxU8> surfaceBuffersData;
     std::vector<mfxFrameSurface1> pmfxSurfaces;
     mfxVideoParam mfxVideoParams;
+    bool initialized = false;
 };
 
 extern "C" int intel_destroy_decoder(void* decoder)
@@ -70,17 +72,8 @@ extern "C" void* intel_new_decoder(HWDeviceType device, PixelFormat pixfmt, Data
     
     p->mfxVideoParams.IOPattern = MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
 
-
-    // Read a chunk of data from stream file into bit stream buffer
-    // - Parse bit stream, searching for header and fill video parameters structure
-    // - Abort if bit stream header is not found in the first bit stream buffer chunk
-    // sts = ReadBitStreamData(&mfxBS, fSource.get());
-    // MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-    // Initialize the Media SDK decoder
-    sts = p->mfxDEC->Init(&p->mfxVideoParams);
-    MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
-    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    // Validate video decode parameters (optional)
+    sts = p->mfxDEC->Query(&p->mfxVideoParams, &p->mfxVideoParams);
 
     return p;
 
@@ -105,17 +98,12 @@ static void get_yuv_data(mfxFrameSurface1* pSurf, DecodeCallback callback, void*
     linesizes[0] = pData->Pitch;
     datas[1] = pData->UV + (pInfo->CropY * pData->Pitch + pInfo->CropX);
     linesizes[1] = pData->Pitch;
+    callback(datas, linesizes, NV12, pInfo->Width, pInfo->Height, obj, 0);
 }
 
-extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallback callback, void* obj)
+static mfxStatus initialize(Decoder *p, mfxBitstream *mfxBS)
 {
-    Decoder *p = (Decoder *)decoder;
     mfxStatus sts = MFX_ERR_NONE;
-    mfxSyncPoint syncp;
-    mfxFrameSurface1* pmfxOutSurface = NULL;
-    int nIndex = 0;
-    bool decoded = false;
-    mfxBitstream mfxBS;
     mfxFrameAllocRequest Request;
     memset(&Request, 0, sizeof(Request));
     mfxU16 numSurfaces;
@@ -124,18 +112,13 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
     mfxU32 surfaceSize;
     mfxU8* surfaceBuffers;
 
-    memset(&mfxBS, 0, sizeof(mfxBS));
-    mfxBS.Data = data;
-    mfxBS.DataLength = len;
-    mfxBS.MaxLength = len;
-
-    sts = p->mfxDEC->DecodeHeader(&mfxBS, &p->mfxVideoParams);
+    sts = p->mfxDEC->DecodeHeader(mfxBS, &p->mfxVideoParams);
     MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     sts = p->mfxDEC->QueryIOSurf(&p->mfxVideoParams, &Request);
     MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
-    DECODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     numSurfaces = Request.NumFrameSuggested;
 
@@ -154,15 +137,52 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
         memset(&p->pmfxSurfaces[i], 0, sizeof(mfxFrameSurface1));
         p->pmfxSurfaces[i].Info = p->mfxVideoParams.mfx.FrameInfo;
         p->pmfxSurfaces[i].Data.Y = &surfaceBuffers[surfaceSize * i];
-        p->pmfxSurfaces[i].Data.U = p->pmfxSurfaces[i].Data.Y + width * height;
-        p->pmfxSurfaces[i].Data.V = p->pmfxSurfaces[i].Data.U + 1;
+        p->pmfxSurfaces[i].Data.UV = p->pmfxSurfaces[i].Data.Y + width * height;
         p->pmfxSurfaces[i].Data.Pitch = width;
     }
 
-    while (MFX_ERR_NONE <= sts || MFX_ERR_MORE_DATA == sts || MFX_ERR_MORE_SURFACE == sts) {
+    // Initialize the Media SDK decoder
+    sts = p->mfxDEC->Init(&p->mfxVideoParams);
+    MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
+    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+
+}
+
+extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallback callback, void* obj)
+{
+    Decoder *p = (Decoder *)decoder;
+    mfxStatus sts = MFX_ERR_NONE;
+    mfxSyncPoint syncp;
+    mfxFrameSurface1* pmfxOutSurface = NULL;
+    int nIndex = 0;
+    bool decoded = false;
+    mfxBitstream mfxBS;
+    mfxU32 decodedSize = 0;
+
+    memset(&mfxBS, 0, sizeof(mfxBS));
+    mfxBS.Data = data;
+    mfxBS.DataLength = len;
+    mfxBS.MaxLength = len;
+
+    if (!p->initialized)
+    {
+        sts = initialize(p, &mfxBS);
+        DECODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+        p->initialized = true;
+    }
+
+    decodedSize = mfxBS.DataLength;
+
+    memset(&mfxBS, 0, sizeof(mfxBS));
+    mfxBS.Data = data;
+    mfxBS.DataLength = len;
+    mfxBS.MaxLength = len;
+    mfxBS.DataFlag = MFX_BITSTREAM_COMPLETE_FRAME;
+
+    do
+    {
         if (MFX_WRN_DEVICE_BUSY == sts)
             MSDK_SLEEP(1);  // Wait if device is busy, then repeat the same call to DecodeFrameAsync
-
         if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_NONE == sts) {
             nIndex = GetFreeSurfaceIndex(p->pmfxSurfaces);        // Find free frame surface
             MSDK_CHECK_ERROR(MFX_ERR_NOT_FOUND, nIndex, MFX_ERR_MEMORY_ALLOC);
@@ -183,12 +203,11 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
         {
             get_yuv_data(pmfxOutSurface, callback, obj);
             decoded = true;
+            break;
         }
-    }
 
-    // MFX_ERR_MORE_DATA means that file has ended, need to go to buffering loop, exit in case of other errors
-    MSDK_IGNORE_MFX_STS(sts, MFX_ERR_MORE_DATA);
-    DECODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    } 
+    while(MFX_ERR_NONE <= sts || MFX_ERR_MORE_DATA == sts || MFX_ERR_MORE_SURFACE == sts);
 
     return decoded ? 0 : -1;
 }
