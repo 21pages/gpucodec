@@ -20,13 +20,18 @@ fn main() {
     let mut builder = Build::new();
 
     // system
+    #[cfg(target_os = "linux")]
+    println!("cargo:rustc-link-lib=stdc++");
+    #[cfg(target_os = "linux")]
+    {
+        builder
+            .include("/usr/include/drm");
+        println!("cargo:rustc-link-lib=va");
+        println!("cargo:rustc-link-lib=va-drm");
+    }
+    
 
-    // ffnvcodec
-    let ffnvcodec_path = externals_dir
-        .join("nv-codec-headers_n11.1.5.2")
-        .join("include")
-        .join("ffnvcodec");
-    builder.include(ffnvcodec_path);
+    // libva-dev
 
     // MediaSDK
     let sdk_path = externals_dir.join("MediaSDK_22.5.4");
@@ -59,7 +64,7 @@ fn main() {
     {
         builder
             .include(mfx_path.join("linux").join("include"))
-            .files(["mfxloader.cpp", "mfxparser.cpp"].map(|f| mfx_path.join("linux").join("src")));
+            .files(["mfxloader.cpp", "mfxparser.cpp"].map(|f| mfx_path.join("linux").join(f)));
     }
 
     builder
@@ -73,11 +78,21 @@ fn main() {
                 "common_utils.cpp",
                 #[cfg(windows)]
                 "common_utils_windows.cpp",
+                #[cfg(target_os = "linux")]
+                "common_utils_linux.cpp",
+                #[cfg(target_os = "linux")]
+                "common_vaapi.cpp",
             ]
             .map(|f| sdk_path.join("tutorials").join("common").join(f)),
         );
 
     // crate
+    #[cfg(target_os = "linux")]
+    {
+        // todo
+        builder.define("MFX_MODULES_DIR", "\"/usr/lib/x86_64-linux-gnu\"").define("MFX_PLUGINS_CONF_DIR", "\"/usr/share/mfx\"");
+    }
+
     builder
         .include("../hw_common/src")
         .file("src/encode.cpp")
