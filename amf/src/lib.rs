@@ -35,7 +35,7 @@ pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
     }
     let mut devices = vec![];
     #[cfg(windows)]
-    devices.append(&mut vec![DX11]);
+    devices.append(&mut vec![DX9, DX11]);
     #[cfg(target_os = "linux")]
     devices.append(&mut vec![OPENCL, VULKAN]);
     let codecs = vec![H264, H265];
@@ -58,7 +58,7 @@ pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
     }
     let mut devices = vec![];
     #[cfg(windows)]
-    devices.append(&mut vec![DX11]);
+    devices.append(&mut vec![DX9, DX11]);
     #[cfg(target_os = "linux")]
     devices.append(&mut vec![OPENCL, VULKAN]);
     let codecs = vec![H264, H265];
