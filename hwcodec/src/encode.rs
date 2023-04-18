@@ -32,6 +32,7 @@ impl Encoder {
         let calls = match ctx.f.driver {
             NVENC => nvidia::encode_calls(),
             AMF => amf::encode_calls(),
+            MFX => intel::encode_calls(),
         };
         let mut pitchs = vec![0; MAX_DATA_NUM as usize];
         unsafe {
