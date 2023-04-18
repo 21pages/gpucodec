@@ -118,6 +118,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "duplication"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "cc",
+ "log",
+]
+
+[[package]]
 name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
