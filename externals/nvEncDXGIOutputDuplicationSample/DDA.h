@@ -25,8 +25,9 @@ private:
     ID3D11Texture2D *pDupTex2D = nullptr;
     /// D3D11 YUV420 Texture2D object that sends the image to NVENC for video encoding
     ID3D11Texture2D *pEncBuf = nullptr;
+    ID3D10Multithread* hmt = NULL;
 private:
-    /// Initialize DXGI pipeline
+/// Initialize DXGI pipeline
     HRESULT InitDXGI()
     {
         HRESULT hr = S_OK;
@@ -42,6 +43,7 @@ private:
         /// Feature levels supported
         D3D_FEATURE_LEVEL FeatureLevels[] =
         {
+            D3D_FEATURE_LEVEL_11_1,
             D3D_FEATURE_LEVEL_11_0,
             D3D_FEATURE_LEVEL_10_1,
             D3D_FEATURE_LEVEL_10_0,
@@ -53,11 +55,15 @@ private:
         /// Create device
         for (UINT DriverTypeIndex = 0; DriverTypeIndex < NumDriverTypes; ++DriverTypeIndex)
         {
-            hr = D3D11CreateDevice(nullptr, DriverTypes[DriverTypeIndex], nullptr, /*D3D11_CREATE_DEVICE_DEBUG*/0, FeatureLevels, NumFeatureLevels,
+            hr = D3D11CreateDevice(nullptr, DriverTypes[DriverTypeIndex], nullptr, D3D11_CREATE_DEVICE_VIDEO_SUPPORT | D3D11_CREATE_DEVICE_BGRA_SUPPORT, FeatureLevels, NumFeatureLevels,
                 D3D11_SDK_VERSION, &pD3DDev, &FeatureLevel, &pCtx);
             if (SUCCEEDED(hr))
             {
                 // Device creation succeeded, no need to loop anymore
+                hr = pCtx->QueryInterface(IID_PPV_ARGS(&hmt));
+                if (SUCCEEDED(hr)) {
+                    hr = hmt->SetMultithreadProtected(TRUE);
+                }
                 break;
             }
         }
@@ -79,6 +85,20 @@ private:
 
 public:
     /// Initialize demo application
+    // HRESULT Init(ID3D11Device *device, ID3D11DeviceContext *ctx)
+    // {
+    //     HRESULT hr = S_OK;
+
+    //     pD3DDev = device;
+    //     pD3DDev->AddRef();
+    //     pCtx = ctx;
+    //     pCtx->AddRef();
+
+    //     hr = InitDup();
+    //     returnIfError(hr);
+
+    //     return hr;
+    // }
     HRESULT Init()
     {
         HRESULT hr = S_OK;
@@ -90,6 +110,10 @@ public:
         returnIfError(hr);
 
         return hr;
+    }
+
+    ID3D11Device *Device() {
+        return pD3DDev;
     }
 
     /// Capture a frame using DDA
@@ -118,6 +142,7 @@ public:
         {
             SAFE_RELEASE(pD3DDev);
             SAFE_RELEASE(pCtx);
+            SAFE_RELEASE(hmt)
         }
     }
     DemoApplication() {}

@@ -13,6 +13,11 @@ extern "C" void* dxgi_new_duplicator()
     return d;
 }
 
+extern "C" void* dxgi_device(void *self) {
+    DemoApplication *d = (DemoApplication *)self;
+    return d->Device();
+}
+
 extern "C" void* dxgi_duplicate(void *self, int wait_ms)
 {
     DemoApplication *d = (DemoApplication *)self;

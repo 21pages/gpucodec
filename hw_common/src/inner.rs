@@ -2,8 +2,7 @@ use crate::{DataFormat, DecodeCallback, EncodeCallback, HWDeviceType};
 use std::os::raw::{c_int, c_void};
 
 pub type NewEncoderCall = unsafe extern "C" fn(
-    device: i32,
-    format: i32,
+    pDevice: *mut c_void,
     codecID: i32,
     width: i32,
     height: i32,
@@ -15,8 +14,7 @@ pub type NewEncoderCall = unsafe extern "C" fn(
 
 pub type EncodeCall = unsafe extern "C" fn(
     encoder: *mut c_void,
-    data: *mut *mut u8,
-    linesize: *mut i32,
+    tex: *mut c_void,
     callback: EncodeCallback,
     obj: *mut c_void,
 ) -> c_int;

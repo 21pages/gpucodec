@@ -55,8 +55,6 @@ private:
     DWORD height = 0;
     /// Running count of no. of accumulated desktop updates
     int frameno = 0;
-    /// output file stream to dump timestamps
-    ofstream ofs;
     /// DXGI_OUTDUPL_FRAME_INFO::latPresentTime from the last Acquired frame
     LARGE_INTEGER lastPTS = { 0 };
     /// Clock frequency from QueryPerformaceFrequency()
@@ -85,7 +83,6 @@ public:
     {
         pD3DDev->AddRef();
         pCtx->AddRef();
-        ofs = ofstream("PresentTSLog.txt");
         QueryPerformanceFrequency(&qpcFreq);
     }
     /// Destructor. Release all resources before destroying the object

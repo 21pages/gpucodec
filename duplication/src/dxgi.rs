@@ -22,6 +22,10 @@ impl Duplicator {
         }
     }
 
+    pub unsafe fn device(&mut self) -> *mut c_void {
+        dxgi_device(self.inner.as_mut())
+    }
+
     pub unsafe fn duplicate(&mut self, wait_ms: i32) -> *mut c_void {
         dxgi_duplicate(self.inner.as_mut(), wait_ms)
     }

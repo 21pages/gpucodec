@@ -3,6 +3,14 @@
 #include "common.h"
 #include "callback.h"
 
+#include <dxgi.h>
+#include <dxgi1_2.h>
+#include <d3d11.h>
+#include <d3d11_1.h>
+#include <d3d11_2.h>
+#include <d3d11_3.h>
+#include <d3d11_4.h>
+
 #define NEW_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return NULL;}}
 #define ENCODE_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
 #define ENCODE_CHECK_ERROR(P, X, ERR)     {if ((X) == (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
@@ -64,13 +72,35 @@ static bool convert_pixfmt(PixelFormat pixfmt, mfxU32 &fourCC)
     return false;
 }
 
-extern "C" void* intel_new_encoder(HWDeviceType device, PixelFormat pixfmt, DataFormat dataFormat,
-                        int32_t w, int32_t h, 
-                        int32_t bitrate, int32_t framerate, int32_t gop,
-                        int32_t pitchs[MAX_DATA_NUM])
+static mfxStatus MFX_CDECL simple_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL* handle)
+{
+    mfxHDLPair* pair = (mfxHDLPair*)handle;
+    pair->first = mid;
+    pair->second = (mfxHDL)(UINT)0;
+//	((ID3D11Texture2D*)mid)->AddRef();
+    return MFX_ERR_NONE;
+}
+
+mfxFrameAllocator alloc{
+    {}, NULL,
+    NULL,
+    NULL,
+    NULL,
+    simple_getHDL,
+    NULL
+};
+
+extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, 
+                        DataFormat dataFormat, int32_t w, int32_t h, 
+                        int32_t bitrate, int32_t framerate, int32_t gop)
 {
     mfxStatus sts = MFX_ERR_NONE;
-    mfxIMPL impl = MFX_IMPL_HARDWARE_ANY;
+    mfxInitParam mfxparams{};
+    mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
+    mfxparams.Implementation = impl;
+    mfxparams.Version.Major = 1;
+    mfxparams.Version.Minor = 17;
+    mfxparams.GPUCopy = MFX_GPUCOPY_OFF;
     mfxVersion ver = { { 0, 1 } };
     mfxVideoParam mfxEncParams;
     memset(&mfxEncParams, 0, sizeof(mfxEncParams));
@@ -88,13 +118,10 @@ extern "C" void* intel_new_encoder(HWDeviceType device, PixelFormat pixfmt, Data
     {
         return NULL;
     }
-    if (!convert_pixfmt(pixfmt, mfxEncParams.mfx.FrameInfo.FourCC))
-    {
-        return NULL;
-    }
     mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
     mfxEncParams.mfx.TargetKbps = bitrate * 1000;
     mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
+    mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
     mfxEncParams.mfx.FrameInfo.FrameRateExtN = framerate;
     mfxEncParams.mfx.FrameInfo.FrameRateExtD = 1;
     mfxEncParams.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
@@ -110,8 +137,9 @@ extern "C" void* intel_new_encoder(HWDeviceType device, PixelFormat pixfmt, Data
         (MFX_PICSTRUCT_PROGRESSIVE == mfxEncParams.mfx.FrameInfo.PicStruct) ?
         MSDK_ALIGN16(h) :
         MSDK_ALIGN32(h);
+    mfxEncParams.mfx.EncodedOrder = 0;
 
-    mfxEncParams.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY;
+    mfxEncParams.IOPattern = MFX_IOPATTERN_IN_VIDEO_MEMORY;
 
     // Configuration for low latency
     mfxEncParams.AsyncDepth = 1;        //1 is best for low latency
@@ -123,7 +151,12 @@ extern "C" void* intel_new_encoder(HWDeviceType device, PixelFormat pixfmt, Data
         goto _exit;
     }
 
-    sts = Initialize(impl, ver, &p->session, NULL);
+    // sts = Initialize(impl, ver, &p->session, NULL);
+    sts = p->session.InitEx(mfxparams);
+    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    sts = p->session.SetHandle(MFX_HANDLE_D3D11_DEVICE, pD3dDevice);
+    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    sts = p->session.SetFrameAllocator(&alloc);
     NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     // Create Media SDK encoder
@@ -191,47 +224,7 @@ _exit:
     return NULL;
 }
 
-static bool fill_nv12_surface(mfxFrameSurface1 *pSurf, uint8_t* datas[MAX_DATA_NUM], int32_t linesizes[MAX_DATA_NUM])
-{
-    mfxFrameInfo* pInfo = &pSurf->Info;
-    mfxFrameData* pData = &pSurf->Data;
-    mfxStatus sts = MFX_ERR_NONE;
-    mfxU32 w, h;
-    mfxU8* ptr;
-
-    if (pInfo->CropH > 0 && pInfo->CropW > 0)
-    {
-        w = pInfo->CropW;
-        h = pInfo->CropH;
-    }
-    else
-    {
-        w = pInfo->Width;
-        h = pInfo->Height;
-    }
-    mfxU16 pitch = pData->Pitch;
-    mfxU32 shiftSizeLuma   = 16 - pInfo->BitDepthLuma;
-    mfxU32 shiftSizeChroma = 16 - pInfo->BitDepthChroma;
-    if (linesizes[0] < w || linesizes[1] < w)
-    {
-        return false;
-    }
-
-    // Y
-    ptr = pData->Y + pInfo->CropX + pInfo->CropY * pData->Pitch;
-    for (mfxU16 i = 0; i < h; i++) {
-        std::memcpy(ptr + i * pitch, datas[0] + linesizes[0] * i, w);
-    }
-    // UV
-    h /= 2;
-    ptr = pData->UV + pInfo->CropX + (pInfo->CropY / 2) * pitch;
-    for(mfxU16 i = 0; i < h; i++)
-    {
-        std::memcpy(ptr + i * pitch, datas[1] + linesizes[1] * i, w);
-    }
-}
-
-extern "C" int intel_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32_t linesizes[MAX_DATA_NUM], 
+extern "C" int intel_encode(void *encoder,  ID3D11Texture2D* tex,
                             EncodeCallback callback, void* obj)
 {
     mfxStatus sts = MFX_ERR_NONE;
@@ -246,10 +239,7 @@ extern "C" int intel_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32_
     nEncSurfIdx = GetFreeSurfaceIndex(p->pEncSurfaces);   // Find free frame surface
     ENCODE_CHECK_ERROR(MFX_ERR_NOT_FOUND, nEncSurfIdx, MFX_ERR_MEMORY_ALLOC);
 
-    if (!fill_nv12_surface(&p->pEncSurfaces[nEncSurfIdx], datas, linesizes))
-    {
-        return -1;
-    }
+    p->pEncSurfaces[nEncSurfIdx].Data.MemId = tex;
 
     for (;;) {
         // Encode a frame asychronously (returns immediately)
