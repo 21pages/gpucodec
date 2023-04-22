@@ -80,7 +80,7 @@ static mfxStatus MFX_CDECL simple_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL* han
     return MFX_ERR_NONE;
 }
 
-mfxFrameAllocator alloc{
+static mfxFrameAllocator alloc{
     {}, NULL,
     NULL,
     NULL,

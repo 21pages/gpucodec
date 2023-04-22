@@ -15,6 +15,7 @@ struct Decoder
     std::vector<mfxFrameSurface1> pmfxSurfaces;
     mfxVideoParam mfxVideoParams;
     bool initialized = false;
+    mfxFrameAllocator mfxAllocator;
 };
 
 extern "C" int intel_destroy_decoder(void* decoder)
@@ -46,10 +47,10 @@ static bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId)
     return false;
 }
 
-extern "C" void* intel_new_decoder(HWDeviceType device, PixelFormat pixfmt, DataFormat codecID)
+extern "C" void* intel_new_decoder(void* hdl, HWDeviceType deviceType, PixelFormat pixfmt, DataFormat codecID)
 {
     mfxStatus sts = MFX_ERR_NONE;
-    mfxIMPL impl = MFX_IMPL_HARDWARE_ANY;
+    mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
     mfxVersion ver = { {0, 1} };
 
     Decoder *p = new Decoder();
@@ -58,7 +59,7 @@ extern "C" void* intel_new_decoder(HWDeviceType device, PixelFormat pixfmt, Data
         goto _exit;
     }
 
-    sts = Initialize(impl, ver, &p->session, NULL);
+    sts = Initialize(impl, ver, &p->session, &p->mfxAllocator);
     NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     // Create Media SDK decoder
@@ -70,7 +71,7 @@ extern "C" void* intel_new_decoder(HWDeviceType device, PixelFormat pixfmt, Data
         goto _exit;
     }
     
-    p->mfxVideoParams.IOPattern = MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
+    p->mfxVideoParams.IOPattern = MFX_IOPATTERN_OUT_VIDEO_MEMORY;
 
     // Validate video decode parameters (optional)
     sts = p->mfxDEC->Query(&p->mfxVideoParams, &p->mfxVideoParams);
@@ -84,21 +85,6 @@ _exit:
         delete p;
     }
     return NULL;
-}
-
-static void get_yuv_data(mfxFrameSurface1* pSurf, DecodeCallback callback, void* obj)
-{
-    mfxFrameInfo* pInfo = &pSurf->Info;
-    mfxFrameData* pData = &pSurf->Data;
-    // mfxU32 ChromaW = (pInfo->CropW % 2) ? (pInfo->CropW + 1) : pInfo->CropW;
-    // mfxU32 ChromaH = (pInfo->CropH + 1) / 2;
-    uint8_t* datas[MAX_DATA_NUM] = {0};
-    int32_t linesizes[MAX_DATA_NUM] = {0};
-    datas[0] = pData->Y + (pInfo->CropY * pData->Pitch + pInfo->CropX);
-    linesizes[0] = pData->Pitch;
-    datas[1] = pData->UV + (pInfo->CropY * pData->Pitch + pInfo->CropX);
-    linesizes[1] = pData->Pitch;
-    callback(datas, linesizes, NV12, pInfo->Width, pInfo->Height, obj, 0);
 }
 
 static mfxStatus initialize(Decoder *p, mfxBitstream *mfxBS)
@@ -122,30 +108,26 @@ static mfxStatus initialize(Decoder *p, mfxBitstream *mfxBS)
 
     numSurfaces = Request.NumFrameSuggested;
 
+    Request.Type |= WILL_READ; // This line is only required for Windows DirectX11 to ensure that surfaces can be retrieved by the application
+
     // Allocate surfaces for decoder
-    // - Width and height of buffer must be aligned, a multiple of 32
-    // - Frame surface array keeps pointers all surface planes and general frame info
-    width = (mfxU16) MSDK_ALIGN32(Request.Info.Width);
-    height = (mfxU16) MSDK_ALIGN32(Request.Info.Height);
-    surfaceSize = width * height * bitsPerPixel / 8;
-    p->surfaceBuffersData.resize(surfaceSize * numSurfaces);
-    surfaceBuffers = p->surfaceBuffersData.data();
+    mfxFrameAllocResponse mfxResponse;
+    sts = p->mfxAllocator.Alloc(p->mfxAllocator.pthis, &Request, &mfxResponse);
+    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     // Allocate surface headers (mfxFrameSurface1) for decoder
     p->pmfxSurfaces.resize(numSurfaces);
     for (int i = 0; i < numSurfaces; i++) {
         memset(&p->pmfxSurfaces[i], 0, sizeof(mfxFrameSurface1));
         p->pmfxSurfaces[i].Info = p->mfxVideoParams.mfx.FrameInfo;
-        p->pmfxSurfaces[i].Data.Y = &surfaceBuffers[surfaceSize * i];
-        p->pmfxSurfaces[i].Data.UV = p->pmfxSurfaces[i].Data.Y + width * height;
-        p->pmfxSurfaces[i].Data.Pitch = width;
+        p->pmfxSurfaces[i].Data.MemId = mfxResponse.mids[i];      // MID (memory id) represents one video NV12 surface
     }
 
     // Initialize the Media SDK decoder
     sts = p->mfxDEC->Init(&p->mfxVideoParams);
     MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
+    return MFX_ERR_NONE;
 }
 
 extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallback callback, void* obj)
@@ -201,7 +183,6 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
 
         if (MFX_ERR_NONE == sts)
         {
-            get_yuv_data(pmfxOutSurface, callback, obj);
             decoded = true;
             break;
         }

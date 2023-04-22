@@ -66,6 +66,8 @@ fn main() {
     }
 
     builder
+        .define("DX11_D3D", None)
+        // .define("DX9_D3D", None)
         .includes([
             sdk_path.join("api").join("include"),
             sdk_path.join("tutorials").join("common"),
@@ -75,6 +77,8 @@ fn main() {
                 "common_utils.cpp",
                 #[cfg(windows)]
                 "common_utils_windows.cpp",
+                #[cfg(windows)]
+                "common_directx11.cpp",
                 #[cfg(target_os = "linux")]
                 "common_utils_linux.cpp",
                 #[cfg(target_os = "linux")]

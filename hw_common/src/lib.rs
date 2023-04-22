@@ -48,10 +48,11 @@ pub struct EncodeContext {
     pub d: DynamicContext,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+// #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DecodeContext {
     pub driver: DecodeDriver,
-    pub device: HWDeviceType,
+    pub deviceType: HWDeviceType,
     pub pixfmt: PixelFormat,
     pub dataFormat: DataFormat,
+    pub hdl: *mut c_void,
 }

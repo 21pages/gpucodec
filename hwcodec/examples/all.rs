@@ -30,7 +30,16 @@ fn main() {
                 gop: MAX_GOP as _,
             },
         };
+        let de_ctx = DecodeContext {
+            driver: DecodeDriver::MFX,
+            deviceType: HWDeviceType::DX11,
+            pixfmt: PixelFormat::NV12,
+            dataFormat: DataFormat::H264,
+            hdl: dup.device(),
+        };
+
         let mut enc = Encoder::new(en_ctx).unwrap();
+        let mut dec = Decoder::new(de_ctx).unwrap();
         let filename = PathBuf::from("D:\\tmp\\1.264");
         let mut file = std::fs::File::create(filename).unwrap();
         let mut dup_sum = Duration::ZERO;
@@ -50,6 +59,8 @@ fn main() {
             counter += 1;
             for f in frame {
                 file.write_all(&mut f.data).unwrap();
+
+                let frames = dec.decode(&f.data).unwrap();
             }
         }
         println!(

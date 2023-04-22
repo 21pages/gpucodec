@@ -14,7 +14,7 @@ int intel_encode(void *encoder,  void* tex, EncodeCallback callback, void* obj);
 
 int intel_destroy_encoder(void *encoder);
 
-void* intel_new_decoder(int32_t device, int32_t format,int32_t codecID);
+void* intel_new_decoder(void* hdl, int32_t deviceType, int32_t format,int32_t codecID);
 
 int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallback callback, void* obj);
 
