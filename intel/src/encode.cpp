@@ -19,7 +19,6 @@ struct Encoder
     MFXVideoSession session;
     MFXVideoENCODE *mfxENC = NULL;
     std::vector<mfxFrameSurface1> pEncSurfaces;
-    std::vector<mfxU8> surfaceBuffersData;
     std::vector<mfxU8> bstData;
     mfxBitstream mfxBS;
 };
@@ -92,14 +91,14 @@ mfxFrameAllocator alloc{
 
 extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, 
                         DataFormat dataFormat, int32_t w, int32_t h, 
-                        int32_t bitrate, int32_t framerate, int32_t gop)
+                        int32_t kbs, int32_t framerate, int32_t gop)
 {
     mfxStatus sts = MFX_ERR_NONE;
     mfxInitParam mfxparams{};
     mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
     mfxparams.Implementation = impl;
     mfxparams.Version.Major = 1;
-    mfxparams.Version.Minor = 17;
+    mfxparams.Version.Minor = 0;
     mfxparams.GPUCopy = MFX_GPUCOPY_OFF;
     mfxVersion ver = { { 0, 1 } };
     mfxVideoParam mfxEncParams;
@@ -119,7 +118,7 @@ extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice,
         return NULL;
     }
     mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
-    mfxEncParams.mfx.TargetKbps = bitrate * 1000;
+    mfxEncParams.mfx.TargetKbps = kbs;
     mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
     mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
     mfxEncParams.mfx.FrameInfo.FrameRateExtN = framerate;
@@ -179,23 +178,11 @@ extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice,
 
     nEncSurfNum = EncRequest.NumFrameSuggested;
 
-    // - Width and height of buffer must be aligned, a multiple of 32
-    width = (mfxU16) MSDK_ALIGN32(EncRequest.Info.Width); // todo
-    height = (mfxU16) MSDK_ALIGN32(EncRequest.Info.Height);
-    surfaceSize = width * height * bitsPerPixel / 8;
-    p->surfaceBuffersData.resize(surfaceSize * nEncSurfNum);
-    surfaceBuffers = p->surfaceBuffersData.data();
-
     // Allocate surface headers (mfxFrameSurface1) for encoder
     p->pEncSurfaces.resize(nEncSurfNum);
     for (int i = 0; i < nEncSurfNum; i++) {
         memset(&p->pEncSurfaces[i], 0, sizeof(mfxFrameSurface1));
         p->pEncSurfaces[i].Info = mfxEncParams.mfx.FrameInfo;
-        p->pEncSurfaces[i].Data.Y = &surfaceBuffers[surfaceSize * i];
-        p->pEncSurfaces[i].Data.U = p->pEncSurfaces[i].Data.Y + width * height;
-        p->pEncSurfaces[i].Data.V = p->pEncSurfaces[i].Data.U + 1;
-        p->pEncSurfaces[i].Data.Pitch = width;
-        ClearYUVSurfaceSysMem(&p->pEncSurfaces[i], width, height);
     }
 
     // Initialize the Media SDK encoder
@@ -210,7 +197,7 @@ extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice,
 
     // Prepare Media SDK bit stream buffer
     memset(&p->mfxBS, 0, sizeof(p->mfxBS));
-    p->mfxBS.MaxLength = par.mfx.BufferSizeInKB * 1000;
+    p->mfxBS.MaxLength = par.mfx.BufferSizeInKB * 1024;
     p->bstData.resize(p->mfxBS.MaxLength);
     p->mfxBS.Data = p->bstData.data();
 
@@ -276,7 +263,7 @@ extern "C" int intel_encode(void *encoder,  ID3D11Texture2D* tex,
 }
 
 
-extern "C" int intel_set_bitrate(void *e, int32_t bitrate)
+extern "C" int intel_set_bitrate(void *e, int32_t kbs)
 {
     return -1;
 }

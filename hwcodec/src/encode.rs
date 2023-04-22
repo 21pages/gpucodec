@@ -41,7 +41,7 @@ impl Encoder {
                 ctx.f.dataFormat as i32,
                 ctx.d.width,
                 ctx.d.height,
-                ctx.d.kbitrate * 1000,
+                ctx.d.kbitrate,
                 ctx.d.framerate,
                 ctx.d.gop,
                 pitchs.as_mut_ptr(),
@@ -87,9 +87,9 @@ impl Encoder {
         }
     }
 
-    pub fn set_bitrate(&mut self, kbitrate: i32) -> Result<(), i32> {
+    pub fn set_bitrate(&mut self, kbs: i32) -> Result<(), i32> {
         unsafe {
-            match (self.calls.set_bitrate)(&mut *self.codec, kbitrate * 1000) {
+            match (self.calls.set_bitrate)(&mut *self.codec, kbs) {
                 0 => Ok(()),
                 err => Err(err),
             }

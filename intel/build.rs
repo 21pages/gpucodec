@@ -24,12 +24,10 @@ fn main() {
     println!("cargo:rustc-link-lib=stdc++");
     #[cfg(target_os = "linux")]
     {
-        builder
-            .include("/usr/include/drm");
+        builder.include("/usr/include/drm");
         println!("cargo:rustc-link-lib=va");
         println!("cargo:rustc-link-lib=va-drm");
     }
-    
 
     // libva-dev
 
@@ -74,7 +72,6 @@ fn main() {
         ])
         .files(
             [
-                "cmd_options.cpp",
                 "common_utils.cpp",
                 #[cfg(windows)]
                 "common_utils_windows.cpp",
@@ -90,7 +87,9 @@ fn main() {
     #[cfg(target_os = "linux")]
     {
         // todo
-        builder.define("MFX_MODULES_DIR", "\"/usr/lib/x86_64-linux-gnu\"").define("MFX_PLUGINS_CONF_DIR", "\"/usr/share/mfx\"");
+        builder
+            .define("MFX_MODULES_DIR", "\"/usr/lib/x86_64-linux-gnu\"")
+            .define("MFX_PLUGINS_CONF_DIR", "\"/usr/share/mfx\"");
     }
 
     builder

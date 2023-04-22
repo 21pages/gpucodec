@@ -7,7 +7,7 @@ int intel_driver_support();
 
 void* intel_new_encoder(void* pD3dDevice, int32_t dataFormat,
                         int32_t width, int32_t height, 
-                        int32_t bitrate, int32_t framerate, int32_t gop,
+                        int32_t kbs, int32_t framerate, int32_t gop,
                         int32_t pitchs[MAX_DATA_NUM]);
 
 int intel_encode(void *encoder,  void* tex, EncodeCallback callback, void* obj);
@@ -20,7 +20,7 @@ int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallback callback,
 
 int intel_destroy_decoder(void* decoder);
 
-int intel_set_bitrate(void *e, int32_t bitrate);
+int intel_set_bitrate(void *e, int32_t kbs);
 
 int intel_set_framerate(void *e, int32_t framerate);
 
