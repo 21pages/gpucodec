@@ -68,11 +68,12 @@ public:
     int32_t m_pitchs[MAX_DATA_NUM] = { 0 };
 private:
     // AMF Internals
+    void *m_hdl;
     AMFFactoryHelper m_AMFFactory;
     amf::AMFContextPtr m_AMFContext = NULL;
     amf::AMFComputePtr m_AMFCompute = NULL;
     amf::AMF_MEMORY_TYPE    m_AMFMemoryType;
-    amf::AMF_SURFACE_FORMAT m_AMFSurfaceFormat;
+    amf::AMF_SURFACE_FORMAT m_AMFSurfaceFormat = amf::AMF_SURFACE_NV12;
     std::pair<int32_t, int32_t> m_Resolution;
     amf_wstring m_codec;
     bool m_OpenCLSubmission = false; // Possible memory leak
@@ -87,12 +88,12 @@ private:
 	std::vector<uint8_t> m_PacketDataBuffer;
 
 public:
-    Encoder(amf::AMF_MEMORY_TYPE memoryType, amf::AMF_SURFACE_FORMAT surfaceFormat, amf_wstring codec, 
+    Encoder(void* hdl, amf::AMF_MEMORY_TYPE memoryType, amf_wstring codec, 
             DataFormat dataFormat,int32_t width, int32_t height, 
             int32_t bitrate, int32_t framerate, int32_t gop):
+        m_hdl(hdl),
         m_dataFormat(dataFormat),
         m_AMFMemoryType(memoryType),
-        m_AMFSurfaceFormat(surfaceFormat), 
         m_Resolution(width, height),
         m_codec(codec),
         m_bitRateIn(bitrate),
@@ -441,10 +442,9 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat,
+extern "C" void* amf_new_encoder(void* hdl, HWDeviceType device, DataFormat dataFormat,
                                 int32_t width, int32_t height,
-                                int32_t bitrate, int32_t framerate, int32_t gop, 
-                                int32_t pitchs[MAX_DATA_NUM]) 
+                                int32_t kbs, int32_t framerate, int32_t gop) 
 {
     try 
     {
@@ -462,21 +462,14 @@ extern "C" void* amf_new_encoder(HWDeviceType device, PixelFormat format, DataFo
         {
             return NULL;
         }
-        amf::AMF_SURFACE_FORMAT surfaceFormat;
-        if (!convert_format(format, surfaceFormat))
-        {
-            return NULL;
-        }
-        Encoder *enc = new Encoder(memoryType, surfaceFormat, codecStr, dataFormat,
+        Encoder *enc = new Encoder(hdl, memoryType, codecStr, dataFormat,
                                     width, height,
-                                    bitrate, framerate, gop);
+                                    kbs * 1000, framerate, gop);
         if (enc && enc->init_result != AMF_OK) {
             enc->destroy();
             delete enc;
             enc = NULL;
         }
-        pitchs[0] = enc->m_pitchs[0];
-        pitchs[1] = enc->m_pitchs[1];
         return enc;
     } 
     catch(const std::exception& e)

@@ -47,7 +47,7 @@ static bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId)
     return false;
 }
 
-extern "C" void* intel_new_decoder(void* hdl, HWDeviceType deviceType, PixelFormat pixfmt, DataFormat codecID)
+extern "C" void* intel_new_decoder(void* hdl, HWDeviceType deviceType, DataFormat codecID)
 {
     mfxStatus sts = MFX_ERR_NONE;
     mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;

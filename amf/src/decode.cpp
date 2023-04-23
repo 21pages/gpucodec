@@ -18,18 +18,20 @@ class Decoder {
 public:
     AMF_RESULT init_result = AMF_FAIL;
 private:
+    void *m_hdl;
     AMFFactoryHelper m_AMFFactory;
     amf::AMFContextPtr m_AMFContext = NULL;
     amf::AMFComponentPtr m_AMFDecoder = NULL;
     amf::AMF_MEMORY_TYPE m_memoryTypeOut;
-    amf::AMF_SURFACE_FORMAT m_formatOut;
+    amf::AMF_SURFACE_FORMAT m_formatOut = amf::AMF_SURFACE_NV12;
     amf_wstring m_codec;
 
     // buffer
     std::vector<std::vector<uint8_t>> m_buffer;
 public:
-    Decoder(amf::AMF_MEMORY_TYPE memoryTypeOut, amf::AMF_SURFACE_FORMAT formatOut, amf_wstring codec):
-        m_memoryTypeOut(memoryTypeOut), m_formatOut(formatOut), m_codec(codec)
+    Decoder(void *hdl, amf::AMF_MEMORY_TYPE memoryTypeOut, amf_wstring codec):
+        m_hdl(hdl),
+        m_memoryTypeOut(memoryTypeOut), m_codec(codec)
     {
         init_result = initialize();
     }
@@ -101,6 +103,7 @@ public:
         oData = NULL;
         iDataWrapBuffer = NULL;
         return decoded ? AMF_OK : AMF_FAIL;
+        return AMF_OK;
     }
 
     AMF_RESULT destroy()
@@ -226,7 +229,7 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat)
+extern "C" void* amf_new_decoder(void* hdl, HWDeviceType device, DataFormat dataFormat)
 {
     try
     {
@@ -240,12 +243,7 @@ extern "C" void* amf_new_decoder(HWDeviceType device, PixelFormat format, DataFo
         {
             return NULL;
         }
-        amf::AMF_SURFACE_FORMAT surfaceFormat;
-        if (!convert_format(format, surfaceFormat))
-        {
-            return NULL;
-        }
-        Decoder *dec = new Decoder(memoryTypeOut, surfaceFormat, codecStr);
+        Decoder *dec = new Decoder(hdl, memoryTypeOut, codecStr);
         if (dec && dec->init_result != AMF_OK)
         {
             dec->destroy();
