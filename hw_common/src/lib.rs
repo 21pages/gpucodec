@@ -13,7 +13,7 @@ pub use serde_derive;
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum EncodeDriver {
     // NVENC,
-    // AMF,
+    AMF,
     MFX,
 }
 

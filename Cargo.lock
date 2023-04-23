@@ -182,6 +182,7 @@ dependencies = [
 name = "hwcodec"
 version = "0.1.0"
 dependencies = [
+ "amf",
  "bindgen",
  "cc",
  "duplication",

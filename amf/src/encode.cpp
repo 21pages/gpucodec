@@ -65,7 +65,6 @@ public:
     AMF_RESULT init_result = AMF_FAIL;
     DataFormat m_dataFormat;
     amf::AMFComponentPtr m_AMFEncoder = NULL;
-    int32_t m_pitchs[MAX_DATA_NUM] = { 0 };
 private:
     // AMF Internals
     void *m_hdl;
@@ -73,7 +72,7 @@ private:
     amf::AMFContextPtr m_AMFContext = NULL;
     amf::AMFComputePtr m_AMFCompute = NULL;
     amf::AMF_MEMORY_TYPE    m_AMFMemoryType;
-    amf::AMF_SURFACE_FORMAT m_AMFSurfaceFormat = amf::AMF_SURFACE_NV12;
+    amf::AMF_SURFACE_FORMAT m_AMFSurfaceFormat = amf::AMF_SURFACE_BGRA;
     std::pair<int32_t, int32_t> m_Resolution;
     amf_wstring m_codec;
     bool m_OpenCLSubmission = false; // Possible memory leak
@@ -107,60 +106,20 @@ public:
         init_result = initialize();
     }
 
-    AMF_RESULT encode(struct encoder_frame* frame, EncodeCallback callback, void* obj)
+    AMF_RESULT encode(void* tex, EncodeCallback callback, void* obj)
     {
         amf::AMFSurfacePtr surface = NULL;
         amf::AMFComputeSyncPointPtr pSyncPoint = NULL;
         AMF_RESULT res;
         bool encoded = false;
 
-        res = allocate_surface(surface);
-        AMF_RETURN_IF_FAILED(res, L"allocate_surface() failed");
+        ID3D11Device *deviceDX11 = (ID3D11Device *)m_AMFContext->GetDX11Device(); // no reference counting - do not Release()
 
-        if (m_AMFCompute != NULL)
-        {
-            res = m_AMFCompute->PutSyncPoint(&pSyncPoint);
-            AMF_RETURN_IF_FAILED(res, L"PutSyncPoint() failed");
-        }
+        ID3D11DeviceContext *deviceContextDX11 = NULL;
+        deviceDX11->GetImmediateContext(&deviceContextDX11);
 
-        // copy data
-        size_t planeCount = surface->GetPlanesCount();
-        for (uint8_t i = 0; i < planeCount; i++) {
-            amf::AMFPlanePtr plane  = surface->GetPlaneAt(i);
-            int32_t          width  = plane->GetWidth();
-            int32_t          height = plane->GetHeight();
-            int32_t          hpitch = plane->GetHPitch();
-            if (m_AMFCompute == NULL)
-            {
-                void* plane_nat = plane->GetNative();
-                for (int32_t py = 0; py < height; py++) {
-                    int32_t plane_off = py * hpitch;
-                    int32_t frame_off = py * frame->linesize[i];
-                    std::memcpy(static_cast<void*>(static_cast<uint8_t*>(plane_nat) + plane_off),
-                                static_cast<void*>(frame->data[i] + frame_off), frame->linesize[i]);
-                }
-            }
-            else
-            {
-                static const amf_size l_origin[] = {0, 0, 0};
-                const amf_size        l_size[]   = {(amf_size)width, (amf_size)height, 1};
-                res = m_AMFCompute->CopyPlaneFromHost(frame->data[i], l_origin, l_size, frame->linesize[i],
-                                                    plane, false);
-                AMF_RETURN_IF_FAILED(res, L"CopyPlaneFromHost() failed");
-            }
-            plane = NULL;
-        }
-
-        if (m_AMFCompute != NULL)
-        {
-		    res = m_AMFCompute->FinishQueue();
-            pSyncPoint->Wait();
-		}
-        if (m_OpenCLSubmission)
-        {
-            res = surface->Convert(m_AMFMemoryType);
-            AMF_RETURN_IF_FAILED(res, L"Convert() failed");
-        }
+        res = m_AMFContext->CreateSurfaceFromDX11Native(tex, &surface, NULL);
+        AMF_RETURN_IF_FAILED(res, L"CreateSurfaceFromDX11Native() failed");
 
         res = m_AMFEncoder->SubmitInput(surface);
         AMF_RETURN_IF_FAILED(res, L"SubmitInput() failed");
@@ -239,18 +198,19 @@ private:
         {
         #ifdef _WIN32
         case amf::AMF_MEMORY_DX9:
-            res = m_AMFContext->InitDX9(NULL); // can be DX9 or DX9Ex device
+            res = m_AMFContext->InitDX9(m_hdl); // can be DX9 or DX9Ex device
             AMF_RETURN_IF_FAILED(res, L"InitDX9(NULL) failed");
             m_OpenCLSubmission = true;
             break;
         case amf::AMF_MEMORY_DX11:
-            res = m_AMFContext->InitDX11(NULL); // can be DX11 device
+            res = m_AMFContext->InitDX11(m_hdl, amf::AMF_DX11_1); // can be DX11 device
+            // res = m_AMFContext->InitDX11(NULL); // can be DX11 device
             AMF_RETURN_IF_FAILED(res, L"InitDX11(NULL) failed");
             m_OpenCLSubmission = true;
             break;
         #endif
         case amf::AMF_MEMORY_VULKAN:
-            res = amf::AMFContext1Ptr(m_AMFContext)->InitVulkan(NULL);
+            res = amf::AMFContext1Ptr(m_AMFContext)->InitVulkan(m_hdl);
             AMF_RETURN_IF_FAILED(res, L"InitVulkan(NULL) failed");
             break;
         case amf::AMF_MEMORY_OPENCL:
@@ -288,17 +248,6 @@ private:
 
         res = m_AMFEncoder->Init(m_AMFSurfaceFormat, m_Resolution.first, m_Resolution.second);
         AMF_RETURN_IF_FAILED(res, L"encoder->Init() failed");
-
-        amf::AMFSurfacePtr surface = NULL;
-        res = allocate_surface(surface);
-        AMF_RETURN_IF_FAILED(res, L"allocate_surface() failed");
-        amf::AMFPlanePtr plane_y = surface->GetPlane(amf::AMF_PLANE_Y);
-        m_pitchs[0] = plane_y->GetHPitch();
-        plane_y = NULL;
-        amf::AMFPlanePtr plane_uv = surface->GetPlane(amf::AMF_PLANE_UV);
-        m_pitchs[1] = plane_uv->GetHPitch();
-        plane_uv = NULL;
-        surface = NULL;
 
         return AMF_OK;
     }
@@ -479,17 +428,12 @@ extern "C" void* amf_new_encoder(void* hdl, HWDeviceType device, DataFormat data
     return NULL;
 }
 
-extern "C" int amf_encode(void *e, uint8_t *data[MAX_DATA_NUM], int32_t linesize[MAX_DATA_NUM], EncodeCallback callback, void* obj)
+extern "C" int amf_encode(void *e, void *tex, EncodeCallback callback, void* obj)
 {
     try
     {
         Encoder *enc = (Encoder*)e;
-        struct encoder_frame frame;
-        for (int i = 0; i < MAX_DATA_NUM; i++) {
-            frame.data[i] = data[i];
-            frame.linesize[i] = linesize[i];
-        }
-        return enc->encode(&frame, callback, obj);
+        return enc->encode(tex, callback, obj);
     }
     catch(const std::exception& e)
     {

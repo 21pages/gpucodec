@@ -11,7 +11,7 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 hw_common = { path = "../hw_common" }
-#amf = { path = "../amf" }
+amf = { path = "../amf" }
 #nvidia = { path = "../nvidia" }
 intel = { path = "../intel" }
 

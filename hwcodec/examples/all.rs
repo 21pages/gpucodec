@@ -16,30 +16,30 @@ fn main() {
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
-                driver: EncodeDriver::MFX,
+                driver: EncodeDriver::AMF,
                 device: HWDeviceType::DX11,
                 pixfmt: PixelFormat::NV12,
                 dataFormat: DataFormat::H264,
             },
             d: DynamicContext {
                 device: dup.device(),
-                width: 1920,
-                height: 1080,
+                width: 2880,
+                height: 1800,
                 kbitrate: 5000,
                 framerate: 30,
                 gop: MAX_GOP as _,
             },
         };
-        let de_ctx = DecodeContext {
-            driver: DecodeDriver::MFX,
-            deviceType: HWDeviceType::DX11,
-            pixfmt: PixelFormat::NV12,
-            dataFormat: DataFormat::H264,
-            hdl: dup.device(),
-        };
+        // let de_ctx = DecodeContext {
+        //     driver: DecodeDriver::MFX,
+        //     deviceType: HWDeviceType::DX11,
+        //     pixfmt: PixelFormat::NV12,
+        //     dataFormat: DataFormat::H264,
+        //     hdl: dup.device(),
+        // };
 
         let mut enc = Encoder::new(en_ctx).unwrap();
-        let mut dec = Decoder::new(de_ctx).unwrap();
+        // let mut dec = Decoder::new(de_ctx).unwrap();
         let filename = PathBuf::from("D:\\tmp\\1.264");
         let mut file = std::fs::File::create(filename).unwrap();
         let mut dup_sum = Duration::ZERO;
@@ -60,7 +60,7 @@ fn main() {
             for f in frame {
                 file.write_all(&mut f.data).unwrap();
 
-                let frames = dec.decode(&f.data).unwrap();
+                // let frames = dec.decode(&f.data).unwrap();
             }
         }
         println!(

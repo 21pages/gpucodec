@@ -37,12 +37,7 @@ impl Decoder {
             MFX => intel::decode_calls(),
         };
         unsafe {
-            let codec = (calls.new)(
-                ctx.hdl,
-                ctx.deviceType as i32,
-                ctx.pixfmt as i32,
-                ctx.dataFormat as i32,
-            );
+            let codec = (calls.new)(ctx.hdl, ctx.deviceType as i32, ctx.dataFormat as i32);
             if codec.is_null() {
                 return Err(());
             }

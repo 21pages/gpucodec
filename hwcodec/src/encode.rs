@@ -18,7 +18,6 @@ pub struct Encoder {
     codec: Box<c_void>,
     frames: *mut Vec<EncodeFrame>,
     pub ctx: EncodeContext,
-    pub pitchs: Vec<i32>,
 }
 
 unsafe impl Send for Encoder {}
@@ -31,20 +30,19 @@ impl Encoder {
         }
         let calls = match ctx.f.driver {
             // NVENC => nvidia::encode_calls(),
-            // AMF => amf::encode_calls(),
+            AMF => amf::encode_calls(),
             MFX => intel::encode_calls(),
         };
-        let mut pitchs = vec![0; MAX_DATA_NUM as usize];
         unsafe {
             let codec = (calls.new)(
                 ctx.d.device,
+                ctx.f.device as _,
                 ctx.f.dataFormat as i32,
                 ctx.d.width,
                 ctx.d.height,
                 ctx.d.kbitrate,
                 ctx.d.framerate,
                 ctx.d.gop,
-                pitchs.as_mut_ptr(),
             );
             if codec.is_null() {
                 return Err(());
@@ -54,7 +52,6 @@ impl Encoder {
                 codec: Box::from_raw(codec as *mut c_void),
                 frames: Box::into_raw(Box::new(Vec::<EncodeFrame>::new())),
                 ctx,
-                pitchs,
             })
         }
     }
