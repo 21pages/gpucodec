@@ -23,18 +23,6 @@
 #define AMF_FACILITY        L"AMFEncoder"
 #define MILLISEC_TIME       10000
 
-/** Encoder input frame */
-struct encoder_frame {
-	/** Data for the frame/audio */
-	uint8_t *data[MAX_DATA_NUM];
-
-	/** size of each plane */
-	uint32_t linesize[MAX_DATA_NUM];
-
-	/** Presentation timestamp */
-	int64_t pts;
-};
-
 /** Encoder output packet */
 struct encoder_packet {
 	uint8_t *data; /**< Packet data */
@@ -112,11 +100,6 @@ public:
         amf::AMFComputeSyncPointPtr pSyncPoint = NULL;
         AMF_RESULT res;
         bool encoded = false;
-
-        ID3D11Device *deviceDX11 = (ID3D11Device *)m_AMFContext->GetDX11Device(); // no reference counting - do not Release()
-
-        ID3D11DeviceContext *deviceContextDX11 = NULL;
-        deviceDX11->GetImmediateContext(&deviceContextDX11);
 
         res = m_AMFContext->CreateSurfaceFromDX11Native(tex, &surface, NULL);
         AMF_RETURN_IF_FAILED(res, L"CreateSurfaceFromDX11Native() failed");
@@ -203,9 +186,8 @@ private:
             m_OpenCLSubmission = true;
             break;
         case amf::AMF_MEMORY_DX11:
-            res = m_AMFContext->InitDX11(m_hdl, amf::AMF_DX11_1); // can be DX11 device
-            // res = m_AMFContext->InitDX11(NULL); // can be DX11 device
-            AMF_RETURN_IF_FAILED(res, L"InitDX11(NULL) failed");
+            res = m_AMFContext->InitDX11(m_hdl); // can be DX11 device
+            AMF_RETURN_IF_FAILED(res, L"InitDX11(m_hdl) failed");
             m_OpenCLSubmission = true;
             break;
         #endif

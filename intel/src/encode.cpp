@@ -60,17 +60,6 @@ static bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId)
     return false;
 }
 
-static bool convert_pixfmt(PixelFormat pixfmt, mfxU32 &fourCC)
-{
-    switch (pixfmt)
-    {
-    case NV12:
-        fourCC = MFX_FOURCC_NV12;
-        return true;
-    }
-    return false;
-}
-
 static mfxStatus MFX_CDECL simple_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL* handle)
 {
     mfxHDLPair* pair = (mfxHDLPair*)handle;
@@ -107,7 +96,6 @@ extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, HWDeviceType device
     memset(&EncRequest, 0, sizeof(EncRequest));
     mfxU16 nEncSurfNum;
     mfxU16 width, height;
-    mfxU8 bitsPerPixel = 12; // NV12 
     mfxU32 surfaceSize;
     mfxU8* surfaceBuffers;
     mfxVideoParam par;
@@ -120,7 +108,7 @@ extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, HWDeviceType device
     mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
     mfxEncParams.mfx.TargetKbps = kbs;
     mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
-    mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
+    mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_BGR4;
     mfxEncParams.mfx.FrameInfo.FrameRateExtN = framerate;
     mfxEncParams.mfx.FrameInfo.FrameRateExtD = 1;
     mfxEncParams.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
