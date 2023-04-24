@@ -35,8 +35,8 @@ private:
         D3D_DRIVER_TYPE DriverTypes[] =
         {
             D3D_DRIVER_TYPE_HARDWARE,
-            D3D_DRIVER_TYPE_WARP,
-            D3D_DRIVER_TYPE_REFERENCE,
+            // D3D_DRIVER_TYPE_WARP,
+            // D3D_DRIVER_TYPE_REFERENCE,
         };
         UINT NumDriverTypes = ARRAYSIZE(DriverTypes);
 
