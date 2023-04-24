@@ -33,7 +33,7 @@ impl Decoder {
     pub fn new(ctx: DecodeContext) -> Result<Self, ()> {
         let calls = match ctx.driver {
             // CUVID => nvidia::decode_calls(),
-            // AMF => amf::decode_calls(),
+            AMF => amf::decode_calls(),
             MFX => intel::decode_calls(),
         };
         unsafe {

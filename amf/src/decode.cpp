@@ -1,3 +1,8 @@
+#ifdef _WIN32
+#include <d3d9.h>
+#include <d3d11.h>
+#endif
+
 #include <public/common/AMFFactory.h>
 #include <public/common/AMFSTL.h>
 #include <public/common/ByteArray.h>
@@ -57,46 +62,45 @@ public:
         } while (res == AMF_REPEAT);
         if (res == AMF_OK && oData != NULL)
         {
-            res = oData->Convert(amf::AMF_MEMORY_HOST); // slow
-            AMF_RETURN_IF_FAILED(res, L"Convert failed");
             amf::AMFSurfacePtr surface(oData);
             AMF_RETURN_IF_INVALID_POINTER(surface, L"surface is NULL");
-            amf_size count = surface->GetPlanesCount();
             PixelFormat pixfmt;
             res = amf_pixfmt_to_common_pixfmt(surface->GetFormat(), pixfmt);
-            AMF_RETURN_IF_FAILED(res, L"Convert failed");
-            uint8_t * datas[MAX_DATA_NUM] = {NULL};
-            int32_t linesizes[MAX_DATA_NUM] = {0};
-            int y_width = 0, y_height = 0;
-            m_buffer.resize(count);
-            // Plane's width, height, linesize is different from ffmepg
-            for (amf_size i = 0; i < count && i < MAX_DATA_NUM; i++)
-            {
-                amf::AMFPlanePtr plane = surface->GetPlaneAt(i);
-                if (i == 0)
-                {
-                    y_width = plane->GetWidth();
-                    y_height = plane->GetHeight();
-                }
-                // write surface removing offsets and alignments
-                amf_uint8 *data     = reinterpret_cast<amf_uint8*>(plane->GetNative());
-                amf_int32 offsetX   = plane->GetOffsetX();
-                amf_int32 offsetY   = plane->GetOffsetY();              //  Y       UV
-                amf_int32 pixelSize = plane->GetPixelSizeInBytes();     //  1       2
-                amf_int32 height    = plane->GetHeight();               // 1800     900
-                amf_int32 width     = plane->GetWidth();                // 2880     1800 
-                amf_int32 pitchH    = plane->GetHPitch();               // 3072     3072
 
-                m_buffer[i].resize(pixelSize * width * height);
-                for( amf_int32 y = 0; y < height; y++)
+            
+            void * native = surface->GetPlaneAt(0)->GetNative();
+
+            switch (surface->GetMemoryType())
+            {
+                case amf::AMF_MEMORY_DX9:
+                    {
+                        IDirect3DSurface9* surfaceDX9 = (IDirect3DSurface9*)native;
+                    }
+                    
+                    break;
+                case amf::AMF_MEMORY_DX11:
+                    {
+                        ID3D11Texture2D* surfaceDX11 = (ID3D11Texture2D*)native;
+                        D3D11_TEXTURE2D_DESC desc;
+                        surfaceDX11->GetDesc(&desc);
+                    }
+                    break;
+                case amf::AMF_MEMORY_OPENCL:
                 {
-                    amf_uint8 *line = data + (y + offsetY) * pitchH;
-                    std::memcpy(&m_buffer[i][pixelSize * width * y], line + offsetX * pixelSize, pixelSize * width);
+                    uint8_t *buf = (uint8_t*)native;
                 }
-                datas[i] = m_buffer[i].data();
-                linesizes[i] = pixelSize * width;
+                    break;
+                
             }
-            callback(datas, linesizes, pixfmt, y_width, y_height, obj, 0);
+            #if 0
+            std::cout << "DataType:" << surface->GetDataType() 
+                       << " Format" << surface->GetFormat() 
+                       << " FrameType" << surface->GetFrameType() 
+                       << " MemoryType" << surface->GetMemoryType()
+                       << std::endl;
+            #endif
+
+
             decoded = true;
             surface = NULL;
         }

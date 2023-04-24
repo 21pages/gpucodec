@@ -30,20 +30,21 @@ fn main() {
                 gop: MAX_GOP as _,
             },
         };
-        // let de_ctx = DecodeContext {
-        //     driver: DecodeDriver::MFX,
-        //     deviceType: HWDeviceType::DX11,
-        //     pixfmt: PixelFormat::NV12,
-        //     dataFormat: DataFormat::H264,
-        //     hdl: dup.device(),
-        // };
+        let de_ctx = DecodeContext {
+            driver: DecodeDriver::AMF,
+            deviceType: HWDeviceType::DX11,
+            pixfmt: PixelFormat::NV12,
+            dataFormat: DataFormat::H264,
+            hdl: dup.device(),
+        };
 
         let mut enc = Encoder::new(en_ctx).unwrap();
-        // let mut dec = Decoder::new(de_ctx).unwrap();
+        let mut dec = Decoder::new(de_ctx).unwrap();
         let filename = PathBuf::from("D:\\tmp\\1.264");
         let mut file = std::fs::File::create(filename).unwrap();
         let mut dup_sum = Duration::ZERO;
         let mut enc_sum = Duration::ZERO;
+        let mut dec_sum = Duration::ZERO;
         let mut counter = 0;
         for _ in 0..1000 {
             let start = Instant::now();
@@ -59,15 +60,17 @@ fn main() {
             counter += 1;
             for f in frame {
                 file.write_all(&mut f.data).unwrap();
-
-                // let frames = dec.decode(&f.data).unwrap();
+                let start = Instant::now();
+                let frames = dec.decode(&f.data).unwrap();
+                dec_sum += start.elapsed();
             }
         }
         println!(
-            "cnt:{}, dup_avg:{:?}, enc_avg:{:?}",
+            "cnt:{}, dup_avg:{:?}, enc_avg:{:?}, dec_avg:{:?}",
             counter,
             dup_sum / counter,
-            enc_sum / counter
+            enc_sum / counter,
+            dec_sum / counter,
         );
     }
 }
