@@ -149,7 +149,7 @@ extern "C" void* nvidia_new_encoder(void *hdl, HWDeviceType deviceType,
         }
         
         if (DX11 == deviceType) {
-             ComPtr<IDXGIFactory1> pFactory;
+            ComPtr<IDXGIFactory1> pFactory;
             ComPtr<IDXGIAdapter> pAdapter;
 
             CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void **)pFactory.GetAddressOf());

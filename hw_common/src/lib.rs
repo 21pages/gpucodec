@@ -19,7 +19,7 @@ pub enum EncodeDriver {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum DecodeDriver {
-    // CUVID,
+    CUVID,
     AMF,
     MFX,
 }

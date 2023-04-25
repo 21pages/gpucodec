@@ -53,14 +53,15 @@ extern "C" int nvidia_decode_driver_support()
 }
 
 
-struct Decoder
+class Decoder
 {
+public:
     CudaFunctions *cudl = NULL;
     CuvidFunctions *cvdl = NULL;
     NvDecoder *dec = NULL;
     CUcontext cuContext = NULL;
 
-    Decoder()
+    Decoder(int) // won't be call if no parameter
     {
         load_driver(&cudl, &cvdl);
     }
@@ -111,13 +112,13 @@ static bool dataFormat_to_cuCodecID(DataFormat dataFormat, cudaVideoCodec &cuda)
     return true;
 }
 
-extern "C" void* nvidia_new_decoder(void *hdl, HWDeviceType device, DataFormat dataFormat) 
+extern "C" void* nvidia_new_decoder(void *hdl, HWDeviceType deviceType, DataFormat dataFormat) 
 {
     Decoder *p = NULL;
     try
     {
-        (void)device;
-        p = new Decoder();
+        (void)deviceType;
+        p = new Decoder(1);
         if (!p)
         {
             goto _exit;
@@ -157,8 +158,9 @@ extern "C" void* nvidia_new_decoder(void *hdl, HWDeviceType device, DataFormat d
         {
             goto _exit;
         }
+        bool bUseDeviceFrame = true;
         bool bLowLatency = true;
-        p->dec = new NvDecoder(p->cudl, p->cvdl, p->cuContext, false, cudaCodecID, bLowLatency, false, &cropRect, &resizeDim);
+        p->dec = new NvDecoder(p->cudl, p->cvdl, p->cuContext, bUseDeviceFrame, cudaCodecID, bLowLatency, false, &cropRect, &resizeDim);
         /* Set operating point for AV1 SVC. It has no impact for other profiles or codecs
         * PFNVIDOPPOINTCALLBACK Callback from video parser will pick operating point set to NvDecoder  */
         p->dec->SetOperatingPoint(opPoint, bDispAllLayers);
@@ -188,24 +190,10 @@ extern "C" int nvidia_decode(void* decoder, uint8_t *data, int len, DecodeCallba
 
         int nFrameReturned = dec->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
         cudaVideoSurfaceFormat format = dec->GetOutputFormat();
-        if (format != cudaVideoSurfaceFormat_NV12) {
-            return -1;
-        }
         bool decoded = false;
         for (int i = 0; i < nFrameReturned; i++) {
             uint8_t *pFrame = dec->GetFrame();
-            uint8_t* datas[MAX_DATA_NUM] = {0};
-            int32_t linesizes[MAX_DATA_NUM] = {0};
-            if (dec->GetWidth() == dec->GetDecodeWidth())
-            {
-                datas[0] = pFrame;
-                datas[1] = datas[0] + dec->GetWidth() * dec->GetHeight();
-                linesizes[0] = dec->GetWidth();
-                linesizes[1] = linesizes[0];
-                callback(datas, linesizes, NV12, dec->GetDecodeWidth(), dec->GetHeight(), obj, 0);
-                decoded = true;
-            }
-            // todo: odd width
+            decoded = true;
         }
         return decoded ? 0 : -1;
     }

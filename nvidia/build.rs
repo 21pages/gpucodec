@@ -67,8 +67,8 @@ fn main() {
 
     // crate
     builder.include("../hw_common/src");
-    #[cfg(windows)]
-    builder.define("WIN32", None);
+    // #[cfg(windows)]
+    // builder.define("WIN32", None);
     builder
         .file("src/encode.cpp")
         .file("src/decode.cpp")
