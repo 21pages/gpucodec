@@ -22,4 +22,3 @@ bindgen = "0.59"
 [dev-dependencies]
 env_logger = "0.9"
 duplication = { path = "../duplication" }
-platform = { path = "../platform" }
