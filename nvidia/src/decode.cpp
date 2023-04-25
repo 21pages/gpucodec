@@ -111,7 +111,7 @@ static bool dataFormat_to_cuCodecID(DataFormat dataFormat, cudaVideoCodec &cuda)
     return true;
 }
 
-extern "C" void* nvidia_new_decoder(HWDeviceType device, PixelFormat format, DataFormat dataFormat) 
+extern "C" void* nvidia_new_decoder(void *hdl, HWDeviceType device, DataFormat dataFormat) 
 {
     Decoder *p = NULL;
     try

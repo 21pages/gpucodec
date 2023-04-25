@@ -12,7 +12,7 @@ serde_derive = "1.0"
 serde_json = "1.0"
 hw_common = { path = "../hw_common" }
 amf = { path = "../amf" }
-#nvidia = { path = "../nvidia" }
+nvidia = { path = "../nvidia" }
 intel = { path = "../intel" }
 
 [build-dependencies]

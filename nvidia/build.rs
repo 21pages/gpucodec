@@ -23,7 +23,7 @@ fn main() {
     #[cfg(target_os = "windows")]
     [
         "kernel32", "user32", "gdi32", "winspool", "shell32", "ole32", "oleaut32", "uuid",
-        "comdlg32", "advapi32",
+        "comdlg32", "advapi32", "d3d11",
     ]
     .map(|lib| println!("cargo:rustc-link-lib={}", lib));
     #[cfg(target_os = "linux")]
@@ -46,7 +46,7 @@ fn main() {
         sdk_path.join("Samples").join("NvCodec").join("NVEncoder"),
         sdk_path.join("Samples").join("NvCodec").join("NVDecoder"),
     ]);
-    for file in vec!["NvEncoder.cpp", "NvEncoderCuda.cpp"] {
+    for file in vec!["NvEncoder.cpp", "NvEncoderCuda.cpp", "NvEncoderD3D11.cpp"] {
         builder.file(
             sdk_path
                 .join("Samples")
@@ -67,6 +67,8 @@ fn main() {
 
     // crate
     builder.include("../hw_common/src");
+    #[cfg(windows)]
+    builder.define("WIN32", None);
     builder
         .file("src/encode.cpp")
         .file("src/decode.cpp")

@@ -8,8 +8,16 @@
 #include <dynlink_loader.h>
 #include <Samples/Utils/NvCodecUtils.h>
 #include <Samples/NvCodec/NvEncoder/NvEncoderCuda.h>
+#include <Samples/NvCodec/NvEncoder/NvEncoderD3D11.h>
 #include <Samples/Utils/Logger.h>
 #include <Samples/Utils/NvEncoderCLIOptions.h>
+
+#ifdef _WIN32
+#include <d3d9.h>
+#include <d3d11.h>
+#include <wrl/client.h>
+using Microsoft::WRL::ComPtr;
+#endif
 
 #include "common.h"
 #include "callback.h"
@@ -60,16 +68,21 @@ extern "C" int nvidia_encode_driver_support()
 
 struct Encoder
 {
+    #ifdef _WIN32
+    ComPtr<ID3D11Device> d3d11Deivce;
+    ComPtr<ID3D11DeviceContext> d3d11DeviceCtx;
+    #endif
+    void *m_hdl;
     CudaFunctions *cuda_dl = NULL;
     NvencFunctions *nvenc_dl = NULL;
     int32_t width;
     int32_t height;
     NV_ENC_BUFFER_FORMAT format;
-    NvEncoderCuda *pEnc = NULL;
+    NvEncoderD3D11 *pEnc = NULL;
     CUcontext cuContext = NULL;
 
-    Encoder(int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format):
-        width(width), height(height), format(format)
+    Encoder(void *hdl, int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format):
+        m_hdl(hdl), width(width), height(height), format(format)
     {
         load_driver(&cuda_dl, &nvenc_dl);
     }
@@ -102,10 +115,9 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
     return -1;
 }
 
-extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, DataFormat dataFormat, 
-                                    int32_t width, int32_t height, 
-                                    int32_t bitrate, int32_t framerate, int32_t gop,
-                                    int32_t pitchs[MAX_DATA_NUM])
+extern "C" void* nvidia_new_encoder(void *hdl, HWDeviceType deviceType,
+                                    DataFormat dataFormat, int32_t width, int32_t height, 
+                                    int32_t kbs, int32_t framerate, int32_t gop)
 {
     Encoder * e = NULL;
     try 
@@ -114,12 +126,6 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
         {
             goto _exit;
         }
-        (void)device;
-        if (nformat != NV12)
-        {
-            goto _exit;
-        }
-        NV_ENC_BUFFER_FORMAT format = NV_ENC_BUFFER_FORMAT_NV12;
         if (dataFormat != H264 && dataFormat != H265)
         {
             goto _exit;
@@ -129,8 +135,9 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
         {
             guidCodec = NV_ENC_CODEC_HEVC_GUID;
         }
+        NV_ENC_BUFFER_FORMAT surfaceFormat = NV_ENC_BUFFER_FORMAT_ARGB;//NV_ENC_BUFFER_FORMAT_ABGR;
 
-        e = new Encoder(width, height, format);
+        e = new Encoder(hdl, width, height, surfaceFormat);
         if (!e)
         {
             std::cout << "failed to new Encoder" << std::endl;
@@ -139,6 +146,19 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
         if(!ck(e->cuda_dl->cuInit(0)))
         {
             goto _exit;
+        }
+        
+        if (DX11 == deviceType) {
+             ComPtr<IDXGIFactory1> pFactory;
+            ComPtr<IDXGIAdapter> pAdapter;
+
+            CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void **)pFactory.GetAddressOf());
+            pFactory->EnumAdapters(1, pAdapter.GetAddressOf());
+        
+            D3D11CreateDevice(pAdapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, NULL, 0,
+            NULL, 0, D3D11_SDK_VERSION, e->d3d11Deivce.GetAddressOf(), NULL, e->d3d11DeviceCtx.GetAddressOf());
+            // e->d3d11Deivce.Attach((ID3D11Device *)hdl);
+            // e->d3d11Deivce->GetImmediateContext(e->d3d11DeviceCtx.GetAddressOf());
         }
         int nGpu = 0, gpu = 0;
         if (!ck(e->cuda_dl->cuDeviceGetCount(&nGpu)))
@@ -165,19 +185,19 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
             goto _exit;
         }
 
-        e->pEnc = new NvEncoderCuda(e->cuda_dl, e->nvenc_dl, e->cuContext, e->width, e->height, e->format, 0); // no delay
+        e->pEnc = new NvEncoderD3D11(e->cuda_dl, e->nvenc_dl, e->d3d11Deivce.Get(), e->width, e->height, e->format, 0, false, false); // no delay
         NV_ENC_INITIALIZE_PARAMS initializeParams = { 0 };
         NV_ENC_CONFIG encodeConfig = { 0 };
 
         initializeParams.encodeConfig = &encodeConfig;
-        e->pEnc->CreateDefaultEncoderParams(&initializeParams, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P3_GUID, NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY);
+        e->pEnc->CreateDefaultEncoderParams(&initializeParams, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P3_GUID /*NV_ENC_PRESET_LOW_LATENCY_HP_GUID*/, NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY);
 
         // no delay
         initializeParams.encodeConfig->frameIntervalP = 1;
         initializeParams.encodeConfig->rcParams.lookaheadDepth = 0;
 
         //bitrate
-        initializeParams.encodeConfig->rcParams.averageBitRate = bitrate;
+        initializeParams.encodeConfig->rcParams.averageBitRate = kbs * 1000;
         //framerate
         initializeParams.frameRateNum = framerate;
         initializeParams.frameRateDen = 1;
@@ -190,10 +210,6 @@ extern "C" void* nvidia_new_encoder(HWDeviceType device, PixelFormat nformat, Da
 
 
         e->pEnc->CreateEncoder(&initializeParams);
-
-        const NvEncInputFrame* frame = e->pEnc->GetNextInputFrame();
-        pitchs[0] = frame->pitch;
-        pitchs[1] = frame->chromaPitch;
 
         return e;
     }
@@ -212,30 +228,57 @@ _exit:
     return NULL;
 }
 
-// to-do: datas, linesizes
-extern "C" int nvidia_encode(void *encoder,  uint8_t* datas[MAX_DATA_NUM], int32_t linesizes[MAX_DATA_NUM], EncodeCallback callback, void* obj)
+static int copy_texture(Encoder *e, void* src, void* dst)
+{
+    ComPtr<ID3D11Device> src_device = (ID3D11Device*)e->m_hdl;
+    ComPtr<ID3D11DeviceContext> src_deviceContext;
+    src_device->GetImmediateContext(src_deviceContext.GetAddressOf());
+    ComPtr<ID3D11Texture2D> src_tex = (ID3D11Texture2D *)src;
+    ComPtr<ID3D11Texture2D> dst_tex = (ID3D11Texture2D *)dst;
+    HRESULT hr;
+
+    D3D11_TEXTURE2D_DESC desc;
+    ZeroMemory(&desc, sizeof(desc));
+    src_tex->GetDesc(&desc);
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    desc.BindFlags = 0;
+    desc.MiscFlags = 0;
+    ComPtr<ID3D11Texture2D> staging_tex;
+    src_device->CreateTexture2D(&desc, NULL, staging_tex.GetAddressOf());
+    src_deviceContext->CopyResource(staging_tex.Get(), src_tex.Get());
+
+    D3D11_MAPPED_SUBRESOURCE map;
+    src_deviceContext->Map(staging_tex.Get(), 0, D3D11_MAP_READ, 0, &map);
+    std::unique_ptr<uint8_t[]> buffer(new uint8_t[desc.Width * desc.Height * 4]);
+    memcpy(buffer.get(), map.pData, desc.Width * desc.Height * 4);
+    src_deviceContext->Unmap(staging_tex.Get(), 0);
+
+    D3D11_BOX Box;
+    Box.left = 0;
+    Box.right = desc.Width;
+    Box.top = 0;
+    Box.bottom = desc.Height;
+    Box.front = 0;
+    Box.back = 1;
+    e->d3d11DeviceCtx->UpdateSubresource(dst_tex.Get(), 0, &Box, buffer.get(), desc.Width * 4, desc.Width * desc.Height* 4);
+
+    return 0;
+}
+
+extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback, void* obj)
 {
     try
     {
         Encoder *e = (Encoder*)encoder;
-        NvEncoderCuda *pEnc = e->pEnc;
+        NvEncoderD3D11 *pEnc = e->pEnc;
         CUcontext cuContext = e->cuContext;
         bool encoded = false;
-
-        // Memory needs to be contiguous
-        uint8_t *pData = datas[0];
-        // NV12 in SDK: srcChromaPitch = srcPitch
-        uint32_t srcPitch = linesizes[0];
         std::vector<NvPacket> vPacket;
-        const NvEncInputFrame* encoderInputFrame = pEnc->GetNextInputFrame();
-        NvEncoderCuda::CopyToDeviceFrame(e->cuda_dl, cuContext, pData, srcPitch, (CUdeviceptr)encoderInputFrame->inputPtr,
-            (int)encoderInputFrame->pitch,
-            pEnc->GetEncodeWidth(),
-            pEnc->GetEncodeHeight(),
-            CU_MEMORYTYPE_HOST, 
-            encoderInputFrame->bufferFormat,
-            encoderInputFrame->chromaOffsets,
-            encoderInputFrame->numChromaPlanes);
+        const NvEncInputFrame* pEncInput = pEnc->GetNextInputFrame();
+
+        copy_texture(e, tex, pEncInput->inputPtr);
+
         pEnc->EncodeFrame(vPacket);
         for (NvPacket &packet : vPacket)
         {
@@ -283,12 +326,12 @@ extern "C" int nvidia_set_bitrate(void *e, int32_t bitrate)
     return -1;    
 }
 
-extern "C" int nvidia_set_framerate(void *e, int32_t framerate)
+extern "C" int nvidia_set_framerate(void *e, int32_t kbs)
 {
     try
     {
         RECONFIGURE_HEAD
-        params.reInitEncodeParams.frameRateNum = framerate;
+        params.reInitEncodeParams.frameRateNum = kbs * 1000;
         params.reInitEncodeParams.frameRateDen = 1;
         RECONFIGURE_TAIL
     }

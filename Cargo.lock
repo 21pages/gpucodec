@@ -190,6 +190,7 @@ dependencies = [
  "hw_common",
  "intel",
  "log",
+ "nvidia",
  "platform",
  "serde",
  "serde_derive",

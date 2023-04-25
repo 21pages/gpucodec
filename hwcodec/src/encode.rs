@@ -29,7 +29,7 @@ impl Encoder {
             return Err(());
         }
         let calls = match ctx.f.driver {
-            // NVENC => nvidia::encode_calls(),
+            NVENC => nvidia::encode_calls(),
             AMF => amf::encode_calls(),
             MFX => intel::encode_calls(),
         };
