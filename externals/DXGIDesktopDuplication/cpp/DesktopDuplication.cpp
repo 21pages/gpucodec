@@ -144,10 +144,13 @@ void DYNAMIC_WAIT::Wait()
 //
 // Program entry point
 //
-int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ INT nCmdShow)
+// int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ INT nCmdShow)
+extern "C" int window_main()
 {
-    UNREFERENCED_PARAMETER(hPrevInstance);
-    UNREFERENCED_PARAMETER(lpCmdLine);
+    HINSTANCE hInstance = GetModuleHandleW(NULL);
+    INT nCmdShow = 1;
+    // UNREFERENCED_PARAMETER(hPrevInstance);
+    // UNREFERENCED_PARAMETER(lpCmdLine);
 
     INT SingleOutput;
 
