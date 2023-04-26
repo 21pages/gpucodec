@@ -109,7 +109,7 @@ HRESULT DDAImpl::GetCapturedFrame(ID3D11Texture2D **ppTex2D, int wait, bool fail
     {
         if (hr == DXGI_ERROR_WAIT_TIMEOUT)
         {
-            printf(__FUNCTION__": %d : Wait for %d ms timed out\n", frameno, wait);
+            // printf(__FUNCTION__": %d : Wait for %d ms timed out\n", frameno, wait);
         }
         if (hr == DXGI_ERROR_INVALID_CALL)
         {
@@ -119,7 +119,8 @@ HRESULT DDAImpl::GetCapturedFrame(ID3D11Texture2D **ppTex2D, int wait, bool fail
         {
             printf(__FUNCTION__": %d : Access lost, frame needs to be released?\n", frameno);
         }
-        RETURN_ERR(hr);
+        // RETURN_ERR(hr);
+        return hr;
     }
     if (fail_if_equal)
     {
