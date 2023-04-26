@@ -40,7 +40,7 @@ extern "C" int intel_destroy_encoder(void *encoder)
             p->mfxENC->Close();
             delete p->mfxENC;
         }
-        Release();
+        // Release();
         // session closed automatically on destruction
     }
     return 0;
