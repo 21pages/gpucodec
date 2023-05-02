@@ -1,7 +1,7 @@
 use duplication::dxgi;
 use hw_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
-    FeatureContext, HWDeviceType, PixelFormat, MAX_GOP,
+    FeatureContext, SurfaceFormat::*, API::*, MAX_GOP,
 };
 use hwcodec::{decode::Decoder, encode::Encoder};
 use render::Render;
@@ -19,8 +19,7 @@ fn main() {
         let en_ctx = EncodeContext {
             f: FeatureContext {
                 driver: EncodeDriver::AMF,
-                device: HWDeviceType::DX11,
-                pixfmt: PixelFormat::NV12,
+                api: API_DX11,
                 dataFormat: DataFormat::H264,
             },
             d: DynamicContext {
@@ -34,8 +33,8 @@ fn main() {
         };
         let de_ctx = DecodeContext {
             driver: DecodeDriver::AMF,
-            deviceType: HWDeviceType::DX11,
-            pixfmt: PixelFormat::NV12,
+            api: API_DX11,
+            outputSurfaceFormat: SURFACE_FORMAT_BGRA,
             dataFormat: DataFormat::H264,
             hdl: render.device(),
         };

@@ -1,6 +1,6 @@
 use hw_common::{
     inner::EncodeCalls, DataFormat::*, DynamicContext, EncodeContext, EncodeDriver::*,
-    FeatureContext, HWDeviceType::*, PixelFormat::NV12, MAX_DATA_NUM,
+    FeatureContext, API::*, MAX_DATA_NUM,
 };
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
@@ -36,7 +36,7 @@ impl Encoder {
         unsafe {
             let codec = (calls.new)(
                 ctx.d.device,
-                ctx.f.device as _,
+                ctx.f.api as _,
                 ctx.f.dataFormat as i32,
                 ctx.d.width,
                 ctx.d.height,

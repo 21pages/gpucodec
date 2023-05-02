@@ -7,7 +7,7 @@ include!(concat!(env!("OUT_DIR"), "/nvidia_ffi.rs"));
 use hw_common::{
     inner::{DecodeCalls, EncodeCalls, InnerDecodeContext, InnerEncodeContext},
     DataFormat::*,
-    HWDeviceType::*,
+    API::*,
 };
 
 pub fn encode_calls() -> EncodeCalls {
@@ -32,13 +32,13 @@ pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
     if unsafe { nvidia_encode_driver_support() } != 0 {
         return vec![];
     }
-    let devices = vec![CUDA];
+    let devices = vec![API_DX11];
     let dataFormats = vec![H264, H265];
     let mut v = vec![];
     for device in devices.iter() {
         for dataFormat in dataFormats.iter() {
             v.push(InnerEncodeContext {
-                device: device.clone(),
+                api: device.clone(),
                 format: dataFormat.clone(),
             });
         }
@@ -50,13 +50,13 @@ pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
     if unsafe { nvidia_encode_driver_support() } != 0 {
         return vec![];
     }
-    let devices = vec![CUDA];
+    let devices = vec![API_DX11];
     let dataFormats = vec![H264, H265];
     let mut v = vec![];
     for device in devices.iter() {
         for dataFormat in dataFormats.iter() {
             v.push(InnerDecodeContext {
-                device: device.clone(),
+                api: device.clone(),
                 dataFormat: dataFormat.clone(),
             });
         }

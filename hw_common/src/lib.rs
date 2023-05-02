@@ -24,11 +24,10 @@ pub enum DecodeDriver {
     MFX,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+// #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct FeatureContext {
     pub driver: EncodeDriver,
-    pub device: HWDeviceType,
-    pub pixfmt: PixelFormat,
+    pub api: API,
     pub dataFormat: DataFormat,
 }
 
@@ -51,8 +50,8 @@ pub struct EncodeContext {
 // #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DecodeContext {
     pub driver: DecodeDriver,
-    pub deviceType: HWDeviceType,
-    pub pixfmt: PixelFormat,
+    pub api: API,
     pub dataFormat: DataFormat,
+    pub outputSurfaceFormat: SurfaceFormat,
     pub hdl: *mut c_void,
 }

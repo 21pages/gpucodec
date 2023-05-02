@@ -78,7 +78,7 @@ static mfxFrameAllocator alloc{
     NULL
 };
 
-extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, HWDeviceType deviceType,
+extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, API api,
                         DataFormat dataFormat, int32_t w, int32_t h, 
                         int32_t kbs, int32_t framerate, int32_t gop)
 {

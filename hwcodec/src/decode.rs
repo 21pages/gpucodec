@@ -3,8 +3,8 @@ use hw_common::{
     inner::DecodeCalls,
     DataFormat::*,
     DecodeContext, DecodeDriver,
-    HWDeviceType::*,
-    PixelFormat::{self, NV12},
+    SurfaceFormat::{self, *},
+    API::*,
     MAX_DATA_NUM,
 };
 use log::{error, trace};
@@ -37,7 +37,12 @@ impl Decoder {
             MFX => intel::decode_calls(),
         };
         unsafe {
-            let codec = (calls.new)(ctx.hdl, ctx.deviceType as i32, ctx.dataFormat as i32);
+            let codec = (calls.new)(
+                ctx.hdl,
+                ctx.api as i32,
+                ctx.dataFormat as i32,
+                ctx.outputSurfaceFormat as i32,
+            );
             if codec.is_null() {
                 return Err(());
             }
@@ -81,7 +86,7 @@ impl Decoder {
         let frames = &mut *(obj as *mut Vec<DecodeFrame>);
 
         let mut frame = DecodeFrame {
-            pixfmt: std::mem::transmute(format),
+            surface_format: std::mem::transmute(format),
             width,
             height,
             texture,
@@ -102,7 +107,7 @@ impl Drop for Decoder {
 }
 
 pub struct DecodeFrame {
-    pub pixfmt: PixelFormat,
+    pub surface_format: SurfaceFormat,
     pub width: i32,
     pub height: i32,
     pub texture: *mut c_void,
@@ -114,7 +119,7 @@ impl std::fmt::Display for DecodeFrame {
         write!(
             f,
             "surface_format:{:?}, width:{}, height:{},key:{}",
-            self.pixfmt, self.width, self.height, self.key,
+            self.surface_format, self.width, self.height, self.key,
         )
     }
 }

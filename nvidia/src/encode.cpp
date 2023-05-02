@@ -115,7 +115,7 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
     return -1;
 }
 
-extern "C" void* nvidia_new_encoder(void *hdl, HWDeviceType deviceType,
+extern "C" void* nvidia_new_encoder(void *hdl, API api,
                                     DataFormat dataFormat, int32_t width, int32_t height, 
                                     int32_t kbs, int32_t framerate, int32_t gop)
 {
@@ -148,7 +148,7 @@ extern "C" void* nvidia_new_encoder(void *hdl, HWDeviceType deviceType,
             goto _exit;
         }
         
-        if (DX11 == deviceType) {
+        if (API_DX11 == api) {
             ComPtr<IDXGIFactory1> pFactory;
             ComPtr<IDXGIAdapter> pAdapter;
 

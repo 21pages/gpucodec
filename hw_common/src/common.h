@@ -16,23 +16,19 @@ enum DataFormat
     AV1,
 };
 
-enum HWDeviceType
+enum API
 {
-    HOST,
-    DX9,
-    DX10,
-    DX11,
-    DX12,
-    OPENCL,
-    OPENGL,
-    CUDA,
-    VULKAN,
+    API_DX11,
+    API_OPENCL,
+    API_OPENGL,
+    API_VULKAN,
 };
 
-enum PixelFormat
+enum SurfaceFormat
 {
-    NV12,
-    I420,
+    SURFACE_FORMAT_BGRA,
+    SURFACE_FORMAT_RGBA,
+    SURFACE_FORMAT_NV12,
 };
 
 enum Usage {

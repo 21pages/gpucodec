@@ -1,10 +1,3 @@
-#ifdef _WIN32
-#include <d3d9.h>
-#include <d3d11.h>
-#include <wrl/client.h>
-using Microsoft::WRL::ComPtr;
-#endif
-
 #include <public/common/AMFFactory.h>
 #include <public/common/AMFSTL.h>
 #include <public/common/ByteArray.h>
@@ -16,6 +9,7 @@ using Microsoft::WRL::ComPtr;
 #include <cstring>
 #include <iostream>
 
+#include "system.h"
 #include "common.h"
 #include "callback.h"
 
@@ -25,15 +19,15 @@ class Decoder {
 public:
     AMF_RESULT init_result = AMF_FAIL;
 private:
+    // system
     void *m_hdl;
-    // #ifdef _WIN32
-    // ComPtr<ID3D11Device> m_d3d11Device;
-    // #endif
+    // amf
     AMFFactoryHelper m_AMFFactory;
     amf::AMFContextPtr m_AMFContext = NULL;
     amf::AMFComponentPtr m_AMFDecoder = NULL;
-    amf::AMF_MEMORY_TYPE m_memoryTypeOut;
-    amf::AMF_SURFACE_FORMAT m_formatOut = amf::AMF_SURFACE_NV12;
+    amf::AMF_MEMORY_TYPE m_AMFMemoryType;
+    amf::AMF_SURFACE_FORMAT m_decodeFormatOut = amf::AMF_SURFACE_NV12;
+    amf::AMF_SURFACE_FORMAT m_textureFormatOut;
     amf::AMFComponentPtr m_AMFConverter = NULL;
     amf_wstring m_codec;
     bool m_OpenCLConversion = false;
@@ -41,9 +35,11 @@ private:
     // buffer
     std::vector<std::vector<uint8_t>> m_buffer;
 public:
-    Decoder(void *hdl, amf::AMF_MEMORY_TYPE memoryTypeOut, amf_wstring codec):
+    Decoder(void *hdl, amf::AMF_MEMORY_TYPE memoryTypeOut, amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut):
         m_hdl(hdl),
-        m_memoryTypeOut(memoryTypeOut), m_codec(codec)
+        m_AMFMemoryType(memoryTypeOut),
+        m_textureFormatOut(textureFormatOut),
+        m_codec(codec)
     {
         init_result = initialize();
     }
@@ -71,8 +67,6 @@ public:
         {
             amf::AMFSurfacePtr surface(oData);
             AMF_RETURN_IF_INVALID_POINTER(surface, L"surface is NULL");
-            PixelFormat pixfmt;
-            res = amf_pixfmt_to_common_pixfmt(surface->GetFormat(), pixfmt);
 
             // convert texture
             amf::AMFDataPtr convertData;
@@ -82,12 +76,6 @@ public:
             void * native = convertSurface->GetPlaneAt(0)->GetNative();
             switch (convertSurface->GetMemoryType())
             {
-                case amf::AMF_MEMORY_DX9:
-                    {
-                        IDirect3DSurface9* surfaceDX9 = (IDirect3DSurface9*)native;
-                    }
-                    
-                    break;
                 case amf::AMF_MEMORY_DX11:
                     {
                         ID3D11Texture2D* surfaceDX11 = (ID3D11Texture2D*)native;
@@ -145,7 +133,7 @@ private:
         res = m_AMFFactory.GetFactory()->CreateContext(&m_AMFContext); 
         AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateContext");
         
-        switch (m_memoryTypeOut)
+        switch (m_AMFMemoryType)
         {
         case amf::AMF_MEMORY_DX9:
             res = m_AMFContext->InitDX9(NULL); // can be DX9 or DX9Ex device
@@ -181,15 +169,15 @@ private:
         res = setParameters();
         AMF_RETURN_IF_FAILED(res, L"AMF Failed to setParameters");
 
-        res = m_AMFDecoder->Init(m_formatOut, 0, 0);
+        res = m_AMFDecoder->Init(m_decodeFormatOut, 0, 0);
         AMF_RETURN_IF_FAILED(res, L"AMF Failed to Init decoder");
 
         res = m_AMFFactory.GetFactory()->CreateComponent(m_AMFContext, AMFVideoConverter, &m_AMFConverter);
         AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateComponent");
-        res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_FORMAT, amf::AMF_SURFACE_BGRA);
-            res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_SIZE, ::AMFConstructSize(2880, 1800));
+        res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_FORMAT, m_textureFormatOut);
+        res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_SIZE, ::AMFConstructSize(2880, 1800));
         AMF_RETURN_IF_FAILED(res, L"AMF Failed to SetProperty");
-        res = m_AMFConverter->Init(amf::AMF_SURFACE_NV12, 2880,1800 );
+        res = m_AMFConverter->Init(m_decodeFormatOut, 2880,1800 );
         AMF_RETURN_IF_FAILED(res, L"AMF Failed to Init converter");
 
         return AMF_OK;
@@ -218,24 +206,12 @@ private:
         res = m_AMFConverter->QueryOutput(&convertData);
         AMF_RETURN_IF_FAILED(res, L"Convert QueryOutput failed");
         if (m_OpenCLConversion) {
-            res = surface->Convert(m_memoryTypeOut);
+            res = surface->Convert(m_AMFMemoryType);
             AMF_RETURN_IF_FAILED(res, L"Convert back failed");
         }
         return AMF_OK;
     }
-   
-    AMF_RESULT amf_pixfmt_to_common_pixfmt(amf::AMF_SURFACE_FORMAT lhs, PixelFormat &rhs)
-    {
-        switch (lhs)
-        {
-        case amf::AMF_SURFACE_NV12:
-            rhs = NV12;
-            break;
-        default:
-            return AMF_INVALID_FORMAT;
-        }
-        return AMF_OK;
-    }
+
 };
 
 static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
@@ -257,21 +233,26 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_decoder(void* hdl, HWDeviceType device, DataFormat dataFormat)
+extern "C" void* amf_new_decoder(void* hdl, API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat)
 {
     try
     {
         amf_wstring codecStr;
+        amf::AMF_MEMORY_TYPE memory;
+        amf::AMF_SURFACE_FORMAT surfaceFormat;
+        if (!convert_api(api, memory))
+        {
+            return NULL;
+        }
         if (!convert_codec(dataFormat, codecStr))
         {
             return NULL;
         }
-        amf::AMF_MEMORY_TYPE memoryTypeOut;
-        if (!convert_device(device, memoryTypeOut))
+        if (!convert_surface_format(outputSurfaceFormat, surfaceFormat))
         {
             return NULL;
         }
-        Decoder *dec = new Decoder(hdl, memoryTypeOut, codecStr);
+        Decoder *dec = new Decoder(hdl, memory, codecStr, surfaceFormat);
         if (dec && dec->init_result != AMF_OK)
         {
             dec->destroy();

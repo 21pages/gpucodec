@@ -5,47 +5,44 @@
 #define AMF_FACILITY        L"AMFCommon"
 #endif
 
-static bool convert_device(HWDeviceType lhs, amf::AMF_MEMORY_TYPE& rhs)
+static bool convert_api(API lhs, amf::AMF_MEMORY_TYPE& rhs)
 {
     switch (lhs)
     {
-    case HOST:
-        rhs = amf::AMF_MEMORY_HOST;
-        break;
-    case DX9:
-        rhs = amf::AMF_MEMORY_DX9;
-        break;
-    case DX11:
+    case API_DX11:
         rhs = amf::AMF_MEMORY_DX11;
         break;
-    case DX12:
-        rhs = amf::AMF_MEMORY_DX12;
-        break;
-    case OPENCL:
+    case API_OPENCL:
         rhs = amf::AMF_MEMORY_OPENCL;
         break;
-    case OPENGL:
+    case API_OPENGL:
         rhs = amf::AMF_MEMORY_OPENGL;
         break;
-    case VULKAN:
+    case API_VULKAN:
         rhs = amf::AMF_MEMORY_VULKAN;
         break;
     default:
-        std::cerr << "unsupported memory type: " << lhs << "\n";
+        std::cerr << "unsupported memory type: " << static_cast<int>(lhs) << "\n";
         return false;
     }
     return true;
 }
 
-static bool convert_format(PixelFormat lhs, amf::AMF_SURFACE_FORMAT& rhs)
+static bool convert_surface_format(SurfaceFormat lhs, amf::AMF_SURFACE_FORMAT& rhs)
 {
     switch (lhs)
     {
-    case NV12:
+    case SURFACE_FORMAT_NV12:
         rhs = amf::AMF_SURFACE_NV12;
         break;
+    case SURFACE_FORMAT_RGBA:
+        rhs = amf::AMF_SURFACE_RGBA;
+        break;
+    case SURFACE_FORMAT_BGRA:
+        rhs = amf::AMF_SURFACE_BGRA;
+        break;
     default:
-        std::cerr << "unsupported format: " << lhs << "\n";
+        std::cerr << "unsupported surface format: " << static_cast<int>(lhs) << "\n";
         return false;
     }
     return true;

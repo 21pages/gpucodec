@@ -1,9 +1,4 @@
 #include <stdio.h>
-#ifdef _WIN32
-#include <tchar.h>
-#include <d3d9.h>
-#include <d3d11.h>
-#endif
 #include <public/common/AMFFactory.h>
 #include <public/common/Thread.h>
 #include <public/common/AMFSTL.h>
@@ -17,6 +12,7 @@
 #include <math.h>
 #include <cstring>
 
+#include "system.h"
 #include "common.h"
 #include "callback.h"
 
@@ -54,8 +50,9 @@ public:
     DataFormat m_dataFormat;
     amf::AMFComponentPtr m_AMFEncoder = NULL;
 private:
-    // AMF Internals
+    // system
     void *m_hdl;
+    // AMF Internals
     AMFFactoryHelper m_AMFFactory;
     amf::AMFContextPtr m_AMFContext = NULL;
     amf::AMFComputePtr m_AMFCompute = NULL;
@@ -87,10 +84,6 @@ public:
         m_frameRate(framerate),
         m_gop(gop)
     {
-        if (m_gop == MAX_GOP)
-        {
-            m_gop = MAX_GOP;
-        }
         init_result = initialize();
     }
 
@@ -100,10 +93,17 @@ public:
         amf::AMFComputeSyncPointPtr pSyncPoint = NULL;
         AMF_RESULT res;
         bool encoded = false;
-
-        res = m_AMFContext->CreateSurfaceFromDX11Native(tex, &surface, NULL);
-        AMF_RETURN_IF_FAILED(res, L"CreateSurfaceFromDX11Native() failed");
-
+        Texture_Lifetime_Keeper keeper(tex);
+        
+        switch (m_AMFMemoryType)
+        {
+        case amf::AMF_MEMORY_DX11:
+            res = m_AMFContext->CreateSurfaceFromDX11Native(tex, &surface, NULL);
+            AMF_RETURN_IF_FAILED(res, L"CreateSurfaceFromDX11Native() failed");
+            break;
+        default:
+            break;
+        }
         res = m_AMFEncoder->SubmitInput(surface);
         AMF_RETURN_IF_FAILED(res, L"SubmitInput() failed");
 
@@ -176,15 +176,9 @@ private:
         res = m_AMFFactory.GetFactory()->CreateContext(&m_AMFContext);
         AMF_RETURN_IF_FAILED(res, L"CreateContext() failed");
 
-        // to-do
         switch (m_AMFMemoryType)
         {
         #ifdef _WIN32
-        case amf::AMF_MEMORY_DX9:
-            res = m_AMFContext->InitDX9(m_hdl); // can be DX9 or DX9Ex device
-            AMF_RETURN_IF_FAILED(res, L"InitDX9(NULL) failed");
-            m_OpenCLSubmission = true;
-            break;
         case amf::AMF_MEMORY_DX11:
             res = m_AMFContext->InitDX11(m_hdl); // can be DX11 device
             AMF_RETURN_IF_FAILED(res, L"InitDX11(m_hdl) failed");
@@ -305,6 +299,9 @@ private:
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_GOP_SIZE, m_gop); // todo
             AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_GOP_SIZE, %d) failed", m_gop);
         } 
+        else {
+            return AMF_FAIL;
+        }
         return AMF_OK;
     }
 
@@ -314,13 +311,13 @@ private:
         {
             uint64_t pktType;
             pData->GetProperty(AMF_VIDEO_ENCODER_OUTPUT_DATA_TYPE, &pktType);
-            packet->keyframe = AMF_VIDEO_ENCODER_OUTPUT_DATA_TYPE_IDR == pktType;
+            packet->keyframe = AMF_VIDEO_ENCODER_OUTPUT_DATA_TYPE_IDR == pktType || AMF_VIDEO_ENCODER_OUTPUT_DATA_TYPE_I == pktType;
         }
         else if (AMFVideoEncoder_HEVC == m_codec)
         {
             uint64_t pktType;
             pData->GetProperty(AMF_VIDEO_ENCODER_HEVC_OUTPUT_DATA_TYPE, &pktType);
-            packet->keyframe = AMF_VIDEO_ENCODER_HEVC_OUTPUT_DATA_TYPE_IDR == pktType;
+            packet->keyframe = AMF_VIDEO_ENCODER_HEVC_OUTPUT_DATA_TYPE_IDR == pktType || AMF_VIDEO_ENCODER_HEVC_OUTPUT_DATA_TYPE_I == pktType;
         }
     }
 };
@@ -344,7 +341,7 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_encoder(void* hdl, HWDeviceType device, DataFormat dataFormat,
+extern "C" void* amf_new_encoder(void* hdl, API api, DataFormat dataFormat,
                                 int32_t width, int32_t height,
                                 int32_t kbs, int32_t framerate, int32_t gop) 
 {
@@ -360,7 +357,7 @@ extern "C" void* amf_new_encoder(void* hdl, HWDeviceType device, DataFormat data
             return NULL;
         }
         amf::AMF_MEMORY_TYPE memoryType;
-        if (!convert_device(device, memoryType))
+        if (!convert_api(api, memoryType))
         {
             return NULL;
         }

@@ -1,4 +1,4 @@
-use crate::{DataFormat, DecodeCallback, EncodeCallback, HWDeviceType};
+use crate::{DataFormat, DecodeCallback, EncodeCallback, API};
 use std::os::raw::{c_int, c_void};
 
 pub type NewEncoderCall = unsafe extern "C" fn(
@@ -19,8 +19,12 @@ pub type EncodeCall = unsafe extern "C" fn(
     obj: *mut c_void,
 ) -> c_int;
 
-pub type NewDecoderCall =
-    unsafe extern "C" fn(hdl: *mut c_void, deviceType: i32, codecID: i32) -> *mut c_void;
+pub type NewDecoderCall = unsafe extern "C" fn(
+    hdl: *mut c_void,
+    api: i32,
+    dataFormat: i32,
+    surfaceFormat: i32,
+) -> *mut c_void;
 
 pub type DecodeCall = unsafe extern "C" fn(
     decoder: *mut c_void,
@@ -48,11 +52,11 @@ pub struct DecodeCalls {
 }
 
 pub struct InnerEncodeContext {
-    pub device: HWDeviceType,
+    pub api: API,
     pub format: DataFormat,
 }
 
 pub struct InnerDecodeContext {
-    pub device: HWDeviceType,
+    pub api: API,
     pub dataFormat: DataFormat,
 }

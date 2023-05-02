@@ -13,7 +13,7 @@ fn main() {
     let en_ctx = EncodeContext {
         f: FeatureContext {
             driver: EncodeDriver::AMF,
-            device: HWDeviceType::DX11,
+            api: HWDeviceType::DX11,
             pixfmt: PixelFormat::NV12,
             dataFormat: DataFormat::H264,
         },
