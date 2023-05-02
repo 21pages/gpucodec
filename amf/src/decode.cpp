@@ -67,6 +67,8 @@ public:
             amf::AMFSurfacePtr surface(oData);
             AMF_RETURN_IF_INVALID_POINTER(surface, L"surface is NULL");
 
+            if (surface->GetPlanesCount() == 0) return AMF_FAIL;
+
             // convert texture
             amf::AMFDataPtr convertData;
             res = Convert(surface, convertData);
