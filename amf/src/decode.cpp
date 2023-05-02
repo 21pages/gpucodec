@@ -30,7 +30,6 @@ private:
     amf::AMF_SURFACE_FORMAT m_textureFormatOut;
     amf::AMFComponentPtr m_AMFConverter = NULL;
     amf_wstring m_codec;
-    bool m_OpenCLConversion = false;
 
     // buffer
     std::vector<std::vector<uint8_t>> m_buffer;
@@ -189,6 +188,7 @@ private:
 
     AMF_RESULT Convert(IN amf::AMFSurfacePtr& surface, OUT amf::AMFDataPtr& convertData)
     {
+        if (m_decodeFormatOut == m_textureFormatOut) return AMF_OK;
         AMF_RESULT res;
 
         if (!m_AMFConverter) {
@@ -196,25 +196,17 @@ private:
             AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateComponent");
             int width = surface->GetPlaneAt(0)->GetWidth();
             int height = surface->GetPlaneAt(0)->GetWidth();
+            res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_MEMORY_TYPE, m_AMFMemoryType);
             res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_FORMAT, m_textureFormatOut);
             res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_SIZE, ::AMFConstructSize(width, height));
             AMF_RETURN_IF_FAILED(res, L"AMF Failed to SetProperty");
             res = m_AMFConverter->Init(m_decodeFormatOut, width, height);
             AMF_RETURN_IF_FAILED(res, L"AMF Failed to Init converter");
         }
-
-        if (m_OpenCLConversion) {
-            res = surface->Convert(amf::AMF_MEMORY_OPENCL);
-            AMF_RETURN_IF_FAILED(res, L"Convert to OPENCL failed");
-        }
         res = m_AMFConverter->SubmitInput(surface);
         AMF_RETURN_IF_FAILED(res, L"Convert SubmitInput failed");
         res = m_AMFConverter->QueryOutput(&convertData);
         AMF_RETURN_IF_FAILED(res, L"Convert QueryOutput failed");
-        if (m_OpenCLConversion) {
-            res = surface->Convert(m_AMFMemoryType);
-            AMF_RETURN_IF_FAILED(res, L"Convert back failed");
-        }
         return AMF_OK;
     }
 
