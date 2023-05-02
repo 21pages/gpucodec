@@ -73,6 +73,7 @@ public:
             res = Convert(surface, convertData);
             amf::AMFSurfacePtr convertSurface(convertData);
 
+            // For DirectX objects, when a pointer to a COM interface is returned, GetNative does not call IUnknown::AddRef on the interface being returned.
             void * native = convertSurface->GetPlaneAt(0)->GetNative();
             switch (convertSurface->GetMemoryType())
             {
@@ -172,13 +173,6 @@ private:
         res = m_AMFDecoder->Init(m_decodeFormatOut, 0, 0);
         AMF_RETURN_IF_FAILED(res, L"AMF Failed to Init decoder");
 
-        res = m_AMFFactory.GetFactory()->CreateComponent(m_AMFContext, AMFVideoConverter, &m_AMFConverter);
-        AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateComponent");
-        res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_FORMAT, m_textureFormatOut);
-        res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_SIZE, ::AMFConstructSize(2880, 1800));
-        AMF_RETURN_IF_FAILED(res, L"AMF Failed to SetProperty");
-        res = m_AMFConverter->Init(m_decodeFormatOut, 2880,1800 );
-        AMF_RETURN_IF_FAILED(res, L"AMF Failed to Init converter");
 
         return AMF_OK;
     }
@@ -196,6 +190,18 @@ private:
     AMF_RESULT Convert(IN amf::AMFSurfacePtr& surface, OUT amf::AMFDataPtr& convertData)
     {
         AMF_RESULT res;
+
+        if (!m_AMFConverter) {
+            res = m_AMFFactory.GetFactory()->CreateComponent(m_AMFContext, AMFVideoConverter, &m_AMFConverter);
+            AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateComponent");
+            int width = surface->GetPlaneAt(0)->GetWidth();
+            int height = surface->GetPlaneAt(0)->GetWidth();
+            res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_FORMAT, m_textureFormatOut);
+            res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_SIZE, ::AMFConstructSize(width, height));
+            AMF_RETURN_IF_FAILED(res, L"AMF Failed to SetProperty");
+            res = m_AMFConverter->Init(m_decodeFormatOut, width, height);
+            AMF_RETURN_IF_FAILED(res, L"AMF Failed to Init converter");
+        }
 
         if (m_OpenCLConversion) {
             res = surface->Convert(amf::AMF_MEMORY_OPENCL);
