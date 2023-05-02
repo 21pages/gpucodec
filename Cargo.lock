@@ -191,6 +191,7 @@ dependencies = [
  "intel",
  "log",
  "nvidia",
+ "render",
  "serde",
  "serde_derive",
  "serde_json",

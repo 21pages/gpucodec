@@ -90,6 +90,122 @@ DUPL_RETURN DISPLAYMANAGER::ProcessFrame(_In_ FRAME_DATA* Data, _Inout_ ID3D11Te
 }
 
 //
+// Process a given frame and its metadata
+//
+DUPL_RETURN DISPLAYMANAGER::ProcessFrameDirectly(_In_ FRAME_DATA* Data, _Inout_ ID3D11Texture2D* SharedSurf, INT OffsetX, INT OffsetY, _In_ DXGI_OUTPUT_DESC* DeskDesc)
+{
+    ID3D11Texture2D *SrcSurface = Data->Frame;
+
+    DUPL_RETURN Ret = DUPL_RETURN_SUCCESS;
+    HRESULT hr;
+
+    D3D11_TEXTURE2D_DESC FullDesc;
+    SharedSurf->GetDesc(&FullDesc);
+
+    D3D11_TEXTURE2D_DESC ThisDesc;
+    SrcSurface->GetDesc(&ThisDesc);
+
+    if (!m_RTV)
+    {
+        hr = m_Device->CreateRenderTargetView(SharedSurf, nullptr, &m_RTV);
+        if (FAILED(hr))
+        {
+            return ProcessFailure(m_Device, L"Failed to create render target view for dirty rects", L"Error", hr, SystemTransitionsExpectedErrors);
+        }
+    }
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC ShaderDesc;
+    ShaderDesc.Format = ThisDesc.Format;
+    ShaderDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    ShaderDesc.Texture2D.MostDetailedMip = ThisDesc.MipLevels - 1;
+    ShaderDesc.Texture2D.MipLevels = ThisDesc.MipLevels;
+
+    // Create new shader resource view
+    ID3D11ShaderResourceView* ShaderResource = nullptr;
+    hr = m_Device->CreateShaderResourceView(SrcSurface, &ShaderDesc, &ShaderResource);
+    if (FAILED(hr))
+    {
+        return ProcessFailure(m_Device, L"Failed to create shader resource view for dirty rects", L"Error", hr, SystemTransitionsExpectedErrors);
+    }
+
+    FLOAT BlendFactor[4] = {0.f, 0.f, 0.f, 0.f};
+    m_DeviceContext->OMSetBlendState(nullptr, BlendFactor, 0xFFFFFFFF);
+    m_DeviceContext->OMSetRenderTargets(1, &m_RTV, nullptr);
+    m_DeviceContext->VSSetShader(m_VertexShader, nullptr, 0);
+    m_DeviceContext->PSSetShader(m_PixelShader, nullptr, 0);
+    m_DeviceContext->PSSetShaderResources(0, 1, &ShaderResource);
+    m_DeviceContext->PSSetSamplers(0, 1, &m_SamplerLinear);
+    m_DeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // // Create space for vertices for the dirty rects if the current space isn't large enough
+    // UINT BytesNeeded = sizeof(VERTEX) * NUMVERTICES * DirtyCount;
+    // if (BytesNeeded > m_DirtyVertexBufferAllocSize)
+    // {
+    //     if (m_DirtyVertexBufferAlloc)
+    //     {
+    //         delete [] m_DirtyVertexBufferAlloc;
+    //     }
+
+    //     m_DirtyVertexBufferAlloc = new (std::nothrow) BYTE[BytesNeeded];
+    //     if (!m_DirtyVertexBufferAlloc)
+    //     {
+    //         m_DirtyVertexBufferAllocSize = 0;
+    //         return ProcessFailure(nullptr, L"Failed to allocate memory for dirty vertex buffer.", L"Error", E_OUTOFMEMORY);
+    //     }
+
+    //     m_DirtyVertexBufferAllocSize = BytesNeeded;
+    // }
+
+    // // Fill them in
+    // VERTEX* DirtyVertex = reinterpret_cast<VERTEX*>(m_DirtyVertexBufferAlloc);
+    // for (UINT i = 0; i < DirtyCount; ++i, DirtyVertex += NUMVERTICES)
+    // {
+    //     SetDirtyVert(DirtyVertex, &(DirtyBuffer[i]), OffsetX, OffsetY, DeskDesc, &FullDesc, &ThisDesc);
+    // }
+
+    // Create vertex buffer
+    // D3D11_BUFFER_DESC BufferDesc;
+    // RtlZeroMemory(&BufferDesc, sizeof(BufferDesc));
+    // BufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    // BufferDesc.ByteWidth = BytesNeeded;
+    // BufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    // BufferDesc.CPUAccessFlags = 0;
+    // D3D11_SUBRESOURCE_DATA InitData;
+    // RtlZeroMemory(&InitData, sizeof(InitData));
+    // InitData.pSysMem = m_DirtyVertexBufferAlloc;
+
+    // ID3D11Buffer* VertBuf = nullptr;
+    // hr = m_Device->CreateBuffer(&BufferDesc, &InitData, &VertBuf);
+    // if (FAILED(hr))
+    // {
+    //     return ProcessFailure(m_Device, L"Failed to create vertex buffer in dirty rect processing", L"Error", hr, SystemTransitionsExpectedErrors);
+    // }
+    // UINT Stride = sizeof(VERTEX);
+    // UINT Offset = 0;
+    // m_DeviceContext->IASetVertexBuffers(0, 1, &VertBuf, &Stride, &Offset);
+
+    D3D11_VIEWPORT VP;
+    VP.Width = static_cast<FLOAT>(FullDesc.Width);
+    VP.Height = static_cast<FLOAT>(FullDesc.Height);
+    VP.MinDepth = 0.0f;
+    VP.MaxDepth = 1.0f;
+    VP.TopLeftX = 0.0f;
+    VP.TopLeftY = 0.0f;
+    m_DeviceContext->RSSetViewports(1, &VP);
+
+    m_DeviceContext->Draw(4, 0);
+    
+
+    // VertBuf->Release();
+    // VertBuf = nullptr;
+
+    ShaderResource->Release();
+    ShaderResource = nullptr;
+
+    return DUPL_RETURN_SUCCESS;
+}
+
+//
 // Returns D3D device being used
 //
 ID3D11Device* DISPLAYMANAGER::GetDevice()
