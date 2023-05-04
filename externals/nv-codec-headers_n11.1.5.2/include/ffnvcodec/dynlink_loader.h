@@ -204,6 +204,7 @@ typedef struct CudaFunctions {
     tcuGraphicsUnmapResources *cuGraphicsUnmapResources;
     tcuGraphicsSubResourceGetMappedArray *cuGraphicsSubResourceGetMappedArray;
     tcuGraphicsResourceGetMappedPointer *cuGraphicsResourceGetMappedPointer;
+    tcuGraphicsResourceSetMapFlags_v2 *cuGraphicsResourceSetMapFlags;
 
     tcuImportExternalMemory *cuImportExternalMemory;
     tcuDestroyExternalMemory *cuDestroyExternalMemory;
@@ -368,6 +369,7 @@ static inline int cuda_load_functions(CudaFunctions **functions, void *logctx)
     LOAD_SYMBOL(cuGraphicsUnmapResources, tcuGraphicsUnmapResources, "cuGraphicsUnmapResources");
     LOAD_SYMBOL(cuGraphicsSubResourceGetMappedArray, tcuGraphicsSubResourceGetMappedArray, "cuGraphicsSubResourceGetMappedArray");
     LOAD_SYMBOL(cuGraphicsResourceGetMappedPointer, tcuGraphicsResourceGetMappedPointer, "cuGraphicsResourceGetMappedPointer_v2");
+    LOAD_SYMBOL(cuGraphicsResourceSetMapFlags, tcuGraphicsResourceSetMapFlags_v2, "cuGraphicsResourceSetMapFlags_v2");
 
     LOAD_SYMBOL_OPT(cuDeviceGetUuid, tcuDeviceGetUuid, "cuDeviceGetUuid");
     LOAD_SYMBOL_OPT(cuImportExternalMemory, tcuImportExternalMemory, "cuImportExternalMemory");

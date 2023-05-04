@@ -551,6 +551,7 @@ typedef CUresult CUDAAPI tcuGraphicsMapResources(unsigned int count, CUgraphicsR
 typedef CUresult CUDAAPI tcuGraphicsUnmapResources(unsigned int count, CUgraphicsResource* resources, CUstream hStream);
 typedef CUresult CUDAAPI tcuGraphicsSubResourceGetMappedArray(CUarray* pArray, CUgraphicsResource resource, unsigned int arrayIndex, unsigned int mipLevel);
 typedef CUresult CUDAAPI tcuGraphicsResourceGetMappedPointer(CUdeviceptr *devPtrOut, size_t *sizeOut, CUgraphicsResource resource);
+typedef CUresult CUDAAPI tcuGraphicsResourceSetMapFlags_v2(CUgraphicsResource resource, unsigned int flags);
 
 typedef CUresult CUDAAPI tcuImportExternalMemory(CUexternalMemory* extMem_out, const CUDA_EXTERNAL_MEMORY_HANDLE_DESC* memHandleDesc);
 typedef CUresult CUDAAPI tcuDestroyExternalMemory(CUexternalMemory extMem);
