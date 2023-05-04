@@ -284,7 +284,7 @@ extern "C" int nvidia_decode(void* decoder, uint8_t *data, int len, DecodeCallba
                 if (!create_register_texture(p)) {
                     return -1;
                 }
-                if (!CopyDeviceFrame())
+                // if (!CopyDeviceFrame())
 
             }
             // Nv12ToColor32<BGRA32>(pFrame, dec.GetWidth(), (uint8_t *)dpFrame, 4 * nRGBWidth, dec.GetWidth(), dec.GetHeight(), iMatrix);

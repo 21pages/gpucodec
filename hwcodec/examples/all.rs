@@ -18,7 +18,7 @@ fn main() {
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
-                driver: EncodeDriver::AMF,
+                driver: EncodeDriver::MFX,
                 api: API_DX11,
                 dataFormat: DataFormat::H264,
             },
@@ -32,7 +32,7 @@ fn main() {
             },
         };
         let de_ctx = DecodeContext {
-            driver: DecodeDriver::AMF,
+            driver: DecodeDriver::MFX,
             api: API_DX11,
             outputSurfaceFormat: SURFACE_FORMAT_BGRA,
             dataFormat: DataFormat::H264,

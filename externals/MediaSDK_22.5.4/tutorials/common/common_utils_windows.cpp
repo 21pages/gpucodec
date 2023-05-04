@@ -25,7 +25,7 @@
  * Windows implementation of OS-specific utility functions
  */
 
-mfxStatus MFX_Initialize(mfxHDL deviceHandle, mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles)
+mfxStatus mfx_common_Initialize(mfxHDL deviceHandle, mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles)
 {
     mfxStatus sts = MFX_ERR_NONE;
     impl |= MFX_IMPL_VIA_D3D11;
@@ -54,17 +54,17 @@ mfxStatus MFX_Initialize(mfxHDL deviceHandle, mfxIMPL impl, mfxVersion ver, MFXV
     return sts;
 }
 
-void MFX_Release()
+void mfx_common_Release()
 {
     mfx_common_CleanupHWDevice();
 }
 
-void MFX_ClearYUVSurfaceVMem(mfxMemId memId)
+void mfx_common_ClearYUVSurfaceVMem(mfxMemId memId)
 {
     mfx_common_ClearYUVSurfaceD3D(memId);
 }
 
-void MFX_ClearRGBSurfaceVMem(mfxMemId memId)
+void mfx_common_ClearRGBSurfaceVMem(mfxMemId memId)
 {
     mfx_common_ClearRGBSurfaceD3D(memId);
 }

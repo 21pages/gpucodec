@@ -19,7 +19,7 @@ public:
         if (m_mfxVPP) m_mfxVPP->Close();
     }
 
-    mfxStatus Init(mfxFrameInfo in, mfxFrameInfo out)
+    mfxStatus Init(mfxFrameInfo &in, mfxFrameInfo &out)
     {
         mfxStatus sts = MFX_ERR_NONE;
 
@@ -135,6 +135,9 @@ static bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId)
     return false;
 }
 
+#include "common_directx11.h"
+
+
 extern "C" void* intel_new_decoder(void* hdl, API api, DataFormat codecID, SurfaceFormat outputSurfaceFormat)
 {
     mfxStatus sts = MFX_ERR_NONE;
@@ -142,6 +145,10 @@ extern "C" void* intel_new_decoder(void* hdl, API api, DataFormat codecID, Surfa
     mfxVersion ver = { {0, 1} };
 
     Decoder *p = new Decoder(hdl);
+    ID3D11Device *device = (ID3D11Device *)hdl;
+    ID3D11DeviceContext *ctx;
+    device->GetImmediateContext(&ctx);
+    mfx_common_SetHWDeviceContext(ctx);
     if (!p)
     {
         goto _exit;
@@ -243,7 +250,9 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
         mfxFrameInfo in = p->mfxVideoParams.mfx.FrameInfo;
         mfxFrameInfo out = in;
         out.FourCC = MFX_FOURCC_BGR4;
+        out.PicStruct = 0;
         sts = p->converter->Init(in, out);
+        DECODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
         p->initialized = true;
     }
 
