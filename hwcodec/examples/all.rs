@@ -24,8 +24,8 @@ fn main() {
             },
             d: DynamicContext {
                 device: dup.device(),
-                width: 2880,
-                height: 1800,
+                width: 1920,
+                height: 1080,
                 kbitrate: 5000,
                 framerate: 30,
                 gop: MAX_GOP as _,

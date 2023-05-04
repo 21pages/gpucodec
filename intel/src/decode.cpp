@@ -110,11 +110,13 @@ public:
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> deviceCtx;
     ComPtr<ID3D11Texture2D> bgraTexture = NULL; 
+    mfxFrameAllocResponse mfxResponse;
 
     Decoder(mfxHDL hdl): m_hdl(hdl) {
         device.Attach((ID3D11Device *)hdl);
         device->GetImmediateContext(deviceCtx.GetAddressOf());
         nv12torgb = std::make_unique<RGBToNV12>(device.Get(), deviceCtx.Get());
+        nv12torgb->Init();
     }
 };
 
@@ -217,8 +219,7 @@ static mfxStatus initialize(Decoder *p, mfxBitstream *mfxBS)
     Request.Type |= WILL_READ; // This line is only required for Windows DirectX11 to ensure that surfaces can be retrieved by the application
 
     // Allocate surfaces for decoder
-    mfxFrameAllocResponse mfxResponse;
-    sts = p->mfxAllocator.Alloc(p->mfxAllocator.pthis, &Request, &mfxResponse);
+    sts = p->mfxAllocator.Alloc(p->mfxAllocator.pthis, &Request, &p->mfxResponse);
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     // Allocate surface headers (mfxFrameSurface1) for decoder
@@ -226,7 +227,7 @@ static mfxStatus initialize(Decoder *p, mfxBitstream *mfxBS)
     for (int i = 0; i < numSurfaces; i++) {
         memset(&p->pmfxSurfaces[i], 0, sizeof(mfxFrameSurface1));
         p->pmfxSurfaces[i].Info = p->mfxVideoParams.mfx.FrameInfo;
-        p->pmfxSurfaces[i].Data.MemId = mfxResponse.mids[i];      // MID (memory id) represents one video NV12 surface
+        p->pmfxSurfaces[i].Data.MemId = p->mfxResponse.mids[i];      // MID (memory id) represents one video NV12 surface
     }
 
     // Initialize the Media SDK decoder
@@ -257,25 +258,6 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
     {
         sts = initialize(p, &mfxBS);
         DECODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-        // mfxFrameInfo in = p->mfxVideoParams.mfx.FrameInfo;
-        // mfxFrameInfo out = in;
-        // out.FourCC = MFX_FOURCC_BGR4;
-        // out.PicStruct = 0;
-        // sts = p->converter->Init(in, out);
-        // DECODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-        D3D11_TEXTURE2D_DESC desc2D;
-        desc2D.Width = p->mfxVideoParams.mfx.FrameInfo.Width;
-        desc2D.Height = p->mfxVideoParams.mfx.FrameInfo.Height;
-        desc2D.MipLevels = 1;
-        desc2D.ArraySize = 1;
-        desc2D.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-        desc2D.SampleDesc.Count = 1;
-        desc2D.SampleDesc.Quality = 0;
-        desc2D.Usage = D3D11_USAGE_DEFAULT;
-        desc2D.BindFlags = D3D11_BIND_RENDER_TARGET;
-        desc2D.CPUAccessFlags = 0;
-        desc2D.MiscFlags = 0;
-        p->device->CreateTexture2D(&desc2D, NULL, p->bgraTexture.GetAddressOf());
         p->initialized = true;
     }
 
@@ -309,10 +291,21 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
 
         if (MFX_ERR_NONE == sts)
         {
-            // sts = p->converter->Convert(pmfxOutSurface, &pmfxConvertSurface);
-            p->nv12torgb->Convert((ID3D11Texture2D*)pmfxOutSurface->Data.MemId, p->bgraTexture.Get());
+            mfxHDLPair pair = {NULL};
+            sts = p->mfxAllocator.GetHDL(p->mfxAllocator.pthis, pmfxOutSurface->Data.MemId, (mfxHDL*)&pair);
+            ID3D11Texture2D* texture = (ID3D11Texture2D*)pair.first;
+            D3D11_TEXTURE2D_DESC desc2D;
+            texture->GetDesc(&desc2D);
+            if (!p->bgraTexture) {
+                desc2D.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+                desc2D.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+                HRESULT hr = p->device->CreateTexture2D(&desc2D, NULL, p->bgraTexture.GetAddressOf());
+                if (FAILED(hr)) return -1;
+            }
+            p->nv12torgb->Convert(texture, p->bgraTexture.Get());
+            p->bgraTexture->GetDesc(&desc2D);
             if (MFX_ERR_NONE == sts) {
-                callback(pmfxConvertSurface->Data.MemId, SURFACE_FORMAT_BGRA, pmfxConvertSurface->Info.CropW, pmfxConvertSurface->Info.CropH, obj, 0);
+                callback(p->bgraTexture.Get(), SURFACE_FORMAT_BGRA, pmfxOutSurface->Info.CropW, pmfxOutSurface->Info.CropH, obj, 0);
                 decoded = true;
             }
             break;
