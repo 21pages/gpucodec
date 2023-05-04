@@ -30,7 +30,7 @@
  * Linux implementation of OS-specific utility functions
  */
 
-mfxStatus Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles)
+mfxStatus mfx_common_Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles)
 {
     mfxStatus sts = MFX_ERR_NONE;
 
@@ -40,7 +40,7 @@ mfxStatus Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mf
 
     // Create VA display
     mfxHDL displayHandle = { 0 };
-    sts = CreateVAEnvDRM(&displayHandle);
+    sts = mfx_common_CreateVAEnvDRM(&displayHandle);
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     // Provide VA display handle to Media SDK
@@ -64,42 +64,17 @@ mfxStatus Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mf
     return sts;
 }
 
-void Release()
+void mfx_common_Release()
 {
-    CleanupVAEnvDRM();
+    mfx_common_CleanupVAEnvDRM();
 }
 
-void mfxGetTime(mfxTime* timestamp)
-{
-    clock_gettime(CLOCK_REALTIME, timestamp);
-}
-
-double TimeDiffMsec(mfxTime tfinish, mfxTime tstart)
-{
-    double result;
-    long long elapsed_nsec = tfinish.tv_nsec - tstart.tv_nsec;
-    long long elapsed_sec = tfinish.tv_sec - tstart.tv_sec;
-
-    //if (tstart.tv_sec==0) return -1;
-
-    //timespec uses two fields -- check if borrowing necessary
-    if (elapsed_nsec < 0) {
-        elapsed_sec -= 1;
-        elapsed_nsec += 1000000000;
-    }
-    //return total converted to milliseconds
-    result = (double)elapsed_sec *1000.0;
-    result += (double)elapsed_nsec / 1000000;
-
-    return result;
-}
-
-void ClearYUVSurfaceVMem(mfxMemId memId)
+void mfx_common_ClearYUVSurfaceVMem(mfxMemId memId)
 {
     ClearYUVSurfaceVAAPI(memId);
 }
 
-void ClearRGBSurfaceVMem(mfxMemId memId)
+void mfx_common_ClearRGBSurfaceVMem(mfxMemId memId)
 {
     ClearRGBSurfaceVAAPI(memId);
 }

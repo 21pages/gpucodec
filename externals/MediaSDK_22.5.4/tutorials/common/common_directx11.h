@@ -41,9 +41,9 @@
 //     - Device must be active (but monitor does NOT have to be attached)
 //     - Device must be enabled in BIOS. Required for the case when used together with a discrete graphics card
 //     - For switchable graphics solutions (mobile) make sure that Intel device is the active device
-mfxStatus CreateHWDevice(mfxSession session, mfxHDL* deviceHandle, HWND hWnd, bool bCreateSharedHandles);
-void CleanupHWDevice();
-void SetHWDeviceContext(CComPtr<ID3D11DeviceContext> devCtx);
-CComPtr<ID3D11DeviceContext> GetHWDeviceContext();
-void ClearYUVSurfaceD3D(mfxMemId memId);
-void ClearRGBSurfaceD3D(mfxMemId memId);
+mfxStatus mfx_common_CreateHWDevice(mfxSession session, mfxHDL* deviceHandle, HWND hWnd, bool bCreateSharedHandles);
+void mfx_common_CleanupHWDevice();
+void mfx_common_SetHWDeviceContext(CComPtr<ID3D11DeviceContext> devCtx);
+CComPtr<ID3D11DeviceContext> mfx_common_GetHWDeviceContext();
+void mfx_common_ClearYUVSurfaceD3D(mfxMemId memId);
+void mfx_common_ClearRGBSurfaceD3D(mfxMemId memId);

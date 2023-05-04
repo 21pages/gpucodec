@@ -88,7 +88,7 @@ const char* DRM_INTEL_DRIVER_NAME = "i915";
 const char* DRI_PATH = "/dev/dri/";
 const char* DRI_NODE_RENDER = "renderD";
 
-int get_drm_driver_name(int fd, char *name, int name_size)
+static int get_drm_driver_name(int fd, char *name, int name_size)
 {
     drm_version_t version = {};
     version.name_len = name_size;
@@ -96,7 +96,7 @@ int get_drm_driver_name(int fd, char *name, int name_size)
     return ioctl(fd, DRM_IOWR(0, drm_version), &version);
 }
 
-int open_intel_adapter()
+static int open_intel_adapter()
 {
     std::string adapterPath = DRI_PATH;
     adapterPath += DRI_NODE_RENDER;
@@ -120,7 +120,7 @@ int open_intel_adapter()
     return -1;
 }
 
-mfxStatus CreateVAEnvDRM(mfxHDL* displayHandle)
+mfxStatus mfx_common_CreateVAEnvDRM(mfxHDL* displayHandle)
 {
     VAStatus va_res = VA_STATUS_SUCCESS;
     mfxStatus sts = MFX_ERR_NONE;
@@ -155,7 +155,7 @@ mfxStatus CreateVAEnvDRM(mfxHDL* displayHandle)
     return MFX_ERR_NONE;
 }
 
-void CleanupVAEnvDRM()
+void mfx_common_CleanupVAEnvDRM()
 {
     if (m_va_dpy) {
         vaTerminate(m_va_dpy);
@@ -166,7 +166,7 @@ void CleanupVAEnvDRM()
 }
 
 //utiility function to convert MFX fourcc to VA format
-unsigned int ConvertMfxFourccToVAFormat(mfxU32 fourcc)
+unsigned int mfx_common_ConvertMfxFourccToVAFormat(mfxU32 fourcc)
 {
     switch (fourcc) {
     case MFX_FOURCC_NV12:
@@ -186,12 +186,12 @@ unsigned int ConvertMfxFourccToVAFormat(mfxU32 fourcc)
     }
 }
 
-void ClearYUVSurfaceVAAPI(mfxMemId memId)
+void mfx_common_ClearYUVSurfaceVAAPI(mfxMemId memId)
 {
     // todo: clear VAAPI surface
 }
 
-void ClearRGBSurfaceVAAPI(mfxMemId memId)
+void mfx_common_ClearRGBSurfaceVAAPI(mfxMemId memId)
 {
     // todo: clear VAAPI surface
 }
@@ -210,7 +210,7 @@ struct vaapiMemId {
 // Media SDK memory allocator entrypoints....
 //
 
-mfxStatus _simple_alloc(mfxFrameAllocRequest* request,
+static mfxStatus _simple_alloc(mfxFrameAllocRequest* request,
                         mfxFrameAllocResponse* response)
 {
     mfxStatus mfx_res = MFX_ERR_NONE;
@@ -322,7 +322,7 @@ mfxStatus _simple_alloc(mfxFrameAllocRequest* request,
     return mfx_res;
 }
 
-mfxStatus simple_alloc(mfxHDL pthis, mfxFrameAllocRequest* request,
+mfxStatus mfx_common_simple_alloc(mfxHDL pthis, mfxFrameAllocRequest* request,
                        mfxFrameAllocResponse* response)
 {
     mfxStatus sts = MFX_ERR_NONE;
@@ -367,7 +367,7 @@ mfxStatus simple_alloc(mfxHDL pthis, mfxFrameAllocRequest* request,
     return sts;
 }
 
-mfxStatus simple_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr)
+mfxStatus mfx_common_simple_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr)
 {
     mfxStatus mfx_res = MFX_ERR_NONE;
     VAStatus va_res = VA_STATUS_SUCCESS;
@@ -470,7 +470,7 @@ mfxStatus simple_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr)
     return mfx_res;
 }
 
-mfxStatus simple_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr)
+mfxStatus mfx_common_simple_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr)
 {
     vaapiMemId* vaapi_mid = (vaapiMemId*) mid;
 
@@ -494,7 +494,7 @@ mfxStatus simple_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr)
     return MFX_ERR_NONE;
 }
 
-mfxStatus simple_gethdl(mfxHDL pthis, mfxMemId mid, mfxHDL* handle)
+mfxStatus mfx_common_simple_gethdl(mfxHDL pthis, mfxMemId mid, mfxHDL* handle)
 {
     vaapiMemId* vaapi_mid = (vaapiMemId*) mid;
 
@@ -505,7 +505,7 @@ mfxStatus simple_gethdl(mfxHDL pthis, mfxMemId mid, mfxHDL* handle)
     return MFX_ERR_NONE;
 }
 
-mfxStatus _simple_free(mfxHDL pthis, mfxFrameAllocResponse* response)
+static mfxStatus _simple_free(mfxHDL pthis, mfxFrameAllocResponse* response)
 {
     vaapiMemId* vaapi_mids = NULL;
     VASurfaceID* surfaces = NULL;
@@ -553,7 +553,7 @@ mfxStatus _simple_free(mfxHDL pthis, mfxFrameAllocResponse* response)
     return MFX_ERR_NONE;
 }
 
-mfxStatus simple_free(mfxHDL pthis, mfxFrameAllocResponse* response)
+mfxStatus mfx_common_simple_free(mfxHDL pthis, mfxFrameAllocResponse* response)
 {
     if (!response) return MFX_ERR_NULL_PTR;
 

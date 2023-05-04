@@ -62,11 +62,11 @@
 // =================================================================
 // Intel Media SDK memory allocator entrypoints....
 // Implementation of this functions is OS/Memory type specific.
-mfxStatus simple_alloc(mfxHDL pthis, mfxFrameAllocRequest* request, mfxFrameAllocResponse* response);
-mfxStatus simple_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr);
-mfxStatus simple_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr);
-mfxStatus simple_gethdl(mfxHDL pthis, mfxMemId mid, mfxHDL* handle);
-mfxStatus simple_free(mfxHDL pthis, mfxFrameAllocResponse* response);
+mfxStatus mfx_common_simple_alloc(mfxHDL pthis, mfxFrameAllocRequest* request, mfxFrameAllocResponse* response);
+mfxStatus mfx_common_simple_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr);
+mfxStatus mfx_common_simple_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData* ptr);
+mfxStatus mfx_common_simple_gethdl(mfxHDL pthis, mfxMemId mid, mfxHDL* handle);
+mfxStatus mfx_common_simple_free(mfxHDL pthis, mfxFrameAllocResponse* response);
 
 typedef mfxI32 msdkComponentType;
 enum
@@ -79,80 +79,20 @@ enum
 
 static const mfxPluginUID MSDK_PLUGINGUID_NULL = { { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 } };
 
-
-// =================================================================
-// Utility functions, not directly tied to Media SDK functionality
-//
-
-void PrintErrString(int err,const char* filestr,int line);
-FILE* OpenFile(const char* fileName, const char* mode);
-void CloseFile(FILE* fHdl);
-
-using fileUniPtr = std::unique_ptr<FILE, decltype(&CloseFile)>;
-
-// LoadRawFrame: Reads raw frame from YUV file (YV12) into NV12 surface
-// - YV12 is a more common format for for YUV files than NV12 (therefore the conversion during read and write)
-// - For the simulation case (fSource = NULL), the surface is filled with default image data
-// LoadRawRGBFrame: Reads raw RGB32 frames from file into RGB32 surface
-// - For the simulation case (fSource = NULL), the surface is filled with default image data
-mfxStatus LoadRawFrame(mfxFrameSurface1* pSurface, FILE* fSource);
-
-// Read raw YUV (P010) from file to a YUV (P010) surface
-mfxStatus LoadRaw10BitFrame(mfxFrameSurface1* pSurface, FILE* fSource);
-mfxStatus LoadRawRGBFrame(mfxFrameSurface1* pSurface, FILE* fSource);
-
-// Write raw YUV (NV12) surface to YUV (YV12) file
-mfxStatus WriteRawFrame(mfxFrameSurface1* pSurface, FILE* fSink);
-
-// Write raw YUV (P010) surface to YUV (YVP010) file
-mfxStatus WriteRaw10BitFrame(mfxFrameSurface1* pSurface, FILE* fSink);
-
-// Write bit stream data for frame to file
-mfxStatus WriteBitStreamFrame(mfxBitstream* pMfxBitstream, FILE* fSink);
-// Read bit stream data from file. Stream is read as large chunks (= many frames)
-mfxStatus ReadBitStreamData(mfxBitstream* pBS, FILE* fSource);
-
-void ClearYUVSurfaceSysMem(mfxFrameSurface1* pSfc, mfxU16 width, mfxU16 height);
-void ClearYUVSurfaceVMem(mfxMemId memId);
-void ClearRGBSurfaceVMem(mfxMemId memId);
-
-// Get free raw frame surface
-int GetFreeSurfaceIndex(mfxFrameSurface1** pSurfacesPool, mfxU16 nPoolSize);
-int GetFreeSurfaceIndex(const std::vector<mfxFrameSurface1>& pSurfacesPool);
-
 // For use with asynchronous task management
 typedef struct {
     mfxBitstream mfxBS;
     mfxSyncPoint syncp;
 } Task;
 
+void PrintErrString(int err,const char* filestr,int line);
+void mfx_common_ClearYUVSurfaceVMem(mfxMemId memId);
+void mfx_common_ClearRGBSurfaceVMem(mfxMemId memId);
+mfxStatus mfx_common_Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles = false);
+void mfx_common_Release();
+
+// Get free raw frame surface
+int GetFreeSurfaceIndex(mfxFrameSurface1** pSurfacesPool, mfxU16 nPoolSize);
+int GetFreeSurfaceIndex(const std::vector<mfxFrameSurface1>& pSurfacesPool);
 // Get free task
 int GetFreeTaskIndex(Task* pTaskPool, mfxU16 nPoolSize);
-
-// Initialize Intel Media SDK Session, device/display and memory manager
-mfxStatus Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles = false);
-
-// Release resources (device/display)
-void Release();
-
-// Convert frame type to string
-char mfxFrameTypeString(mfxU16 FrameType);
-
-void mfxGetTime(mfxTime* timestamp);
-
-//void mfxInitTime();  might need this for Windows
-double TimeDiffMsec(mfxTime tfinish, mfxTime tstart);
-#if defined(_WIN32) || defined(_WIN64)
-//This is the utility to show the current processor id of the platform.
-void showCPUInfo();
-#endif
-//This function is to check the UID return value after retrieving the UID for the current plugin
-bool AreGuidsEqual(const mfxPluginUID& guid1, const mfxPluginUID& guid2);
-
-//This function is convert UID to string
-char* ConvertGuidToString(const mfxPluginUID& guid);
-
-//This function to get the UID of the video plug-in
-const mfxPluginUID & msdkGetPluginUID(mfxIMPL impl, msdkComponentType type, mfxU32 uCodecid);
-
-mfxStatus ConvertFrameRate(mfxF64 dFrameRate, mfxU32* pnFrameRateExtN, mfxU32* pnFrameRateExtD);

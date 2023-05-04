@@ -35,10 +35,10 @@
 
 // =================================================================
 // VAAPI functionality required to manage VA surfaces
-mfxStatus CreateVAEnvDRM(mfxHDL* displayHandle);
-void CleanupVAEnvDRM();
-void ClearYUVSurfaceVAAPI(mfxMemId memId);
-void ClearRGBSurfaceVAAPI(mfxMemId memId);
+mfxStatus mfx_common_CreateVAEnvDRM(mfxHDL* displayHandle);
+void mfx_common_CleanupVAEnvDRM();
+void mfx_common_ClearYUVSurfaceVAAPI(mfxMemId memId);
+void mfx_common_ClearRGBSurfaceVAAPI(mfxMemId memId);
 
 // utility
-mfxStatus va_to_mfx_status(VAStatus va_res);
+mfxStatus mfx_common_va_to_mfx_status(VAStatus va_res);
