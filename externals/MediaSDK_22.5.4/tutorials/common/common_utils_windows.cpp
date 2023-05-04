@@ -25,7 +25,7 @@
  * Windows implementation of OS-specific utility functions
  */
 
-mfxStatus MFX_Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles)
+mfxStatus MFX_Initialize(mfxHDL deviceHandle, mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles)
 {
     mfxStatus sts = MFX_ERR_NONE;
     impl |= MFX_IMPL_VIA_D3D11;
@@ -35,11 +35,6 @@ mfxStatus MFX_Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
     // If mfxFrameAllocator is provided it means we need to setup DirectX device and memory allocator
     if (pmfxAllocator) {
-        // Create DirectX device context
-        mfxHDL deviceHandle;
-        sts = mfx_common_CreateHWDevice(*pSession, &deviceHandle, NULL, bCreateSharedHandles);
-        MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
         // Provide device manager to Media SDK
         sts = pSession->SetHandle(DEVICE_MGR_TYPE, deviceHandle);
         MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);

@@ -88,7 +88,7 @@ typedef struct {
 void PrintErrString(int err,const char* filestr,int line);
 void mfx_common_ClearYUVSurfaceVMem(mfxMemId memId);
 void mfx_common_ClearRGBSurfaceVMem(mfxMemId memId);
-mfxStatus mfx_common_Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles = false);
+mfxStatus mfx_common_Initialize(mfxHDL deviceHandle, mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles = false);
 void mfx_common_Release();
 
 // Get free raw frame surface

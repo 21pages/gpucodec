@@ -30,17 +30,12 @@
  * Linux implementation of OS-specific utility functions
  */
 
-mfxStatus mfx_common_Initialize(mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles)
+mfxStatus mfx_common_Initialize(mfxHDL displayHandle, mfxIMPL impl, mfxVersion ver, MFXVideoSession* pSession, mfxFrameAllocator* pmfxAllocator, bool bCreateSharedHandles)
 {
     mfxStatus sts = MFX_ERR_NONE;
 
     // Initialize Intel Media SDK Session
     sts = pSession->Init(impl, &ver);
-    MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-    // Create VA display
-    mfxHDL displayHandle = { 0 };
-    sts = mfx_common_CreateVAEnvDRM(&displayHandle);
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     // Provide VA display handle to Media SDK
