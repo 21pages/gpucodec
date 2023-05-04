@@ -11,96 +11,12 @@
 #define DECODE_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
 #define DECODE_CHECK_ERROR(P, X, ERR)     {if ((X) == (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
 
-class Converter {
-public:
-    Converter(MFXVideoSession *session): m_session(session)
-    {
-        m_mfxVPP = std::make_unique<MFXVideoVPP>(*m_session);
-    }
-    
-    ~Converter()
-    {
-        if (m_mfxVPP) m_mfxVPP->Close();
-    }
-
-    mfxStatus Init(mfxFrameInfo &in, mfxFrameInfo &out)
-    {
-        mfxStatus sts = MFX_ERR_NONE;
-
-        memset(&param, 0, sizeof(param));
-        param.vpp.In = in;
-        param.vpp.Out = out;
-
-        param.IOPattern = MFX_IOPATTERN_IN_VIDEO_MEMORY | MFX_IOPATTERN_OUT_VIDEO_MEMORY;
-
-            // Query number of required surfaces for VPP
-        mfxFrameAllocRequest VPPRequest; 
-        memset(&VPPRequest, 0, sizeof(mfxFrameAllocRequest));
-        sts = m_mfxVPP->QueryIOSurf(&param, &VPPRequest);
-        MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-        VPPRequest.Type |= WILL_READ; // This line is only required for Windows DirectX11 to ensure that surfaces can be retrieved by the application
-
-        // Allocate required surfaces
-        mfxFrameAllocResponse mfxResponse;
-        sts = mfxAllocator.Alloc(mfxAllocator.pthis, &VPPRequest, &mfxResponse);
-        MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-        mfxU16 nVPPSurfNum = mfxResponse.NumFrameActual;
-
-        // Allocate surface headers (mfxFrameSurface1) for VPP
-        pVPPSurfaces.resize(nVPPSurfNum);
-        for (int i = 0; i < nVPPSurfNum; i++) {
-            memset(&pVPPSurfaces[i], 0, sizeof(mfxFrameSurface1));
-            pVPPSurfaces[i].Info = param.vpp.Out;
-            pVPPSurfaces[i].Data.MemId = mfxResponse.mids[i];    // MID (memory id) represent one D3D NV12 surface
-        }
-
-         // Initialize Media SDK VPP
-        sts = m_mfxVPP->Init(&param);
-        MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
-        MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-    }
-
-    mfxStatus Convert(mfxFrameSurface1 *in, mfxFrameSurface1 **out)
-    {
-        mfxStatus sts = MFX_ERR_NONE;
-        mfxSyncPoint sync = NULL;
-        int nSurfIdxIn = GetFreeSurfaceIndex(pVPPSurfaces);
-        if (nSurfIdxIn == MFX_ERR_NOT_FOUND || nSurfIdxIn >= pVPPSurfaces.size()) {
-            return MFX_ERR_NOT_FOUND;
-        }
-        mfxFrameSurface1 *free = &pVPPSurfaces[nSurfIdxIn];
-        sts = m_mfxVPP->RunFrameVPPAsync(in, free, NULL, &sync);
-        for (;;) {
-            // Process a frame asychronously (returns immediately)
-            sts = m_mfxVPP->RunFrameVPPAsync(in, free, NULL, &sync);
-            if (MFX_WRN_DEVICE_BUSY == sts) {
-                MSDK_SLEEP(1);  // Wait if device is busy, then repeat the same call
-            } else
-                break;
-        }
-        MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-        sts = m_session->SyncOperation(sync, 1000);      // Synchronize. Wait until frame processing is ready
-        MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-        *out = free;
-        return sts;
-    }
-private:
-    std::unique_ptr<MFXVideoVPP> m_mfxVPP = NULL;
-    MFXVideoSession *m_session;
-    mfxVideoParam param;
-    mfxFrameAllocator mfxAllocator;
-    std::vector<mfxFrameSurface1> pVPPSurfaces;
-};
-
 class Decoder
 {
 public:
     mfxHDL m_hdl;
     MFXVideoSession session;
     MFXVideoDECODE *mfxDEC = NULL;
-    std::unique_ptr<Converter> converter = NULL;
     std::vector<mfxU8> surfaceBuffersData;
     std::vector<mfxFrameSurface1> pmfxSurfaces;
     mfxVideoParam mfxVideoParams;
@@ -170,8 +86,6 @@ extern "C" void* intel_new_decoder(void* hdl, API api, DataFormat codecID, Surfa
 
     // Create Media SDK decoder
     p->mfxDEC = new MFXVideoDECODE(p->session);
-    p->converter = std::make_unique<Converter>(&p->session);
-
 
     memset(&p->mfxVideoParams, 0, sizeof(p->mfxVideoParams));
     if (!convert_codec(codecID, p->mfxVideoParams.mfx.CodecId))
