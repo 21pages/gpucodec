@@ -89,6 +89,9 @@ fn main() {
             .map(|f| sdk_path.join("tutorials").join("common").join(f)),
         );
 
+    let dxgi_path = externals_dir.join("nvEncDXGIOutputDuplicationSample");
+    builder.include(&dxgi_path);
+
     // crate
     #[cfg(target_os = "linux")]
     {

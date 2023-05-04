@@ -3,6 +3,10 @@
 #include "common.h"
 #include "callback.h"
 
+#include "Preproc.h"
+
+#include "system.h"
+
 #define NEW_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); goto _exit;}}
 #define DECODE_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
 #define DECODE_CHECK_ERROR(P, X, ERR)     {if ((X) == (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
@@ -102,8 +106,16 @@ public:
     mfxVideoParam mfxVideoParams;
     bool initialized = false;
     mfxFrameAllocator mfxAllocator;
+    std::unique_ptr<RGBToNV12> nv12torgb = NULL;
+    ComPtr<ID3D11Device> device;
+    ComPtr<ID3D11DeviceContext> deviceCtx;
+    ComPtr<ID3D11Texture2D> bgraTexture = NULL; 
 
-    Decoder(mfxHDL hdl): m_hdl(hdl) {}
+    Decoder(mfxHDL hdl): m_hdl(hdl) {
+        device.Attach((ID3D11Device *)hdl);
+        device->GetImmediateContext(deviceCtx.GetAddressOf());
+        nv12torgb = std::make_unique<RGBToNV12>(device.Get(), deviceCtx.Get());
+    }
 };
 
 extern "C" int intel_destroy_decoder(void* decoder)
@@ -145,10 +157,7 @@ extern "C" void* intel_new_decoder(void* hdl, API api, DataFormat codecID, Surfa
     mfxVersion ver = { {0, 1} };
 
     Decoder *p = new Decoder(hdl);
-    ID3D11Device *device = (ID3D11Device *)hdl;
-    ID3D11DeviceContext *ctx;
-    device->GetImmediateContext(&ctx);
-    mfx_common_SetHWDeviceContext(ctx);
+    mfx_common_SetHWDeviceContext(p->deviceCtx.Get());
     if (!p)
     {
         goto _exit;
@@ -160,6 +169,7 @@ extern "C" void* intel_new_decoder(void* hdl, API api, DataFormat codecID, Surfa
     // Create Media SDK decoder
     p->mfxDEC = new MFXVideoDECODE(p->session);
     p->converter = std::make_unique<Converter>(&p->session);
+
 
     memset(&p->mfxVideoParams, 0, sizeof(p->mfxVideoParams));
     if (!convert_codec(codecID, p->mfxVideoParams.mfx.CodecId))
@@ -247,12 +257,25 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
     {
         sts = initialize(p, &mfxBS);
         DECODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-        mfxFrameInfo in = p->mfxVideoParams.mfx.FrameInfo;
-        mfxFrameInfo out = in;
-        out.FourCC = MFX_FOURCC_BGR4;
-        out.PicStruct = 0;
-        sts = p->converter->Init(in, out);
-        DECODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+        // mfxFrameInfo in = p->mfxVideoParams.mfx.FrameInfo;
+        // mfxFrameInfo out = in;
+        // out.FourCC = MFX_FOURCC_BGR4;
+        // out.PicStruct = 0;
+        // sts = p->converter->Init(in, out);
+        // DECODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+        D3D11_TEXTURE2D_DESC desc2D;
+        desc2D.Width = p->mfxVideoParams.mfx.FrameInfo.Width;
+        desc2D.Height = p->mfxVideoParams.mfx.FrameInfo.Height;
+        desc2D.MipLevels = 1;
+        desc2D.ArraySize = 1;
+        desc2D.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        desc2D.SampleDesc.Count = 1;
+        desc2D.SampleDesc.Quality = 0;
+        desc2D.Usage = D3D11_USAGE_DEFAULT;
+        desc2D.BindFlags = D3D11_BIND_RENDER_TARGET;
+        desc2D.CPUAccessFlags = 0;
+        desc2D.MiscFlags = 0;
+        p->device->CreateTexture2D(&desc2D, NULL, p->bgraTexture.GetAddressOf());
         p->initialized = true;
     }
 
@@ -286,7 +309,8 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
 
         if (MFX_ERR_NONE == sts)
         {
-            sts = p->converter->Convert(pmfxOutSurface, &pmfxConvertSurface);
+            // sts = p->converter->Convert(pmfxOutSurface, &pmfxConvertSurface);
+            p->nv12torgb->Convert((ID3D11Texture2D*)pmfxOutSurface->Data.MemId, p->bgraTexture.Get());
             if (MFX_ERR_NONE == sts) {
                 callback(pmfxConvertSurface->Data.MemId, SURFACE_FORMAT_BGRA, pmfxConvertSurface->Info.CropW, pmfxConvertSurface->Info.CropH, obj, 0);
                 decoded = true;
