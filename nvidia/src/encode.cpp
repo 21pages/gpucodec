@@ -71,6 +71,7 @@ struct Encoder
     #ifdef _WIN32
     ComPtr<ID3D11Device> d3d11Deivce;
     ComPtr<ID3D11DeviceContext> d3d11DeviceCtx;
+    NvEncoderD3D11 *pEnc = NULL;
     #endif
     void *m_hdl;
     CudaFunctions *cuda_dl = NULL;
@@ -78,7 +79,6 @@ struct Encoder
     int32_t width;
     int32_t height;
     NV_ENC_BUFFER_FORMAT format;
-    NvEncoderD3D11 *pEnc = NULL;
     CUcontext cuContext = NULL;
 
     Encoder(void *hdl, int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format):
@@ -148,7 +148,8 @@ extern "C" void* nvidia_new_encoder(void *hdl, API api,
             goto _exit;
         }
         
-        if (API_DX11 == api) {
+        if (API_DX11 == api)
+        {
             ComPtr<IDXGIFactory1> pFactory;
             ComPtr<IDXGIAdapter> pAdapter;
 
@@ -159,6 +160,10 @@ extern "C" void* nvidia_new_encoder(void *hdl, API api,
             NULL, 0, D3D11_SDK_VERSION, e->d3d11Deivce.GetAddressOf(), NULL, e->d3d11DeviceCtx.GetAddressOf());
             // e->d3d11Deivce.Attach((ID3D11Device *)hdl);
             // e->d3d11Deivce->GetImmediateContext(e->d3d11DeviceCtx.GetAddressOf());
+        } 
+        else
+        {
+            goto _exit;
         }
         int nGpu = 0, gpu = 0;
         if (!ck(e->cuda_dl->cuDeviceGetCount(&nGpu)))
