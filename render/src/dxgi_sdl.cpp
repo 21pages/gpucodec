@@ -369,8 +369,6 @@ public:
 
 simplerenderer::atomic_packed_32x2::atomic_packed_32x2(void) {}
 
-// static dx_device_context ctx;
-// static simplerenderer *renderer = nullptr;
 
 class Render {
 public:
