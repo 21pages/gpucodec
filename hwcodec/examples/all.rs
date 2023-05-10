@@ -18,21 +18,21 @@ fn main() {
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
-                driver: EncodeDriver::MFX,
+                driver: EncodeDriver::AMF,
                 api: API_DX11,
                 dataFormat: DataFormat::H264,
             },
             d: DynamicContext {
                 device: dup.device(),
-                width: 1920,
-                height: 1080,
+                width: 2880,
+                height: 1800,
                 kbitrate: 5000,
                 framerate: 30,
                 gop: MAX_GOP as _,
             },
         };
         let de_ctx = DecodeContext {
-            driver: DecodeDriver::MFX,
+            driver: DecodeDriver::AMF,
             api: API_DX11,
             outputSurfaceFormat: SURFACE_FORMAT_BGRA,
             dataFormat: DataFormat::H264,

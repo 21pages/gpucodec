@@ -167,13 +167,13 @@ bool NativeDevice::Init(AdapterVendor vendor)
     D3D_FEATURE_LEVEL featureLevel;
     D3D_DRIVER_TYPE d3dDriverType = D3D_DRIVER_TYPE_HARDWARE;
 	hr = D3D11CreateDevice(m_DXGIAdapter1.Get(), d3dDriverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
-		D3D11_SDK_VERSION, m_pd3dDevice.GetAddressOf(), &featureLevel, m_pd3dImmediateContext.GetAddressOf());
+		D3D11_SDK_VERSION, m_pd3dDevice.ReleaseAndGetAddressOf(), &featureLevel, m_pd3dImmediateContext.ReleaseAndGetAddressOf());
 
 	if (hr == E_INVALIDARG)
 	{
 		// Direct3D 11.0 的API不承认D3D_FEATURE_LEVEL_11_1，所以我们需要尝试特性等级11.0以及以下的版本
 		hr = D3D11CreateDevice(nullptr, d3dDriverType, nullptr, createDeviceFlags, &featureLevels[1], numFeatureLevels - 1,
-			D3D11_SDK_VERSION, m_pd3dDevice.GetAddressOf(), &featureLevel, m_pd3dImmediateContext.GetAddressOf());
+			D3D11_SDK_VERSION, m_pd3dDevice.ReleaseAndGetAddressOf(), &featureLevel, m_pd3dImmediateContext.ReleaseAndGetAddressOf());
 	}
 
     if (FAILED(hr))
@@ -204,8 +204,8 @@ bool NativeDevice::Init(AdapterVendor vendor)
     // 为了正确创建 DXGI交换链，首先我们需要获取创建 D3D设备 的 DXGI工厂，否则会引发报错：
     // "IDXGIFactory::CreateSwapChain: This function is being called with a device from a different IDXGIFactory."
     HRB(m_pd3dDevice.As(&dxgiDevice));
-    HRB(dxgiDevice->GetAdapter(dxgiAdapter.GetAddressOf()));
-    HRB(dxgiAdapter->GetParent(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(dxgiFactory1.GetAddressOf())));
+    HRB(dxgiDevice->GetAdapter(dxgiAdapter.ReleaseAndGetAddressOf()));
+    HRB(dxgiAdapter->GetParent(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(dxgiFactory1.ReleaseAndGetAddressOf())));
 
     // 查看该对象是否包含IDXGIFactory2接口
     hr = dxgiFactory1.As(&dxgiFactory2);
@@ -243,7 +243,7 @@ bool NativeDevice::Init(AdapterVendor vendor)
         fd.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
         fd.Windowed = TRUE;
         // 为当前窗口创建交换链
-        HRB(dxgiFactory2->CreateSwapChainForHwnd(m_pd3dDevice.Get(), m_hMainWnd, &sd, &fd, nullptr, m_pSwapChain1.GetAddressOf()));
+        HRB(dxgiFactory2->CreateSwapChainForHwnd(m_pd3dDevice.Get(), m_hMainWnd, &sd, &fd, nullptr, m_pSwapChain1.ReleaseAndGetAddressOf()));
         HRB(m_pSwapChain1.As(&m_pSwapChain));
     }
     else
@@ -275,7 +275,7 @@ bool NativeDevice::Init(AdapterVendor vendor)
         sd.Windowed = TRUE;
         sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
         sd.Flags = 0;
-        HRB(dxgiFactory1->CreateSwapChain(m_pd3dDevice.Get(), &sd, m_pSwapChain.GetAddressOf()));
+        HRB(dxgiFactory1->CreateSwapChain(m_pd3dDevice.Get(), &sd, m_pSwapChain.ReleaseAndGetAddressOf()));
     }
 
     // 可以禁止alt+enter全屏

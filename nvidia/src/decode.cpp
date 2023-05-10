@@ -76,7 +76,7 @@ public:
     Decoder(void *hdl)
     {
         d3d11_device = ((ID3D11Device *)hdl);
-        d3d11_device->GetImmediateContext(d3d11_device_ctx.GetAddressOf());
+        d3d11_device->GetImmediateContext(d3d11_device_ctx.ReleaseAndGetAddressOf());
         load_driver(&cudl, &cvdl);
     }
 };
@@ -154,10 +154,10 @@ extern "C" void* nvidia_new_decoder(void *hdl, API api, DataFormat dataFormat, S
         CUdevice cuDevice = 0;
 #ifdef _WIN32
         ComPtr<IDXGIDevice> dxgi_device;
-        HRESULT hr = p->d3d11_device->QueryInterface(__uuidof(IDXGIDevice), (void **)dxgi_device.GetAddressOf());
+        HRESULT hr = p->d3d11_device->QueryInterface(__uuidof(IDXGIDevice), (void **)dxgi_device.ReleaseAndGetAddressOf());
         if (FAILED(hr)) goto _exit;
         ComPtr<IDXGIAdapter> dxgi_adapter;
-        hr = dxgi_device->GetAdapter(dxgi_adapter.GetAddressOf());
+        hr = dxgi_device->GetAdapter(dxgi_adapter.ReleaseAndGetAddressOf());
         if(!ck(p->cudl->cuD3D11GetDevice(&cuDevice, dxgi_adapter.Get()))) goto _exit;
 #else
         int nGpu = 0, gpu = 0;
@@ -257,7 +257,7 @@ static bool create_register_texture(Decoder *p)
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     desc.CPUAccessFlags = 0;
 
-    HRB(p->d3d11_device->CreateTexture2D(&desc, nullptr, p->d3d11_texture.GetAddressOf()));
+    HRB(p->d3d11_device->CreateTexture2D(&desc, nullptr, p->d3d11_texture.ReleaseAndGetAddressOf()));
     if(!ck(p->cudl->cuCtxPushCurrent(p->cuContext))) return false;
     if(!ck(p->cudl->cuGraphicsD3D11RegisterResource(&p->cuResource, p->d3d11_texture.Get(), CU_GRAPHICS_REGISTER_FLAGS_NONE))) return false;
     if(!ck(p->cudl->cuGraphicsResourceSetMapFlags(p->cuResource, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD))) return false;

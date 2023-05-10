@@ -153,13 +153,13 @@ extern "C" void* nvidia_new_encoder(void *hdl, API api,
             ComPtr<IDXGIFactory1> pFactory;
             ComPtr<IDXGIAdapter> pAdapter;
 
-            CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void **)pFactory.GetAddressOf());
-            pFactory->EnumAdapters(1, pAdapter.GetAddressOf());
+            CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void **)pFactory.ReleaseAndGetAddressOf());
+            pFactory->EnumAdapters(1, pAdapter.ReleaseAndGetAddressOf());
         
             D3D11CreateDevice(pAdapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, NULL, 0,
-            NULL, 0, D3D11_SDK_VERSION, e->d3d11Deivce.GetAddressOf(), NULL, e->d3d11DeviceCtx.GetAddressOf());
+            NULL, 0, D3D11_SDK_VERSION, e->d3d11Deivce.ReleaseAndGetAddressOf(), NULL, e->d3d11DeviceCtx.ReleaseAndGetAddressOf());
             // e->d3d11Deivce = (ID3D11Device *)hdl;
-            // e->d3d11Deivce->GetImmediateContext(e->d3d11DeviceCtx.GetAddressOf());
+            // e->d3d11Deivce->GetImmediateContext(e->d3d11DeviceCtx.ReleaseAndGetAddressOf());
         } 
         else
         {
@@ -238,7 +238,7 @@ static int copy_texture(Encoder *e, void* src, void* dst)
 {
     ComPtr<ID3D11Device> src_device = (ID3D11Device*)e->m_hdl;
     ComPtr<ID3D11DeviceContext> src_deviceContext;
-    src_device->GetImmediateContext(src_deviceContext.GetAddressOf());
+    src_device->GetImmediateContext(src_deviceContext.ReleaseAndGetAddressOf());
     ComPtr<ID3D11Texture2D> src_tex = (ID3D11Texture2D *)src;
     ComPtr<ID3D11Texture2D> dst_tex = (ID3D11Texture2D *)dst;
     HRESULT hr;
@@ -251,7 +251,7 @@ static int copy_texture(Encoder *e, void* src, void* dst)
     desc.BindFlags = 0;
     desc.MiscFlags = 0;
     ComPtr<ID3D11Texture2D> staging_tex;
-    src_device->CreateTexture2D(&desc, NULL, staging_tex.GetAddressOf());
+    src_device->CreateTexture2D(&desc, NULL, staging_tex.ReleaseAndGetAddressOf());
     src_deviceContext->CopyResource(staging_tex.Get(), src_tex.Get());
 
     D3D11_MAPPED_SUBRESOURCE map;

@@ -30,7 +30,7 @@ public:
 
     Decoder(mfxHDL hdl): m_hdl(hdl) {
         device = ((ID3D11Device *)hdl);
-        device->GetImmediateContext(deviceCtx.GetAddressOf());
+        device->GetImmediateContext(deviceCtx.ReleaseAndGetAddressOf());
         nv12torgb = std::make_unique<RGBToNV12>(device.Get(), deviceCtx.Get());
         nv12torgb->Init();
     }
@@ -213,7 +213,7 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
             if (!p->bgraTexture) {
                 desc2D.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
                 desc2D.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-                HRESULT hr = p->device->CreateTexture2D(&desc2D, NULL, p->bgraTexture.GetAddressOf());
+                HRESULT hr = p->device->CreateTexture2D(&desc2D, NULL, p->bgraTexture.ReleaseAndGetAddressOf());
                 if (FAILED(hr)) return -1;
             }
             p->nv12torgb->Convert(texture, p->bgraTexture.Get());
