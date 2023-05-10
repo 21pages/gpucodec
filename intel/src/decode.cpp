@@ -29,7 +29,7 @@ public:
     mfxFrameAllocResponse mfxResponse;
 
     Decoder(mfxHDL hdl): m_hdl(hdl) {
-        device.Attach((ID3D11Device *)hdl);
+        device = ((ID3D11Device *)hdl);
         device->GetImmediateContext(deviceCtx.GetAddressOf());
         nv12torgb = std::make_unique<RGBToNV12>(device.Get(), deviceCtx.Get());
         nv12torgb->Init();

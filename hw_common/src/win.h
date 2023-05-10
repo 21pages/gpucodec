@@ -21,7 +21,7 @@ enum class AdapterVendor {
 class Texture_Lifetime_Keeper {
 public:
     Texture_Lifetime_Keeper(void *texture) {
-        d3d11_texture.Attach((ID3D11Texture2D*)texture);
+        d3d11_texture = (ID3D11Texture2D*)texture;
     }
 private:
     ComPtr<ID3D11Texture2D> d3d11_texture;

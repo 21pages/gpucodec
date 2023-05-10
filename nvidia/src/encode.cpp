@@ -158,7 +158,7 @@ extern "C" void* nvidia_new_encoder(void *hdl, API api,
         
             D3D11CreateDevice(pAdapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, NULL, 0,
             NULL, 0, D3D11_SDK_VERSION, e->d3d11Deivce.GetAddressOf(), NULL, e->d3d11DeviceCtx.GetAddressOf());
-            // e->d3d11Deivce.Attach((ID3D11Device *)hdl);
+            // e->d3d11Deivce = (ID3D11Device *)hdl;
             // e->d3d11Deivce->GetImmediateContext(e->d3d11DeviceCtx.GetAddressOf());
         } 
         else

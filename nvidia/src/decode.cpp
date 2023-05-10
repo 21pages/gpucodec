@@ -75,7 +75,7 @@ public:
 
     Decoder(void *hdl)
     {
-        d3d11_device.Attach((ID3D11Device *)hdl);
+        d3d11_device = ((ID3D11Device *)hdl);
         d3d11_device->GetImmediateContext(d3d11_device_ctx.GetAddressOf());
         load_driver(&cudl, &cvdl);
     }
