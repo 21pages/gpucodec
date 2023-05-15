@@ -179,25 +179,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hwcodec"
-version = "0.1.0"
-dependencies = [
- "amf",
- "bindgen",
- "cc",
- "duplication",
- "env_logger",
- "hw_common",
- "intel",
- "log",
- "nvidia",
- "render",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
 name = "intel"
 version = "0.1.0"
 dependencies = [
@@ -408,6 +389,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be55cf8942feac5c765c2c993422806843c9a9a45d4d5c407ad6dd2ea95eb9b6"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "texcodec"
+version = "0.1.0"
+dependencies = [
+ "amf",
+ "bindgen",
+ "cc",
+ "duplication",
+ "env_logger",
+ "hw_common",
+ "intel",
+ "log",
+ "nvidia",
+ "render",
+ "serde",
+ "serde_derive",
+ "serde_json",
 ]
 
 [[package]]

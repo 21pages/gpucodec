@@ -3,13 +3,13 @@ use hw_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
     FeatureContext, SurfaceFormat::*, API::*, MAX_GOP,
 };
-use hwcodec::{decode::Decoder, encode::Encoder};
 use render::Render;
 use std::{
     io::{Read, Write},
     path::PathBuf,
     time::{Duration, Instant},
 };
+use texcodec::{decode::Decoder, encode::Encoder};
 
 fn main() {
     unsafe {
