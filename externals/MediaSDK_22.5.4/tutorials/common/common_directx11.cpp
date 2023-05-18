@@ -47,7 +47,7 @@ void mfx_common_SetHWDeviceContext(CComPtr<ID3D11DeviceContext> devCtx)
 // Free HW device context
 void mfx_common_CleanupHWDevice()
 {
-    g_pAdapter->Release();
+    if (g_pAdapter) g_pAdapter->Release();
 }
 
 CComPtr<ID3D11DeviceContext> GetHWDeviceContext()
