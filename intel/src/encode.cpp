@@ -95,8 +95,8 @@ static bool SetDeviceMultithreadProtected(ID3D11Device *pD3dDevice)
         return false;
     }
     if (!hmt->SetMultithreadProtected(TRUE)) {
-        std::cerr << "Failed to SetMultithreadProtected" << std::endl;
-        return false;
+        std::cerr << "Failed to SetMultithreadProtected:" << hmt->GetMultithreadProtected() << std::endl;
+        // return false; // FALSE works
     }
     return true;
 }
