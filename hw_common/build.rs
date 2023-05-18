@@ -32,7 +32,7 @@ fn main() {
 struct MyCallbacks;
 impl bindgen::callbacks::ParseCallbacks for MyCallbacks {
     fn add_derives(&self, name: &str) -> Vec<String> {
-        let names = vec!["DataFormat", "HWDeviceType", "PixelFormat"];
+        let names = vec!["DataFormat", "SurfaceFormat", "API"];
         if names.contains(&name) {
             vec!["Serialize", "Deserialize"]
                 .drain(..)

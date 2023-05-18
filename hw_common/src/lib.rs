@@ -24,14 +24,14 @@ pub enum DecodeDriver {
     MFX,
 }
 
-// #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct FeatureContext {
     pub driver: EncodeDriver,
     pub api: API,
     pub dataFormat: DataFormat,
 }
 
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DynamicContext {
     pub device: *mut c_void,
     pub width: i32,
@@ -41,13 +41,13 @@ pub struct DynamicContext {
     pub gop: i32,
 }
 
-// #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncodeContext {
     pub f: FeatureContext,
     pub d: DynamicContext,
 }
 
-// #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodeContext {
     pub driver: DecodeDriver,
     pub api: API,

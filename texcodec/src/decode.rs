@@ -1,4 +1,4 @@
-use crate::get_bin_file;
+use crate::native_codec_get_bin_file;
 use hw_common::{
     inner::DecodeCalls,
     DataFormat::*,
