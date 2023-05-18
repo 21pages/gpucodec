@@ -1,4 +1,5 @@
 #include <cstring>
+#include <iostream>
 #include <common_utils.h>
 #include "common.h"
 #include "callback.h"
@@ -10,6 +11,11 @@
 #include <d3d11_2.h>
 #include <d3d11_3.h>
 #include <d3d11_4.h>
+
+#include <d3d11.h>
+#include <d3d11_1.h>
+#include <wrl/client.h>
+using Microsoft::WRL::ComPtr;
 
 #define NEW_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return NULL;}}
 #define ENCODE_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
@@ -78,6 +84,23 @@ static mfxFrameAllocator alloc{
     NULL
 };
 
+static bool SetDeviceMultithreadProtected(ID3D11Device *pD3dDevice)
+{
+    ComPtr<ID3D11DeviceContext> deviceCtx = nullptr;
+    ComPtr<ID3D10Multithread> hmt = nullptr;
+    pD3dDevice->GetImmediateContext(deviceCtx.ReleaseAndGetAddressOf());
+    HRESULT hr =  deviceCtx.As(&hmt);
+    if (FAILED(hr)) {
+        std::cerr << "Failed to get ID3D10Multithread, hr = 0x" << std::hex << hr << std::dec << std::endl;
+        return false;
+    }
+    if (!hmt->SetMultithreadProtected(TRUE)) {
+        std::cerr << "Failed to SetMultithreadProtected" << std::endl;
+        return false;
+    }
+    return true;
+}
+
 extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, API api,
                         DataFormat dataFormat, int32_t w, int32_t h, 
                         int32_t kbs, int32_t framerate, int32_t gop)
@@ -135,6 +158,10 @@ extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, API api,
     Encoder *p = new Encoder();
     if (!p)
     {
+        goto _exit;
+    }
+
+    if (!SetDeviceMultithreadProtected(pD3dDevice)) {
         goto _exit;
     }
 
@@ -234,7 +261,7 @@ extern "C" int intel_encode(void *encoder,  ID3D11Texture2D* tex,
     }
 
     if (MFX_ERR_NONE == sts) {
-        sts = p->session.SyncOperation(syncp, 60000);      // Synchronize. Wait until encoded frame is ready
+        sts = p->session.SyncOperation(syncp, 1000);      // Synchronize. Wait until encoded frame is ready
         ENCODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
         if (p->mfxBS.DataLength > 0)
         {
