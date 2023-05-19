@@ -35,7 +35,7 @@ impl Encoder {
         };
         unsafe {
             let codec = (calls.new)(
-                ctx.d.device,
+                ctx.d.device.unwrap_or(std::ptr::null_mut()),
                 ctx.f.api as _,
                 ctx.f.dataFormat as i32,
                 ctx.d.width,

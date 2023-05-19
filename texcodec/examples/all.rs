@@ -23,7 +23,7 @@ fn main() {
                 dataFormat: DataFormat::H264,
             },
             d: DynamicContext {
-                device: dup.device(),
+                device: Some(dup.device()),
                 width: 2880,
                 height: 1800,
                 kbitrate: 5000,
@@ -36,7 +36,7 @@ fn main() {
             api: API_DX11,
             outputSurfaceFormat: SURFACE_FORMAT_BGRA,
             dataFormat: DataFormat::H264,
-            hdl: render.device(),
+            device: Some(render.device()),
         };
 
         let mut enc = Encoder::new(en_ctx).unwrap();

@@ -31,9 +31,10 @@ pub struct FeatureContext {
     pub dataFormat: DataFormat,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DynamicContext {
-    pub device: *mut c_void,
+    #[serde(skip)]
+    pub device: Option<*mut c_void>,
     pub width: i32,
     pub height: i32,
     pub kbitrate: i32,
@@ -41,17 +42,18 @@ pub struct DynamicContext {
     pub gop: i32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct EncodeContext {
     pub f: FeatureContext,
     pub d: DynamicContext,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DecodeContext {
+    #[serde(skip)]
+    pub device: Option<*mut c_void>,
     pub driver: DecodeDriver,
     pub api: API,
     pub dataFormat: DataFormat,
     pub outputSurfaceFormat: SurfaceFormat,
-    pub hdl: *mut c_void,
 }

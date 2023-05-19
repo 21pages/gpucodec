@@ -38,7 +38,7 @@ impl Decoder {
         };
         unsafe {
             let codec = (calls.new)(
-                ctx.hdl,
+                ctx.device.unwrap_or(std::ptr::null_mut()),
                 ctx.api as i32,
                 ctx.dataFormat as i32,
                 ctx.outputSurfaceFormat as i32,
