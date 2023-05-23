@@ -31,6 +31,7 @@ private:
 public:
     // Direct3D 11
     ComPtr<IDXGIFactory1> factory1_ = nullptr;
+    ComPtr<IDXGIAdapter> adapter_ = nullptr;
     ComPtr<IDXGIAdapter1> adapter1_ = nullptr;
     ComPtr<ID3D11Device> device_ = nullptr;
     ComPtr<ID3D11DeviceContext> context_ = nullptr;

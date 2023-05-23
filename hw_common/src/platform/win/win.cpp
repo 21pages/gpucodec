@@ -52,6 +52,8 @@ bool NativeDevice::Init(AdapterVendor vendor)
 		}
 	}
 
+	if (adapter1_) HRB(adapter1_.As(&adapter_));
+
 	UINT createDeviceFlags = 0;
 	D3D_FEATURE_LEVEL featureLevels[] =
 	{
@@ -81,7 +83,12 @@ bool NativeDevice::Init(ID3D11Device *device)
 {
 	device_ = device;
 	device_->GetImmediateContext(context_.ReleaseAndGetAddressOf());
-	
+	ComPtr<IDXGIDevice> dxgiDevice = nullptr;
+	HRB(device_.As(&dxgiDevice));
+	HRB(dxgiDevice->GetAdapter(adapter_.ReleaseAndGetAddressOf()));
+	HRB(adapter_.As(&adapter1_));
+	HRB(adapter1_->GetParent(IID_PPV_ARGS(&factory1_)));
+
 	return true;
 }
 
