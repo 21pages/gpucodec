@@ -1,27 +1,17 @@
 #include <cstring>
 #include <iostream>
 #include <common_utils.h>
+
 #include "common.h"
 #include "callback.h"
-
-#include <dxgi.h>
-#include <dxgi1_2.h>
-#include <d3d11.h>
-#include <d3d11_1.h>
-#include <d3d11_2.h>
-#include <d3d11_3.h>
-#include <d3d11_4.h>
-
-#include <d3d11.h>
-#include <d3d11_1.h>
-#include <wrl/client.h>
-using Microsoft::WRL::ComPtr;
+#include "system.h"
 
 #define NEW_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return NULL;}}
 #define ENCODE_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
 #define ENCODE_CHECK_ERROR(P, X, ERR)     {if ((X) == (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
 struct Encoder
 {
+    std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
     MFXVideoSession session;
     MFXVideoENCODE *mfxENC = NULL;
     std::vector<mfxFrameSurface1> pEncSurfaces;
@@ -29,9 +19,22 @@ struct Encoder
     mfxBitstream mfxBS;
 };
 
+static mfxStatus InitSession(MFXVideoSession &session)
+{
+    mfxInitParam mfxparams{};
+    mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
+    mfxparams.Implementation = impl;
+    mfxparams.Version.Major = 1;
+    mfxparams.Version.Minor = 0;
+    mfxparams.GPUCopy = MFX_GPUCOPY_OFF;
+
+    return session.InitEx(mfxparams);
+}
+
 extern "C" int intel_driver_support()
 {
-    return 0;
+    MFXVideoSession session;
+    return InitSession(session) == MFX_ERR_NONE ? 0 : -1;
 }
 
 extern "C" int intel_destroy_encoder(void *encoder)
@@ -84,34 +87,11 @@ static mfxFrameAllocator alloc{
     NULL
 };
 
-static bool SetDeviceMultithreadProtected(ID3D11Device *pD3dDevice)
-{
-    ComPtr<ID3D11DeviceContext> deviceCtx = nullptr;
-    ComPtr<ID3D10Multithread> hmt = nullptr;
-    pD3dDevice->GetImmediateContext(deviceCtx.ReleaseAndGetAddressOf());
-    HRESULT hr =  deviceCtx.As(&hmt);
-    if (FAILED(hr)) {
-        std::cerr << "Failed to get ID3D10Multithread, hr = 0x" << std::hex << hr << std::dec << std::endl;
-        return false;
-    }
-    if (!hmt->SetMultithreadProtected(TRUE)) {
-        std::cerr << "Failed to SetMultithreadProtected:" << hmt->GetMultithreadProtected() << std::endl;
-        // return false; // FALSE works
-    }
-    return true;
-}
-
-extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, API api,
+extern "C" void* intel_new_encoder(void *opaque, API api,
                         DataFormat dataFormat, int32_t w, int32_t h, 
                         int32_t kbs, int32_t framerate, int32_t gop)
 {
     mfxStatus sts = MFX_ERR_NONE;
-    mfxInitParam mfxparams{};
-    mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
-    mfxparams.Implementation = impl;
-    mfxparams.Version.Major = 1;
-    mfxparams.Version.Minor = 0;
-    mfxparams.GPUCopy = MFX_GPUCOPY_OFF;
     mfxVersion ver = { { 0, 1 } };
     mfxVideoParam mfxEncParams;
     memset(&mfxEncParams, 0, sizeof(mfxEncParams));
@@ -124,10 +104,8 @@ extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, API api,
     mfxVideoParam par;
     memset(&par, 0, sizeof(par));
 
-    if (!convert_codec(dataFormat, mfxEncParams.mfx.CodecId))
-    {
-        return NULL;
-    }
+    if (!convert_codec(dataFormat, mfxEncParams.mfx.CodecId)) return NULL;
+
     mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
     mfxEncParams.mfx.TargetKbps = kbs;
     mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
@@ -156,19 +134,14 @@ extern "C" void* intel_new_encoder(ID3D11Device *pD3dDevice, API api,
     mfxEncParams.mfx.GopRefDist = 1;    //1 is best for low latency, I and P frames only
 
     Encoder *p = new Encoder();
-    if (!p)
-    {
-        goto _exit;
-    }
+    if (!p) goto _exit;
 
-    if (!SetDeviceMultithreadProtected(pD3dDevice)) {
-        goto _exit;
-    }
+    p->nativeDevice_ = std::make_unique<NativeDevice>();
+    if (!p->nativeDevice_->Init(ADAPTER_VENDOR_INTEL, (ID3D11Device*)opaque)) goto _exit;
 
-    // sts = Initialize(impl, ver, &p->session, NULL);
-    sts = p->session.InitEx(mfxparams);
+    sts = InitSession(p->session);
     NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-    sts = p->session.SetHandle(MFX_HANDLE_D3D11_DEVICE, pD3dDevice);
+    sts = p->session.SetHandle(MFX_HANDLE_D3D11_DEVICE, p->nativeDevice_->device_.Get());
     NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
     sts = p->session.SetFrameAllocator(&alloc);
     NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
