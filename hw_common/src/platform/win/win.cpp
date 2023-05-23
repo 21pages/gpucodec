@@ -104,3 +104,25 @@ bool NativeDevice::SetMultithreadProtected()
     }
 	return true;
 }
+
+bool NativeDevice::CreateTexture(int width, int height)
+{
+	D3D11_TEXTURE2D_DESC desc;
+
+    ZeroMemory(&desc, sizeof(desc));
+    desc.Width = width;
+    desc.Height = height;
+    desc.MipLevels = 0;
+    desc.ArraySize = 1;
+    desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+    desc.CPUAccessFlags = 0;
+
+	HRB(device_->CreateTexture2D(&desc, nullptr, texture_.ReleaseAndGetAddressOf()));
+
+	return true;
+}

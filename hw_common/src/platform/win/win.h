@@ -24,6 +24,7 @@ private:
 class NativeDevice {
 public:
     bool Init(AdapterVendor vendor, ID3D11Device *device);
+    bool CreateTexture(int width, int height);
 private:
     bool Init(AdapterVendor vendor);
     bool Init(ID3D11Device *device);
