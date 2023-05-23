@@ -1,14 +1,12 @@
 use hw_common::{
-    inner::EncodeCalls, DataFormat::*, DynamicContext, EncodeContext, EncodeDriver::*,
-    FeatureContext, API::*, MAX_DATA_NUM,
+    inner::EncodeCalls, DynamicContext, EncodeContext, EncodeDriver::*, FeatureContext,
 };
 use log::trace;
-use serde_derive::{Deserialize, Serialize};
 use std::{
     fmt::Display,
     os::raw::{c_int, c_void},
     slice::from_raw_parts,
-    sync::{Arc, Condvar, Mutex},
+    sync::{Arc, Mutex},
     thread,
     time::Instant,
 };
@@ -141,10 +139,13 @@ pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
 }
 
 fn available_(d: DynamicContext) -> Vec<FeatureContext> {
-    let mut natives: Vec<_> = nvidia::possible_support_encoders()
-        .drain(..)
-        .map(|n| (NVENC, n))
-        .collect();
+    let mut natives: Vec<_> = vec![];
+    natives.append(
+        &mut nvidia::possible_support_encoders()
+            .drain(..)
+            .map(|n| (NVENC, n))
+            .collect(),
+    );
     natives.append(
         &mut amf::possible_support_encoders()
             .drain(..)
@@ -165,25 +166,11 @@ fn available_(d: DynamicContext) -> Vec<FeatureContext> {
         },
         d,
     });
-    // https://forums.developer.nvidia.com/t/is-there-limit-for-multi-thread-encoder/73187
-    // https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new
-    let max_nv_thread = 1;
-    let nv_cond = Arc::new((Mutex::new(0), Condvar::new()));
     let outputs = Arc::new(Mutex::new(Vec::<EncodeContext>::new()));
-    let start = Instant::now();
-    log::debug!("prepare yuv {:?}", start.elapsed());
     let mut handles = vec![];
     for input in inputs {
         let outputs = outputs.clone();
-        let nv_cond = nv_cond.clone();
         let handle = thread::spawn(move || {
-            let (nv_cnt, nv_cvar) = &*nv_cond;
-            if input.f.driver == NVENC {
-                let _guard = nv_cvar
-                    .wait_while(nv_cnt.lock().unwrap(), |cnt| *cnt >= max_nv_thread)
-                    .unwrap();
-            }
-            *nv_cnt.lock().unwrap() += 1;
             let start = Instant::now();
             if let Ok(mut encoder) = Encoder::new(input.clone()) {
                 log::debug!("{:?} new {:?}", input, start.elapsed());
@@ -196,10 +183,6 @@ fn available_(d: DynamicContext) -> Vec<FeatureContext> {
                 }
             } else {
                 log::debug!("{:?} new failed {:?}", input, start.elapsed());
-            }
-            if input.f.driver == NVENC {
-                *nv_cnt.lock().unwrap() -= 1;
-                nv_cvar.notify_one();
             }
         });
         handles.push(handle);

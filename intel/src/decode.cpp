@@ -14,7 +14,7 @@
 class Decoder
 {
 public:
-    mfxHDL m_hdl;
+    std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
     MFXVideoSession session;
     MFXVideoDECODE *mfxDEC = NULL;
     std::vector<mfxU8> surfaceBuffersData;
@@ -23,17 +23,8 @@ public:
     bool initialized = false;
     mfxFrameAllocator mfxAllocator;
     std::unique_ptr<RGBToNV12> nv12torgb = NULL;
-    ComPtr<ID3D11Device> device;
-    ComPtr<ID3D11DeviceContext> deviceCtx;
     ComPtr<ID3D11Texture2D> bgraTexture = NULL; 
     mfxFrameAllocResponse mfxResponse;
-
-    Decoder(mfxHDL hdl): m_hdl(hdl) {
-        device = ((ID3D11Device *)hdl);
-        device->GetImmediateContext(deviceCtx.ReleaseAndGetAddressOf());
-        nv12torgb = std::make_unique<RGBToNV12>(device.Get(), deviceCtx.Get());
-        nv12torgb->Init();
-    }
 };
 
 extern "C" int intel_destroy_decoder(void* decoder)
@@ -68,20 +59,24 @@ static bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId)
 #include "common_directx11.h"
 
 
-extern "C" void* intel_new_decoder(void* hdl, API api, DataFormat codecID, SurfaceFormat outputSurfaceFormat)
+extern "C" void* intel_new_decoder(void* opaque, API api, DataFormat codecID, SurfaceFormat outputSurfaceFormat)
 {
     mfxStatus sts = MFX_ERR_NONE;
     mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
     mfxVersion ver = { {0, 1} };
 
-    Decoder *p = new Decoder(hdl);
-    mfx_common_SetHWDeviceContext(p->deviceCtx.Get());
+    Decoder *p = new Decoder();
+    p->nativeDevice_ = std::make_unique<NativeDevice>();
+    if (!p->nativeDevice_->Init(ADAPTER_VENDOR_INTEL, (ID3D11Device*)opaque)) goto _exit;
+    p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice_->device_.Get(), p->nativeDevice_->context_.Get());
+    p->nv12torgb->Init();
+    mfx_common_SetHWDeviceContext(p->nativeDevice_->context_.Get());
     if (!p)
     {
         goto _exit;
     }
 
-    sts = mfx_common_Initialize(hdl, impl, ver, &p->session, &p->mfxAllocator);
+    sts = mfx_common_Initialize(p->nativeDevice_->device_.Get(), impl, ver, &p->session, &p->mfxAllocator);
     NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     // Create Media SDK decoder
@@ -213,7 +208,7 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
             if (!p->bgraTexture) {
                 desc2D.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
                 desc2D.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-                HRESULT hr = p->device->CreateTexture2D(&desc2D, NULL, p->bgraTexture.ReleaseAndGetAddressOf());
+                HRESULT hr = p->nativeDevice_->device_->CreateTexture2D(&desc2D, NULL, p->bgraTexture.ReleaseAndGetAddressOf());
                 if (FAILED(hr)) return -1;
             }
             p->nv12torgb->Convert(texture, p->bgraTexture.Get());

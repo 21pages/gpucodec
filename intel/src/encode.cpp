@@ -257,7 +257,7 @@ extern "C" int intel_test_encode(void* encoder)
     try
     {
         Encoder *self = (Encoder*)encoder;
-        if (!self->nativeDevice_->CreateTexture(self->width, self->height)) return false;
+        if (!self->nativeDevice_->CreateTexture(self->width, self->height)) return -1;
         return intel_encode(encoder, self->nativeDevice_->texture_.Get(), nullptr, nullptr);
     }
     catch(const std::exception& e)

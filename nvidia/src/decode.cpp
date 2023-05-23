@@ -7,13 +7,6 @@
 #include <Samples/NvCodec/NvDecoder/NvDecoder.h>
 #include <Samples/Utils/NvCodecUtils.h>
 
-// #ifdef _WIN32
-// #include <d3d11.h>
-// #include <d3d11_1.h>
-// #include <wrl/client.h>
-// using Microsoft::WRL::ComPtr;
-// #endif
-
 #include "common.h"
 #include "callback.h"
 #include "system.h"
@@ -69,14 +62,11 @@ public:
     NvDecoder *dec = NULL;
     CUcontext cuContext = NULL;
     CUgraphicsResource cuResource = NULL;
-    ComPtr<ID3D11Device> d3d11_device = NULL;
-    ComPtr<ID3D11DeviceContext> d3d11_device_ctx = NULL;
     ComPtr<ID3D11Texture2D> d3d11_texture = NULL;
+    std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
 
-    Decoder(void *hdl)
+    Decoder(int)
     {
-        d3d11_device = ((ID3D11Device *)hdl);
-        d3d11_device->GetImmediateContext(d3d11_device_ctx.ReleaseAndGetAddressOf());
         load_driver(&cudl, &cvdl);
     }
 };
@@ -131,13 +121,13 @@ static bool dataFormat_to_cuCodecID(DataFormat dataFormat, cudaVideoCodec &cuda)
     return true;
 }
 
-extern "C" void* nvidia_new_decoder(void *hdl, API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat) 
+extern "C" void* nvidia_new_decoder(void *opaque, API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat) 
 {
     Decoder *p = NULL;
     try
     {
         (void)api;
-        p = new Decoder(hdl);
+        p = new Decoder(0);
         if (!p)
         {
             goto _exit;
@@ -153,12 +143,9 @@ extern "C" void* nvidia_new_decoder(void *hdl, API api, DataFormat dataFormat, S
 
         CUdevice cuDevice = 0;
 #ifdef _WIN32
-        ComPtr<IDXGIDevice> dxgi_device;
-        HRESULT hr = p->d3d11_device->QueryInterface(__uuidof(IDXGIDevice), (void **)dxgi_device.ReleaseAndGetAddressOf());
-        if (FAILED(hr)) goto _exit;
-        ComPtr<IDXGIAdapter> dxgi_adapter;
-        hr = dxgi_device->GetAdapter(dxgi_adapter.ReleaseAndGetAddressOf());
-        if(!ck(p->cudl->cuD3D11GetDevice(&cuDevice, dxgi_adapter.Get()))) goto _exit;
+        p->nativeDevice_ = std::make_unique<NativeDevice>();
+        if (!p->nativeDevice_->Init(ADAPTER_VENDOR_NVIDIA, (ID3D11Device*)opaque)) goto _exit;
+        if(!ck(p->cudl->cuD3D11GetDevice(&cuDevice, p->nativeDevice_->adapter_.Get()))) goto _exit;
 #else
         int nGpu = 0, gpu = 0;
         ck(p->cudl->cuDeviceGetCount(&nGpu));
@@ -257,7 +244,7 @@ static bool create_register_texture(Decoder *p)
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     desc.CPUAccessFlags = 0;
 
-    HRB(p->d3d11_device->CreateTexture2D(&desc, nullptr, p->d3d11_texture.ReleaseAndGetAddressOf()));
+    HRB(p->nativeDevice_->device_->CreateTexture2D(&desc, nullptr, p->d3d11_texture.ReleaseAndGetAddressOf()));
     if(!ck(p->cudl->cuCtxPushCurrent(p->cuContext))) return false;
     if(!ck(p->cudl->cuGraphicsD3D11RegisterResource(&p->cuResource, p->d3d11_texture.Get(), CU_GRAPHICS_REGISTER_FLAGS_NONE))) return false;
     if(!ck(p->cudl->cuGraphicsResourceSetMapFlags(p->cuResource, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD))) return false;

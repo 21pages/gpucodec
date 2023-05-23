@@ -130,10 +130,13 @@ pub fn available() -> Vec<DecodeContext> {
 
 fn available_() -> Vec<DecodeContext> {
     // to-do: log control
-    let mut natives: Vec<_> = nvidia::possible_support_decoders()
-        .drain(..)
-        .map(|n| (CUVID, n))
-        .collect();
+    let mut natives: Vec<_> = vec![];
+    natives.append(
+        &mut nvidia::possible_support_decoders()
+            .drain(..)
+            .map(|n| (CUVID, n))
+            .collect(),
+    );
     natives.append(
         &mut amf::possible_support_decoders()
             .drain(..)
