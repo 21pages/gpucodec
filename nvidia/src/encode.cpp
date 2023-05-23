@@ -263,21 +263,6 @@ static int copy_texture(Encoder *e, void* src, void* dst)
     return 0;
 }
 
-#include <chrono>
-using std::chrono::high_resolution_clock;
-static long long us_since(std::chrono::steady_clock::time_point start)
-{
-    auto end = high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    return duration.count();
-}
-
-static int encoded_counter = 0;
-static int encode_index = 0;
-static long long encode_us = 0;
-static std::chrono::steady_clock::time_point timestamps[10000];
-
-
 extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback, void* obj)
 {
     try
@@ -287,14 +272,10 @@ extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback,
         CUcontext cuContext = e->cuContext;
         bool encoded = false;
         std::vector<NvPacket> vPacket;
-        auto start = high_resolution_clock::now();
         const NvEncInputFrame* pEncInput = pEnc->GetNextInputFrame();
-        auto cur = us_since(start);
 
         copy_texture(e, tex, pEncInput->inputPtr);
 
-        start = high_resolution_clock::now();
-        timestamps[encode_index] = start;
         pEnc->EncodeFrame(vPacket);
         for (NvPacket &packet : vPacket)
         {
@@ -304,11 +285,6 @@ extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback,
                 encoded = true;
             }
         }
-        cur += us_since(start);
-        encode_us += cur;
-        printf("%d, avg:%d us, cur:%dus, offset:%dus\n", encoded_counter, encode_us  /  (encoded_counter > 0 ? encoded_counter : 1), cur, us_since(timestamps[encoded_counter]));
-        encode_index++;
-        if (encoded) encoded_counter++;
         return encoded ? 0 : -1;
     }
     catch(const std::exception& e)

@@ -4,11 +4,8 @@ use hw_common::{
     DataFormat::*,
     DecodeContext, DecodeDriver,
     SurfaceFormat::{self, *},
-    API::*,
-    MAX_DATA_NUM,
 };
 use log::{error, trace};
-use serde_derive::{Deserialize, Serialize};
 use std::{
     ffi::c_void,
     os::raw::c_int,
