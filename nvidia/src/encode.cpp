@@ -73,7 +73,6 @@ struct Encoder
     std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
     NvEncoderD3D11 *pEnc = NULL;
     #endif
-    void *m_hdl;
     CudaFunctions *cuda_dl = NULL;
     NvencFunctions *nvenc_dl = NULL;
     int32_t width;
@@ -81,8 +80,8 @@ struct Encoder
     NV_ENC_BUFFER_FORMAT format;
     CUcontext cuContext = NULL;
 
-    Encoder(void *hdl, int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format):
-        m_hdl(hdl), width(width), height(height), format(format)
+    Encoder(int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format):
+            width(width), height(height), format(format)
     {
         load_driver(&cuda_dl, &nvenc_dl);
     }
@@ -137,7 +136,7 @@ extern "C" void* nvidia_new_encoder(void *hdl, API api,
         }
         NV_ENC_BUFFER_FORMAT surfaceFormat = NV_ENC_BUFFER_FORMAT_ARGB;//NV_ENC_BUFFER_FORMAT_ABGR;
 
-        e = new Encoder(hdl, width, height, surfaceFormat);
+        e = new Encoder(width, height, surfaceFormat);
         if (!e)
         {
             std::cout << "failed to new Encoder" << std::endl;
@@ -228,7 +227,7 @@ _exit:
 
 static int copy_texture(Encoder *e, void* src, void* dst)
 {
-    ComPtr<ID3D11Device> src_device = (ID3D11Device*)e->m_hdl;
+    ComPtr<ID3D11Device> src_device = e->nativeDevice_->device_.Get();
     ComPtr<ID3D11DeviceContext> src_deviceContext;
     src_device->GetImmediateContext(src_deviceContext.ReleaseAndGetAddressOf());
     ComPtr<ID3D11Texture2D> src_tex = (ID3D11Texture2D *)src;
@@ -300,8 +299,10 @@ extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback,
         for (NvPacket &packet : vPacket)
         {
             int32_t key = packet.pictureType == NV_ENC_PIC_TYPE_IDR ? 1 : 0;
-            callback(packet.data.data(), packet.data.size(), 0, key, obj);
-            encoded = true;
+            if (packet.data.size() > 0) {
+                if (callback) callback(packet.data.data(), packet.data.size(), 0, key, obj);
+                encoded = true;
+            }
         }
         cur += us_since(start);
         encode_us += cur;
@@ -335,6 +336,16 @@ if (enc->pEnc->Reconfigure(&params))                \
 
 extern "C" int nvidia_test_encode(void *encoder)
 {
+    try
+    {
+        Encoder *self = (Encoder*)encoder;
+        if (!self->nativeDevice_->CreateTexture(self->width, self->height)) return -1;
+        return nvidia_encode(encoder, self->nativeDevice_->texture_.Get(), nullptr, nullptr);
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
     return -1;
 }
 
