@@ -17,6 +17,8 @@ struct Encoder
     std::vector<mfxFrameSurface1> pEncSurfaces;
     std::vector<mfxU8> bstData;
     mfxBitstream mfxBS;
+    int width = 0;
+    int height = 0;
 };
 
 static mfxStatus InitSession(MFXVideoSession &session)
@@ -49,7 +51,6 @@ extern "C" int intel_destroy_encoder(void *encoder)
             p->mfxENC->Close();
             delete p->mfxENC;
         }
-        // Release();
         // session closed automatically on destruction
     }
     return 0;
@@ -74,7 +75,6 @@ static mfxStatus MFX_CDECL simple_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL* han
     mfxHDLPair* pair = (mfxHDLPair*)handle;
     pair->first = mid;
     pair->second = (mfxHDL)(UINT)0;
-//	((ID3D11Texture2D*)mid)->AddRef();
     return MFX_ERR_NONE;
 }
 
@@ -136,6 +136,8 @@ extern "C" void* intel_new_encoder(void *opaque, API api,
     Encoder *p = new Encoder();
     if (!p) goto _exit;
 
+    p->width = w;
+    p->height = h;
     p->nativeDevice_ = std::make_unique<NativeDevice>();
     if (!p->nativeDevice_->Init(ADAPTER_VENDOR_INTEL, (ID3D11Device*)opaque)) goto _exit;
 
@@ -238,7 +240,7 @@ extern "C" int intel_encode(void *encoder,  ID3D11Texture2D* tex,
         ENCODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
         if (p->mfxBS.DataLength > 0)
         {
-            callback(p->mfxBS.Data + p->mfxBS.DataOffset, p->mfxBS.DataLength, 0, 0, obj);
+            if(callback) callback(p->mfxBS.Data + p->mfxBS.DataOffset, p->mfxBS.DataLength, 0, 0, obj);
             encoded = true;
         }
     }
@@ -254,8 +256,9 @@ extern "C" int intel_test_encode(void* encoder)
 {
     try
     {
-        // Encoder *self = (Encoder*)encoder;
-        
+        Encoder *self = (Encoder*)encoder;
+        if (!self->nativeDevice_->CreateTexture(self->width, self->height)) return false;
+        return intel_encode(encoder, self->nativeDevice_->texture_.Get(), nullptr, nullptr);
     }
     catch(const std::exception& e)
     {
