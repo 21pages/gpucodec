@@ -137,15 +137,7 @@ impl Display for EncodeFrame {
 }
 
 pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
-    static mut CACHED: Vec<FeatureContext> = vec![];
-    static mut CACHED_INPUT: Option<DynamicContext> = None;
-    unsafe {
-        if CACHED_INPUT.clone().take() != Some(d.clone()) {
-            CACHED_INPUT = Some(d.clone());
-            CACHED = available_(d);
-        }
-    }
-    unsafe { CACHED.clone() }
+    available_(d)
 }
 
 fn available_(d: DynamicContext) -> Vec<FeatureContext> {

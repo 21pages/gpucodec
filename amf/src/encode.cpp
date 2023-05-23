@@ -74,16 +74,16 @@ private:
 public:
     Encoder(void* hdl, amf::AMF_MEMORY_TYPE memoryType, amf_wstring codec, 
             DataFormat dataFormat,int32_t width, int32_t height, 
-            int32_t bitrate, int32_t framerate, int32_t gop):
-        m_hdl(hdl),
-        m_dataFormat(dataFormat),
-        m_AMFMemoryType(memoryType),
-        m_Resolution(width, height),
-        m_codec(codec),
-        m_bitRateIn(bitrate),
-        m_frameRate(framerate),
-        m_gop(gop)
+            int32_t bitrate, int32_t framerate, int32_t gop)
     {
+        m_hdl = hdl;
+        m_dataFormat = dataFormat;
+        m_AMFMemoryType = memoryType;
+        m_Resolution = std::make_pair(width, height);
+        m_codec = codec;
+        m_bitRateIn = bitrate;
+        m_frameRate = framerate;
+        m_gop = gop;
         init_result = initialize();
     }
 
@@ -164,8 +164,8 @@ public:
     {
         AMF_RESULT res = AMF_OK;
         amf::AMFSurfacePtr surface = nullptr;
-        res = allocate_surface(surface);
-        AMF_RETURN_IF_FAILED(res, L"allocate_surface() failed");
+        res = m_AMFContext->AllocSurface(m_AMFMemoryType, m_AMFSurfaceFormat, m_Resolution.first, m_Resolution.second, &surface);
+        AMF_RETURN_IF_FAILED(res, L"AllocSurface() failed");
         if (surface->GetPlanesCount() < 1) return AMF_FAIL;
         void * native = surface->GetPlaneAt(0)->GetNative();
         if (!native) return AMF_FAIL;
@@ -239,20 +239,6 @@ private:
         res = m_AMFEncoder->Init(m_AMFSurfaceFormat, m_Resolution.first, m_Resolution.second);
         AMF_RETURN_IF_FAILED(res, L"encoder->Init() failed");
 
-        return AMF_OK;
-    }
-
-
-    AMF_RESULT allocate_surface(amf::AMFSurfacePtr &surface)
-    {
-        AMF_RESULT res = m_AMFContext->AllocSurface(m_AMFMemoryType, m_AMFSurfaceFormat, m_Resolution.first,
-										 m_Resolution.second, &surface);
-        AMF_RETURN_IF_FAILED(res, L"AllocSurface() failed");
-        if (m_OpenCLSubmission)
-        {
-            res = surface->Convert(amf::AMF_MEMORY_OPENCL);
-            AMF_RETURN_IF_FAILED(res, L"Convert() failed");
-        }
         return AMF_OK;
     }
 
