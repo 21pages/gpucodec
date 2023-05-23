@@ -21,6 +21,7 @@ using Microsoft::WRL::ComPtr;
 
 #include "common.h"
 #include "callback.h"
+#include "system.h"
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -69,8 +70,7 @@ extern "C" int nvidia_encode_driver_support()
 struct Encoder
 {
     #ifdef _WIN32
-    ComPtr<ID3D11Device> d3d11Deivce;
-    ComPtr<ID3D11DeviceContext> d3d11DeviceCtx;
+    std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
     NvEncoderD3D11 *pEnc = NULL;
     #endif
     void *m_hdl;
@@ -150,16 +150,8 @@ extern "C" void* nvidia_new_encoder(void *hdl, API api,
         
         if (API_DX11 == api)
         {
-            ComPtr<IDXGIFactory1> pFactory;
-            ComPtr<IDXGIAdapter> pAdapter;
-
-            CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void **)pFactory.ReleaseAndGetAddressOf());
-            pFactory->EnumAdapters(1, pAdapter.ReleaseAndGetAddressOf());
-        
-            D3D11CreateDevice(pAdapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, NULL, 0,
-            NULL, 0, D3D11_SDK_VERSION, e->d3d11Deivce.ReleaseAndGetAddressOf(), NULL, e->d3d11DeviceCtx.ReleaseAndGetAddressOf());
-            // e->d3d11Deivce = (ID3D11Device *)hdl;
-            // e->d3d11Deivce->GetImmediateContext(e->d3d11DeviceCtx.ReleaseAndGetAddressOf());
+            e->nativeDevice_ = std::make_unique<NativeDevice>();
+            if (!e->nativeDevice_->Init(ADAPTER_VENDOR_NVIDIA, (ID3D11Device*)hdl)) goto _exit;
         } 
         else
         {
@@ -191,7 +183,7 @@ extern "C" void* nvidia_new_encoder(void *hdl, API api,
         }
 
         int nExtraOutputDelay = 0;
-        e->pEnc = new NvEncoderD3D11(e->cuda_dl, e->nvenc_dl, e->d3d11Deivce.Get(), e->width, e->height, e->format, nExtraOutputDelay, false, false); // no delay
+        e->pEnc = new NvEncoderD3D11(e->cuda_dl, e->nvenc_dl, e->nativeDevice_->device_.Get(), e->width, e->height, e->format, nExtraOutputDelay, false, false); // no delay
         NV_ENC_INITIALIZE_PARAMS initializeParams = { 0 };
         NV_ENC_CONFIG encodeConfig = { 0 };
 
@@ -267,7 +259,7 @@ static int copy_texture(Encoder *e, void* src, void* dst)
     Box.bottom = desc.Height;
     Box.front = 0;
     Box.back = 1;
-    e->d3d11DeviceCtx->UpdateSubresource(dst_tex.Get(), 0, &Box, buffer.get(), desc.Width * 4, desc.Width * desc.Height* 4);
+    e->nativeDevice_->context_->UpdateSubresource(dst_tex.Get(), 0, &Box, buffer.get(), desc.Width * 4, desc.Width * desc.Height* 4);
 
     return 0;
 }
@@ -340,6 +332,11 @@ if (enc->pEnc->Reconfigure(&params))                \
 {                                                   \
     return 0;                                       \
 }                                                   \
+
+extern "C" int nvidia_test_encode(void *encoder)
+{
+    return -1;
+}
 
 extern "C" int nvidia_set_bitrate(void *e, int32_t bitrate)
 {

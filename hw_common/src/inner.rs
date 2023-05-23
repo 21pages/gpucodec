@@ -42,6 +42,7 @@ pub struct EncodeCalls {
     pub new: NewEncoderCall,
     pub encode: EncodeCall,
     pub destroy: IVCall,
+    pub test: IVCall,
     pub set_bitrate: IVICall,
     pub set_framerate: IVICall,
 }

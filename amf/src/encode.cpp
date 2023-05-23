@@ -49,12 +49,12 @@ public:
     AMF_RESULT init_result = AMF_FAIL;
     DataFormat m_dataFormat;
     amf::AMFComponentPtr m_AMFEncoder = NULL;
+    amf::AMFContextPtr m_AMFContext = NULL;
 private:
     // system
     void *m_hdl;
     // AMF Internals
     AMFFactoryHelper m_AMFFactory;
-    amf::AMFContextPtr m_AMFContext = NULL;
     amf::AMFComputePtr m_AMFCompute = NULL;
     amf::AMF_MEMORY_TYPE    m_AMFMemoryType;
     amf::AMF_SURFACE_FORMAT m_AMFSurfaceFormat = amf::AMF_SURFACE_BGRA;
@@ -122,14 +122,16 @@ public:
                 PacketKeyframe(data, &packet);
                 amf::AMFBufferPtr pBuffer   = amf::AMFBufferPtr(data);
                 packet.size = pBuffer->GetSize();
-                if (m_PacketDataBuffer.size() < packet.size) {
-                    size_t newBufferSize = (size_t)exp2(ceil(log2((double)packet.size)));
-                    m_PacketDataBuffer.resize(newBufferSize);
+                if (packet.size > 0) {
+                    if (m_PacketDataBuffer.size() < packet.size) {
+                        size_t newBufferSize = (size_t)exp2(ceil(log2((double)packet.size)));
+                        m_PacketDataBuffer.resize(newBufferSize);
+                    }
+                    packet.data = m_PacketDataBuffer.data();
+                    std::memcpy(packet.data, pBuffer->GetNative(), packet.size);
+                    if (callback) callback(packet.data, packet.size, 0, packet.keyframe, obj);
+                    encoded = true;
                 }
-                packet.data = m_PacketDataBuffer.data();
-                std::memcpy(packet.data, pBuffer->GetNative(), packet.size);
-                callback(packet.data, packet.size, 0, packet.keyframe, obj);
-                encoded = true;
                 pBuffer = NULL;
         }
         data = NULL;
@@ -156,6 +158,18 @@ public:
         }
         m_AMFFactory.Terminate();
         return AMF_OK;
+    }
+
+    AMF_RESULT test()
+    {
+        AMF_RESULT res = AMF_OK;
+        amf::AMFSurfacePtr surface = nullptr;
+        res = allocate_surface(surface);
+        AMF_RETURN_IF_FAILED(res, L"allocate_surface() failed");
+        if (surface->GetPlanesCount() < 1) return AMF_FAIL;
+        void * native = surface->GetPlaneAt(0)->GetNative();
+        if (!native) return AMF_FAIL;
+        return encode(native, nullptr, nullptr);
     }
 private:
 
@@ -420,6 +434,22 @@ extern "C" int amf_driver_support()
     }
     catch(const std::exception& e)
     {
+    }
+    return -1;
+}
+
+extern "C" int amf_test_encode(void *encoder) {
+    try
+    {
+        Encoder *self = (Encoder*)encoder;
+        return self->test() == AMF_OK ? 0 : -1;
+        // amf::AMFContextPtr AMFContext = self->m_AMFEncoder->GetContext();
+        // if (!AMFContext) return -1;
+        // ComPtr<ID3D11Device> device =  (ID3D11Device*)AMFContext->GetDX11Device();
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
     }
     return -1;
 }

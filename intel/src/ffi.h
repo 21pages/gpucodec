@@ -19,6 +19,8 @@ int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallback callback,
 
 int intel_destroy_decoder(void* decoder);
 
+int intel_test_encode(void* encoder);
+
 int intel_set_bitrate(void *e, int32_t kbs);
 
 int intel_set_framerate(void *e, int32_t framerate);

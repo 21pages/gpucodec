@@ -85,7 +85,7 @@ impl Decoder {
     ) {
         let frames = &mut *(obj as *mut Vec<DecodeFrame>);
 
-        let mut frame = DecodeFrame {
+        let frame = DecodeFrame {
             surface_format: std::mem::transmute(format),
             width,
             height,

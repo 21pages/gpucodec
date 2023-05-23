@@ -12,9 +12,10 @@ fn main() {
         kbitrate: 5000,
         framerate: 30,
         gop: MAX_GOP as _,
+        device: None,
     });
     encoders.iter().map(|e| println!("{:?}", e)).count();
     println!("decoders:");
-    let decoders = decode::available();
-    decoders.iter().map(|e| println!("{:?}", e)).count();
+    // let decoders = decode::available();
+    // decoders.iter().map(|e| println!("{:?}", e)).count();
 }

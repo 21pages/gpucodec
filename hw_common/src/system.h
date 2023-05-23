@@ -2,7 +2,7 @@
 #define SYSTEM_H
 
 #ifdef _WIN32
-#include "win.h"
+#include "platform/win/win.h"
 #endif
 
 #endif // SYSTEM_H

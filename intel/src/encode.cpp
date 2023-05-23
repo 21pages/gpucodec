@@ -277,6 +277,20 @@ extern "C" int intel_encode(void *encoder,  ID3D11Texture2D* tex,
 
 }
 
+extern "C" int intel_test_encode(void* encoder)
+{
+    try
+    {
+        // Encoder *self = (Encoder*)encoder;
+        
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+
+    return -1;
+}
 
 extern "C" int intel_set_bitrate(void *e, int32_t kbs)
 {

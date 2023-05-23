@@ -21,6 +21,8 @@ int nvidia_decode(void* decoder, uint8_t *data, int len, DecodeCallback callback
 
 int nvidia_destroy_decoder(void* decoder);
 
+int nvidia_test_encode(void* encoder);
+
 int nvidia_set_bitrate(void *e, int32_t bitrate);
 
 int nvidia_set_framerate(void *e, int32_t framerate);

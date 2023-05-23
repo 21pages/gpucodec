@@ -84,6 +84,17 @@ impl Encoder {
         }
     }
 
+    pub fn test(&mut self) -> Result<(), i32> {
+        unsafe {
+            let result = (self.calls.test)(&mut *self.codec);
+            if result == 0 {
+                Ok(())
+            } else {
+                Err(result)
+            }
+        }
+    }
+
     pub fn set_bitrate(&mut self, kbs: i32) -> Result<(), i32> {
         unsafe {
             match (self.calls.set_bitrate)(&mut *self.codec, kbs) {
@@ -125,94 +136,88 @@ impl Display for EncodeFrame {
     }
 }
 
-// pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
-//     static mut CACHED: Vec<FeatureContext> = vec![];
-//     static mut CACHED_INPUT: Option<DynamicContext> = None;
-//     unsafe {
-//         if CACHED_INPUT.clone().take() != Some(d.clone()) {
-//             CACHED_INPUT = Some(d.clone());
-//             CACHED = available_(d);
-//         }
-//     }
-//     unsafe { CACHED.clone() }
-// }
+pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
+    static mut CACHED: Vec<FeatureContext> = vec![];
+    static mut CACHED_INPUT: Option<DynamicContext> = None;
+    unsafe {
+        if CACHED_INPUT.clone().take() != Some(d.clone()) {
+            CACHED_INPUT = Some(d.clone());
+            CACHED = available_(d);
+        }
+    }
+    unsafe { CACHED.clone() }
+}
 
-// fn available_(d: DynamicContext) -> Vec<FeatureContext> {
-//     // to-do: disable log
-//     let format = NV12;
-//     let mut natives: Vec<_> = nvidia::possible_support_encoders()
-//         .drain(..)
-//         .map(|n| (NVENC, n))
-//         .collect();
-//     natives.append(
-//         &mut amf::possible_support_encoders()
-//             .drain(..)
-//             .map(|n| (AMF, n))
-//             .collect(),
-//     );
-//     let inputs = natives.drain(..).map(|(driver, n)| EncodeContext {
-//         f: FeatureContext {
-//             driver,
-//             device: n.device,
-//             pixfmt: format,
-//             dataFormat: n.format,
-//         },
-//         d,
-//     });
-//     // https://forums.developer.nvidia.com/t/is-there-limit-for-multi-thread-encoder/73187
-//     // https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new
-//     let max_nv_thread = 1;
-//     let nv_cond = Arc::new((Mutex::new(0), Condvar::new()));
-//     let outputs = Arc::new(Mutex::new(Vec::<EncodeContext>::new()));
-//     let start = Instant::now();
-//     let yuv = vec![0u8; (d.height * d.width * 3 / 2) as usize]; // to-do
-//     log::debug!("prepare yuv {:?}", start.elapsed());
-//     let yuv = Arc::new(yuv);
-//     let mut handles = vec![];
-//     for input in inputs {
-//         let yuv = yuv.clone();
-//         let outputs = outputs.clone();
-//         let nv_cond = nv_cond.clone();
-//         let handle = thread::spawn(move || {
-//             let (nv_cnt, nv_cvar) = &*nv_cond;
-//             if input.f.driver == NVENC {
-//                 let _guard = nv_cvar
-//                     .wait_while(nv_cnt.lock().unwrap(), |cnt| *cnt >= max_nv_thread)
-//                     .unwrap();
-//             }
-//             *nv_cnt.lock().unwrap() += 1;
-//             let mut linesizes = vec![d.width, d.width]; // to-do
-//             linesizes.resize(8, 0);
-//             let ylen = (linesizes[0] * d.height) as usize;
-//             let y = &yuv[0..ylen];
-//             let uv = &yuv[ylen..];
-//             let yuvs = vec![y, uv];
-//             let start = Instant::now();
-//             if let Ok(mut encoder) = Encoder::new(input.clone()) {
-//                 log::debug!("{:?} new {:?}", input, start.elapsed());
-//                 let start = Instant::now();
-//                 if let Ok(_) = encoder.encode(yuvs, linesizes.clone()) {
-//                     log::debug!("{:?} encode {:?}", input, start.elapsed());
-//                     outputs.lock().unwrap().push(input.clone());
-//                 } else {
-//                     log::debug!("{:?} encode failed {:?}", input, start.elapsed());
-//                 }
-//             } else {
-//                 log::debug!("{:?} new failed {:?}", input, start.elapsed());
-//             }
-//             if input.f.driver == NVENC {
-//                 *nv_cnt.lock().unwrap() -= 1;
-//                 nv_cvar.notify_one();
-//             }
-//         });
-//         handles.push(handle);
-//     }
-//     for handle in handles {
-//         handle.join().ok();
-//     }
-//     let mut x = outputs.lock().unwrap().clone();
-//     x.drain(..).map(|e| e.f).collect()
-// }
+fn available_(d: DynamicContext) -> Vec<FeatureContext> {
+    let mut natives: Vec<_> = nvidia::possible_support_encoders()
+        .drain(..)
+        .map(|n| (NVENC, n))
+        .collect();
+    natives.append(
+        &mut amf::possible_support_encoders()
+            .drain(..)
+            .map(|n| (AMF, n))
+            .collect(),
+    );
+    natives.append(
+        &mut intel::possible_support_encoders()
+            .drain(..)
+            .map(|n| (MFX, n))
+            .collect(),
+    );
+    let inputs = natives.drain(..).map(|(driver, n)| EncodeContext {
+        f: FeatureContext {
+            driver,
+            api: n.api,
+            dataFormat: n.format,
+        },
+        d,
+    });
+    // https://forums.developer.nvidia.com/t/is-there-limit-for-multi-thread-encoder/73187
+    // https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new
+    let max_nv_thread = 1;
+    let nv_cond = Arc::new((Mutex::new(0), Condvar::new()));
+    let outputs = Arc::new(Mutex::new(Vec::<EncodeContext>::new()));
+    let start = Instant::now();
+    log::debug!("prepare yuv {:?}", start.elapsed());
+    let mut handles = vec![];
+    for input in inputs {
+        let outputs = outputs.clone();
+        let nv_cond = nv_cond.clone();
+        let handle = thread::spawn(move || {
+            let (nv_cnt, nv_cvar) = &*nv_cond;
+            if input.f.driver == NVENC {
+                let _guard = nv_cvar
+                    .wait_while(nv_cnt.lock().unwrap(), |cnt| *cnt >= max_nv_thread)
+                    .unwrap();
+            }
+            *nv_cnt.lock().unwrap() += 1;
+            let start = Instant::now();
+            if let Ok(mut encoder) = Encoder::new(input.clone()) {
+                log::debug!("{:?} new {:?}", input, start.elapsed());
+                let start = Instant::now();
+                if let Ok(_) = encoder.test() {
+                    log::debug!("{:?} encode {:?}", input, start.elapsed());
+                    outputs.lock().unwrap().push(input.clone());
+                } else {
+                    log::debug!("{:?} encode failed {:?}", input, start.elapsed());
+                }
+            } else {
+                log::debug!("{:?} new failed {:?}", input, start.elapsed());
+            }
+            if input.f.driver == NVENC {
+                *nv_cnt.lock().unwrap() -= 1;
+                nv_cvar.notify_one();
+            }
+        });
+        handles.push(handle);
+    }
+    for handle in handles {
+        handle.join().ok();
+    }
+    let mut x = outputs.lock().unwrap().clone();
+    x.drain(..).map(|e| e.f).collect()
+}
 
 // #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 // pub struct Best {

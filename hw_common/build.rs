@@ -20,6 +20,25 @@ fn main() {
         .write_to_file(Path::new(&env::var_os("OUT_DIR").unwrap()).join("common_ffi.rs"))
         .unwrap();
     let mut builder = Build::new();
+
+    // system
+    #[cfg(windows)]
+    {
+        ["d3d11", "dxgi"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
+    }
+
+    builder.include(manifest_dir.join("src"));
+
+    // platform
+    let platform_path = manifest_dir.join("src").join("platform");
+    #[cfg(windows)]
+    {
+        let win_path = platform_path.join("win");
+        builder.include(&win_path);
+        builder.file(win_path.join("win.cpp"));
+    }
+
+    // video processer
     let dxgi_path = externals_dir.join("nvEncDXGIOutputDuplicationSample");
     builder.include(&dxgi_path);
     for f in vec!["Preproc.cpp"] {

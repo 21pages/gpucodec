@@ -6,6 +6,14 @@
 #define MAX_DATA_NUM    8
 #define MAX_GOP         0xFFFF
 
+enum AdapterVendor {
+    ADAPTER_VENDOR_ANY = 0,
+    ADAPTER_VENDOR_FIRST = 1,
+    ADAPTER_VENDOR_AMD = 0x1002,
+    ADAPTER_VENDOR_INTEL = 0x8086,
+    ADAPTER_VENDOR_NVIDIA = 0x10DE,
+};
+
 
 enum DataFormat
 {

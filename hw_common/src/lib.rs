@@ -42,6 +42,9 @@ pub struct DynamicContext {
     pub gop: i32,
 }
 
+unsafe impl Send for DynamicContext {}
+unsafe impl Sync for DynamicContext {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct EncodeContext {
     pub f: FeatureContext,

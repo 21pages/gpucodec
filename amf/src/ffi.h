@@ -19,6 +19,8 @@ int amf_decode(void *decoder, uint8_t *data, int32_t length, DecodeCallback call
 
 int amf_destroy_decoder(void *decoder);
 
+int amf_test_encode(void *encoder);
+
 int amf_set_bitrate(void *e, int32_t bitrate);
 
 int amf_set_framerate(void *e, int32_t framerate);

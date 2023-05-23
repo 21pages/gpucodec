@@ -8,7 +8,6 @@ use hw_common::{
     inner::{DecodeCalls, EncodeCalls, InnerDecodeContext, InnerEncodeContext},
     DataFormat::*,
     API::*,
-    API::*,
 };
 
 pub fn encode_calls() -> EncodeCalls {
@@ -16,6 +15,7 @@ pub fn encode_calls() -> EncodeCalls {
         new: intel_new_encoder,
         encode: intel_encode,
         destroy: intel_destroy_encoder,
+        test: intel_test_encode,
         set_bitrate: intel_set_bitrate,
         set_framerate: intel_set_framerate,
     }

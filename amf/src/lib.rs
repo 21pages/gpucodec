@@ -15,6 +15,7 @@ pub fn encode_calls() -> EncodeCalls {
         new: amf_new_encoder,
         encode: amf_encode,
         destroy: amf_destroy_encoder,
+        test: amf_test_encode,
         set_bitrate: amf_set_bitrate,
         set_framerate: amf_set_framerate,
     }
