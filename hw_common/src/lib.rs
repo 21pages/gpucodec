@@ -60,3 +60,6 @@ pub struct DecodeContext {
     pub dataFormat: DataFormat,
     pub outputSurfaceFormat: SurfaceFormat,
 }
+
+unsafe impl Send for DecodeContext {}
+unsafe impl Sync for DecodeContext {}
