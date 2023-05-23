@@ -28,20 +28,6 @@ fn main() {
 
     #[cfg(windows)]
     {
-        // dxgi
-        // let ddd_path = externals_dir.join("DXGIDesktopDuplication").join("cpp");
-        // builder.include(&ddd_path);
-        // for f in vec![
-        //     // "DesktopDuplication.cpp",
-        //     "DisplayManager.cpp",
-        //     "DuplicationManager.cpp",
-        //     "OutputManager.cpp",
-        //     "ThreadManager.cpp",
-        // ] {
-        //     builder.file(format!("{}/{}", ddd_path.display(), f));
-        // }
-        // builder.file(manifest_dir.join("src").join("dxgi.cpp"));
-
         builder.include("D:\\lib\\SDL\\include");
         builder.file(manifest_dir.join("src").join("dxgi_sdl.cpp"));
         println!("cargo:rustc-link-search=native=D:\\lib\\SDL\\lib\\x64");
