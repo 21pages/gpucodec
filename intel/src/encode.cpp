@@ -273,7 +273,7 @@ extern "C" int intel_test_encode(void *outDescs, int32_t maxDescNum, int32_t *ou
     {
         AdapterDesc *descs = (AdapterDesc*) outDescs;
         Adapters adapters;
-        if (!adapters.Init(ADAPTER_VENDOR_AMD)) return -1;
+        if (!adapters.Init(ADAPTER_VENDOR_INTEL)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
             Encoder *e = (Encoder *)intel_new_encoder((void*)adapter.get()->device_.Get(), api, dataFormat, width, height, kbs, framerate, gop);
