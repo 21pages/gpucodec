@@ -1,5 +1,4 @@
 /target
 .vscode
-externals/MediaSDK_22.5.4/samples/
 externals/Video_Codec_SDK_11.1.5/Samples/Utils
 *.cso
