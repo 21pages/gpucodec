@@ -39,4 +39,25 @@ public:
     ComPtr<ID3D11Texture2D> texture_ = nullptr;
 };
 
+class Adapter {
+public:
+    bool Init(IDXGIAdapter1 *adapter1);
+private:
+    bool SetMultithreadProtected();
+public:
+    ComPtr<IDXGIAdapter> adapter_ = nullptr;
+    ComPtr<IDXGIAdapter1> adapter1_ = nullptr;
+    ComPtr<ID3D11Device> device_ = nullptr;
+    ComPtr<ID3D11DeviceContext> context_ = nullptr;
+    DXGI_ADAPTER_DESC1 desc1_;
+};
+
+class Adapters {
+public:
+    bool Init(AdapterVendor vendor);
+public:
+    ComPtr<IDXGIFactory1> factory1_ = nullptr;
+    std::vector<std::unique_ptr<Adapter>> adapters_;
+};
+
 #endif

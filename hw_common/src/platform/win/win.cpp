@@ -30,29 +30,19 @@ bool NativeDevice::Init(AdapterVendor vendor)
 
 	HRB(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)factory1_.ReleaseAndGetAddressOf()));
 
-	if (vendor == ADAPTER_VENDOR_ANY) {
-		adapter1_.Reset();
-	} else {
-		ComPtr<IDXGIAdapter1> tmpAdapter = nullptr;
-		for (int i = 0; !FAILED(factory1_->EnumAdapters1(i, tmpAdapter.ReleaseAndGetAddressOf())); i++) {
-			if (vendor == ADAPTER_VENDOR_FIRST) {
-				adapter1_.Swap(tmpAdapter);
-				break;
-			} else {
-				DXGI_ADAPTER_DESC1 desc = DXGI_ADAPTER_DESC1();
-				tmpAdapter->GetDesc1(&desc);
-				if (desc.VendorId == static_cast<int>(vendor)) {
-					adapter1_.Swap(tmpAdapter);
-					break;
-				}
-			}
-		}
-		if (!adapter1_) {
-			return false;
+	ComPtr<IDXGIAdapter1> tmpAdapter = nullptr;
+	for (int i = 0; !FAILED(factory1_->EnumAdapters1(i, tmpAdapter.ReleaseAndGetAddressOf())); i++) {
+		DXGI_ADAPTER_DESC1 desc = DXGI_ADAPTER_DESC1();
+		tmpAdapter->GetDesc1(&desc);
+		if (desc.VendorId == static_cast<int>(vendor)) {
+			adapter1_.Swap(tmpAdapter);
+			break;
 		}
 	}
-
-	if (adapter1_) HRB(adapter1_.As(&adapter_));
+	if (!adapter1_) {
+		return false;
+	}
+	HRB(adapter1_.As(&adapter_));
 
 	UINT createDeviceFlags = 0;
 	D3D_FEATURE_LEVEL featureLevels[] =
@@ -123,6 +113,78 @@ bool NativeDevice::CreateTexture(int width, int height)
     desc.CPUAccessFlags = 0;
 
 	HRB(device_->CreateTexture2D(&desc, nullptr, texture_.ReleaseAndGetAddressOf()));
+
+	return true;
+}
+
+bool Adapter::Init(IDXGIAdapter1 *adapter1)
+{
+	HRESULT hr = S_OK;
+
+	adapter1_= adapter1;
+	HRB(adapter1_.As(&adapter_));
+
+	UINT createDeviceFlags = 0;
+	D3D_FEATURE_LEVEL featureLevels[] =
+	{
+		D3D_FEATURE_LEVEL_11_0,
+	};
+	UINT numFeatureLevels = ARRAYSIZE(featureLevels);
+
+	D3D_FEATURE_LEVEL featureLevel;
+	D3D_DRIVER_TYPE d3dDriverType = adapter1_ ? D3D_DRIVER_TYPE_UNKNOWN: D3D_DRIVER_TYPE_HARDWARE;
+	hr = D3D11CreateDevice(adapter1_.Get(), d3dDriverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
+		D3D11_SDK_VERSION, device_.ReleaseAndGetAddressOf(), &featureLevel, context_.ReleaseAndGetAddressOf());
+
+	if (FAILED(hr))
+	{
+		return false;
+	}
+
+	if (featureLevel != D3D_FEATURE_LEVEL_11_0)
+	{
+		std::cerr << "Direct3D Feature Level 11 unsupported." << std::endl;
+		return false;
+	}
+
+	HRB(adapter1->GetDesc1(&desc1_));
+	if (desc1_.VendorId == ADAPTER_VENDOR_INTEL) {
+		if (!SetMultithreadProtected()) return false;
+	}
+
+	return true;
+}
+
+bool Adapter::SetMultithreadProtected()
+{
+	ComPtr<ID3D10Multithread> hmt = nullptr;
+	HRB(context_.As(&hmt));
+    if (!hmt->SetMultithreadProtected(TRUE)) {
+		if (!hmt->GetMultithreadProtected()) {
+			std::cerr << "Failed to SetMultithreadProtected" << std::endl;
+			return false;
+		}
+    }
+	return true;
+}
+
+bool Adapters::Init(AdapterVendor vendor)
+{
+	HRESULT hr = S_OK;
+
+	HRB(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)factory1_.ReleaseAndGetAddressOf()));
+
+	ComPtr<IDXGIAdapter1> tmpAdapter = nullptr;
+	for (int i = 0; !FAILED(factory1_->EnumAdapters1(i, tmpAdapter.ReleaseAndGetAddressOf())); i++) {
+		DXGI_ADAPTER_DESC1 desc = DXGI_ADAPTER_DESC1();
+		tmpAdapter->GetDesc1(&desc);
+		if (desc.VendorId == static_cast<int>(vendor)) {
+			auto adapter = std::make_unique<Adapter>();
+			if (adapter->Init(tmpAdapter.Get())) {
+				adapters_.push_back(std::move(adapter));
+			}
+		}
+	}
 
 	return true;
 }

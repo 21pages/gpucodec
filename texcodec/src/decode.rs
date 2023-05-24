@@ -37,8 +37,8 @@ impl Decoder {
             let codec = (calls.new)(
                 ctx.device.unwrap_or(std::ptr::null_mut()),
                 ctx.api as i32,
-                ctx.dataFormat as i32,
-                ctx.outputSurfaceFormat as i32,
+                ctx.data_format as i32,
+                ctx.output_surface_format as i32,
             );
             if codec.is_null() {
                 return Err(());
@@ -149,9 +149,9 @@ fn available_() -> Vec<DecodeContext> {
     let inputs = natives.drain(..).map(|(driver, n)| DecodeContext {
         driver,
         device: None,
-        dataFormat: n.dataFormat,
+        data_format: n.dataFormat,
         api: n.api,
-        outputSurfaceFormat: SURFACE_FORMAT_BGRA,
+        output_surface_format: SURFACE_FORMAT_BGRA,
     });
     let outputs = Arc::new(Mutex::new(Vec::<DecodeContext>::new()));
     let mut p_bin_264: *mut u8 = std::ptr::null_mut();
@@ -177,7 +177,7 @@ fn available_() -> Vec<DecodeContext> {
             let start = Instant::now();
             if let Ok(mut decoder) = Decoder::new(ctx.clone()) {
                 log::debug!("{:?} new:{:?}", ctx, start.elapsed());
-                let data = match ctx.dataFormat {
+                let data = match ctx.data_format {
                     H264 => &buf264[..],
                     H265 => &buf265[..],
                     _ => return,

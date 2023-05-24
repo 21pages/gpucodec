@@ -5,7 +5,7 @@
 
 int intel_driver_support();
 
-void* intel_new_encoder(void* pD3dDevice, int32_t deviceType, int32_t dataFormat,
+void* intel_new_encoder(void* device, int32_t api, int32_t dataFormat,
                         int32_t width, int32_t height, 
                         int32_t kbs, int32_t framerate, int32_t gop);
 
@@ -19,7 +19,10 @@ int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallback callback,
 
 int intel_destroy_decoder(void* decoder);
 
-int intel_test_encode(void* encoder);
+int intel_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
+                    int32_t api, int32_t dataFormat,
+                    int32_t width, int32_t height,
+                    int32_t kbs, int32_t framerate, int32_t gop);
 
 int intel_set_bitrate(void *e, int32_t kbs);
 

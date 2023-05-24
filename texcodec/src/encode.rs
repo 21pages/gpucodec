@@ -1,5 +1,5 @@
 use hw_common::{
-    inner::EncodeCalls, DynamicContext, EncodeContext, EncodeDriver::*, FeatureContext,
+    inner::EncodeCalls, AdapterDesc, DynamicContext, EncodeContext, EncodeDriver::*, FeatureContext,
 };
 use log::trace;
 use std::{
@@ -8,7 +8,6 @@ use std::{
     slice::from_raw_parts,
     sync::{Arc, Mutex},
     thread,
-    time::Instant,
 };
 
 pub struct Encoder {
@@ -82,17 +81,6 @@ impl Encoder {
         }
     }
 
-    pub fn test(&mut self) -> Result<(), i32> {
-        unsafe {
-            let result = (self.calls.test)(&mut *self.codec);
-            if result == 0 {
-                Ok(())
-            } else {
-                Err(result)
-            }
-        }
-    }
-
     pub fn set_bitrate(&mut self, kbs: i32) -> Result<(), i32> {
         unsafe {
             match (self.calls.set_bitrate)(&mut *self.codec, kbs) {
@@ -163,6 +151,8 @@ fn available_(d: DynamicContext) -> Vec<FeatureContext> {
             driver,
             api: n.api,
             dataFormat: n.format,
+            luid_low: 0,
+            luid_high: 0,
         },
         d,
     });
@@ -171,18 +161,35 @@ fn available_(d: DynamicContext) -> Vec<FeatureContext> {
     for input in inputs {
         let outputs = outputs.clone();
         let handle = thread::spawn(move || {
-            let start = Instant::now();
-            if let Ok(mut encoder) = Encoder::new(input.clone()) {
-                log::debug!("{:?} new {:?}", input, start.elapsed());
-                let start = Instant::now();
-                if let Ok(_) = encoder.test() {
-                    log::debug!("{:?} encode {:?}", input, start.elapsed());
-                    outputs.lock().unwrap().push(input.clone());
-                } else {
-                    log::debug!("{:?} encode failed {:?}", input, start.elapsed());
+            let test = match input.f.driver {
+                NVENC => nvidia::encode_calls().test,
+                AMF => amf::encode_calls().test,
+                MFX => intel::encode_calls().test,
+            };
+            let mut descs: Vec<AdapterDesc> = vec![];
+            descs.resize(4, unsafe { std::mem::zeroed() });
+            let mut desc_count: i32 = 0;
+            if 0 == unsafe {
+                test(
+                    descs.as_mut_ptr() as _,
+                    descs.len() as _,
+                    &mut desc_count,
+                    input.f.api as _,
+                    input.f.dataFormat as i32,
+                    input.d.width,
+                    input.d.height,
+                    input.d.kbitrate,
+                    input.d.framerate,
+                    input.d.gop,
+                )
+            } {
+                if desc_count as usize <= descs.len() {}
+                for i in 0..desc_count as usize {
+                    let mut input = input.clone();
+                    input.f.luid_low = descs[i].adapter_luid_low;
+                    input.f.luid_high = descs[i].adapter_luid_high;
+                    outputs.lock().unwrap().push(input);
                 }
-            } else {
-                log::debug!("{:?} new failed {:?}", input, start.elapsed());
             }
         });
         handles.push(handle);

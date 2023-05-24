@@ -310,13 +310,32 @@ if (enc->pEnc->Reconfigure(&params))                \
     return 0;                                       \
 }                                                   \
 
-extern "C" int nvidia_test_encode(void *encoder)
-{
+extern "C" int nvidia_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
+                    API api, DataFormat dataFormat,
+                    int32_t width, int32_t height,
+                    int32_t kbs, int32_t framerate, int32_t gop) {
     try
     {
-        Encoder *self = (Encoder*)encoder;
-        if (!self->nativeDevice_->CreateTexture(self->width, self->height)) return -1;
-        return nvidia_encode(encoder, self->nativeDevice_->texture_.Get(), nullptr, nullptr);
+        AdapterDesc *descs = (AdapterDesc*) outDescs;
+        Adapters adapters;
+        if (!adapters.Init(ADAPTER_VENDOR_AMD)) return -1;
+        int count = 0;
+        for (auto& adapter : adapters.adapters_) {
+            Encoder *e = (Encoder *)nvidia_new_encoder((void*)adapter.get()->device_.Get(), api, dataFormat, width, height, kbs, framerate, gop);
+            if (!e) continue;
+            if (!e->nativeDevice_->CreateTexture(e->width, e->height)) continue;
+            if (nvidia_encode(e, e->nativeDevice_->texture_.Get(), nullptr, nullptr) == 0) {
+                AdapterDesc *desc = descs + count;
+                memcpy(desc->desc, adapter.get()->desc1_.Description, sizeof(desc->desc));
+                desc->adapter_luid_high = adapter.get()->desc1_.AdapterLuid.HighPart;
+                desc->adapter_luid_low = adapter.get()->desc1_.AdapterLuid.LowPart;
+                count += 1;
+                if (count >= maxDescNum) break;
+            }
+        }
+        *outDescNum = count;
+        return 0;
+
     }
     catch(const std::exception& e)
     {

@@ -34,6 +34,19 @@ pub type DecodeCall = unsafe extern "C" fn(
     obj: *mut c_void,
 ) -> c_int;
 
+pub type TestEncodeCall = unsafe extern "C" fn(
+    outDescs: *mut c_void,
+    maxDescNum: i32,
+    outDescNum: *mut i32,
+    api: i32,
+    dataFormat: i32,
+    width: i32,
+    height: i32,
+    kbs: i32,
+    framerate: i32,
+    gop: i32,
+) -> c_int;
+
 pub type IVCall = unsafe extern "C" fn(v: *mut c_void) -> c_int;
 
 pub type IVICall = unsafe extern "C" fn(v: *mut c_void, v: i32) -> c_int;
@@ -42,7 +55,7 @@ pub struct EncodeCalls {
     pub new: NewEncoderCall,
     pub encode: EncodeCall,
     pub destroy: IVCall,
-    pub test: IVCall,
+    pub test: TestEncodeCall,
     pub set_bitrate: IVICall,
     pub set_framerate: IVICall,
 }

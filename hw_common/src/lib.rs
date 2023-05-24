@@ -27,6 +27,8 @@ pub enum DecodeDriver {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct FeatureContext {
     pub driver: EncodeDriver,
+    pub luid_low: ::std::os::raw::c_ulong,
+    pub luid_high: ::std::os::raw::c_long,
     pub api: API,
     pub dataFormat: DataFormat,
 }
@@ -57,9 +59,31 @@ pub struct DecodeContext {
     pub device: Option<*mut c_void>,
     pub driver: DecodeDriver,
     pub api: API,
-    pub dataFormat: DataFormat,
-    pub outputSurfaceFormat: SurfaceFormat,
+    pub data_format: DataFormat,
+    pub output_surface_format: SurfaceFormat,
 }
 
 unsafe impl Send for DecodeContext {}
 unsafe impl Sync for DecodeContext {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct Available {
+    pub e: Vec<FeatureContext>,
+    pub d: Vec<DecodeContext>,
+}
+
+impl Available {
+    pub fn serialize(&self) -> Result<String, ()> {
+        match serde_json::to_string_pretty(self) {
+            Ok(s) => Ok(s),
+            Err(_) => Err(()),
+        }
+    }
+
+    pub fn deserialize(s: &str) -> Result<Self, ()> {
+        match serde_json::from_str(s) {
+            Ok(c) => Ok(c),
+            Err(_) => Err(()),
+        }
+    }
+}

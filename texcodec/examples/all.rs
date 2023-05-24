@@ -21,6 +21,8 @@ fn main() {
                 driver: EncodeDriver::AMF,
                 api: API_DX11,
                 dataFormat: DataFormat::H264,
+                luid_low: 0,
+                luid_high: 0,
             },
             d: DynamicContext {
                 device: Some(dup.device()),
@@ -34,9 +36,9 @@ fn main() {
         let de_ctx = DecodeContext {
             driver: DecodeDriver::AMF,
             api: API_DX11,
-            outputSurfaceFormat: SURFACE_FORMAT_BGRA,
-            dataFormat: DataFormat::H264,
             device: Some(render.device()),
+            data_format: DataFormat::H264,
+            output_surface_format: SURFACE_FORMAT_BGRA,
         };
 
         let mut enc = Encoder::new(en_ctx).unwrap();
