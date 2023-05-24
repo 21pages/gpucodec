@@ -366,7 +366,7 @@ extern "C" void* amf_new_encoder(void* hdl, API api, DataFormat dataFormat,
                                     kbs * 1000, framerate, gop);
         if (enc && enc->init_result != AMF_OK) {
             enc->destroy();
-            delete enc;
+            delete enc; // TODO: run all in non-amf crash
             enc = NULL;
         }
         return enc;
@@ -429,9 +429,6 @@ extern "C" int amf_test_encode(void *encoder) {
     {
         Encoder *self = (Encoder*)encoder;
         return self->test() == AMF_OK ? 0 : -1;
-        // amf::AMFContextPtr AMFContext = self->m_AMFEncoder->GetContext();
-        // if (!AMFContext) return -1;
-        // ComPtr<ID3D11Device> device =  (ID3D11Device*)AMFContext->GetDX11Device();
     }
     catch(const std::exception& e)
     {

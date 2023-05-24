@@ -268,7 +268,7 @@ extern "C" int nvidia_decode(void* decoder, uint8_t *data, int len, DecodeCallba
         for (int i = 0; i < nFrameReturned; i++) {
             uint8_t *pFrame = dec->GetFrame();
             if (!p->d3d11_texture) {
-                if (!create_register_texture(p)) {
+                if (!create_register_texture(p)) { //TODO: failed on available
                     return -1;
                 }
                 // if (!CopyDeviceFrame())
