@@ -1,15 +1,16 @@
 #include <cstring>
-#include <common_utils.h>
+
+#include <sample_defs.h>
+#include <sample_utils.h>
+#include <d3d11_allocator.h>
+#include <Preproc.h>
+
 #include "common.h"
 #include "callback.h"
-
-#include "Preproc.h"
-
 #include "system.h"
 
-#define NEW_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); goto _exit;}}
-#define DECODE_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
-#define DECODE_CHECK_ERROR(P, X, ERR)     {if ((X) == (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
+#define CHECK_STATUS_GOTO(X, MSG)          {if ((X) < MFX_ERR_NONE) {MSDK_PRINT_RET_MSG(X, MSG); goto _exit;}}
+#define CHECK_STATUS_RETURN(X, MSG)                {if ((X) < MFX_ERR_NONE) {MSDK_PRINT_RET_MSG(X, MSG); return X;}}
 
 class Decoder
 {
@@ -21,7 +22,7 @@ public:
     std::vector<mfxFrameSurface1> pmfxSurfaces;
     mfxVideoParam mfxVideoParams;
     bool initialized = false;
-    mfxFrameAllocator mfxAllocator;
+    D3D11FrameAllocator d3d11FrameAllocator;
     std::unique_ptr<RGBToNV12> nv12torgb = NULL;
     ComPtr<ID3D11Texture2D> bgraTexture = NULL; 
     mfxFrameAllocResponse mfxResponse;
@@ -37,7 +38,6 @@ extern "C" int intel_destroy_decoder(void* decoder)
             p->mfxDEC->Close();
             delete p->mfxDEC;
         }
-        mfx_common_Release();
     }
     return 0;
 }
@@ -56,28 +56,46 @@ static bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId)
     return false;
 }
 
-#include "common_directx11.h"
-
-
-extern "C" void* intel_new_decoder(void* opaque, API api, DataFormat codecID, SurfaceFormat outputSurfaceFormat)
+static mfxStatus InitializeMFX(Decoder *p)
 {
     mfxStatus sts = MFX_ERR_NONE;
     mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
     mfxVersion ver = { {0, 1} };
+    D3D11AllocatorParams allocParams;
+
+    sts = p->session.Init(impl, &ver);
+    MSDK_CHECK_STATUS(sts, "session Init");
+
+    sts = p->session.SetHandle(MFX_HANDLE_D3D11_DEVICE, p->nativeDevice_->device_.Get());
+    MSDK_CHECK_STATUS(sts, "SetHandle");
+
+    allocParams.bUseSingleTexture = true;
+    allocParams.pDevice = p->nativeDevice_->device_.Get();
+    allocParams.uncompressedResourceMiscFlags = 0;
+    sts = p->d3d11FrameAllocator.Init(&allocParams);
+    MSDK_CHECK_STATUS(sts, "init D3D11FrameAllocator");
+
+    sts = p->session.SetFrameAllocator(&p->d3d11FrameAllocator);
+    MSDK_CHECK_STATUS(sts, "SetFrameAllocator");
+
+    return MFX_ERR_NONE;
+}
+
+extern "C" void* intel_new_decoder(void* opaque, API api, DataFormat codecID, SurfaceFormat outputSurfaceFormat)
+{
+    mfxStatus sts = MFX_ERR_NONE;
 
     Decoder *p = new Decoder();
     p->nativeDevice_ = std::make_unique<NativeDevice>();
     if (!p->nativeDevice_->Init(ADAPTER_VENDOR_INTEL, (ID3D11Device*)opaque)) goto _exit;
     p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice_->device_.Get(), p->nativeDevice_->context_.Get());
     p->nv12torgb->Init();
-    mfx_common_SetHWDeviceContext(p->nativeDevice_->context_.Get());
     if (!p)
     {
         goto _exit;
     }
-
-    sts = mfx_common_Initialize(p->nativeDevice_->device_.Get(), impl, ver, &p->session, &p->mfxAllocator);
-    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    sts = InitializeMFX(p);
+    CHECK_STATUS_GOTO(sts, "InitializeMFX");
 
     // Create Media SDK decoder
     p->mfxDEC = new MFXVideoDECODE(p->session);
@@ -125,10 +143,10 @@ static mfxStatus initialize(Decoder *p, mfxBitstream *mfxBS)
 
     numSurfaces = Request.NumFrameSuggested;
 
-    Request.Type |= WILL_READ; // This line is only required for Windows DirectX11 to ensure that surfaces can be retrieved by the application
+    // Request.Type |= WILL_READ; // This line is only required for Windows DirectX11 to ensure that surfaces can be retrieved by the application
 
     // Allocate surfaces for decoder
-    sts = p->mfxAllocator.Alloc(p->mfxAllocator.pthis, &Request, &p->mfxResponse);
+    sts = p->d3d11FrameAllocator.AllocFrames(&Request, &p->mfxResponse);
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     // Allocate surface headers (mfxFrameSurface1) for decoder
@@ -166,7 +184,7 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
     if (!p->initialized)
     {
         sts = initialize(p, &mfxBS);
-        DECODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+        CHECK_STATUS_RETURN(sts, "initialize");
         p->initialized = true;
     }
 
@@ -183,8 +201,8 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
         if (MFX_WRN_DEVICE_BUSY == sts)
             MSDK_SLEEP(1);  // Wait if device is busy, then repeat the same call to DecodeFrameAsync
         if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_NONE == sts) {
-            nIndex = GetFreeSurfaceIndex(p->pmfxSurfaces);        // Find free frame surface
-            MSDK_CHECK_ERROR(MFX_ERR_NOT_FOUND, nIndex, MFX_ERR_MEMORY_ALLOC);
+            nIndex = GetFreeSurfaceIndex(p->pmfxSurfaces.data(), p->pmfxSurfaces.size());        // Find free frame surface
+            if (nIndex >= p->pmfxSurfaces.size()) return -1;
         }
         // Decode a frame asychronously (returns immediately)
         //  - If input bitstream contains multiple frames DecodeFrameAsync will start decoding multiple frames, and remove them from bitstream
@@ -201,7 +219,7 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
         if (MFX_ERR_NONE == sts)
         {
             mfxHDLPair pair = {NULL};
-            sts = p->mfxAllocator.GetHDL(p->mfxAllocator.pthis, pmfxOutSurface->Data.MemId, (mfxHDL*)&pair);
+            sts = p->d3d11FrameAllocator.GetFrameHDL(pmfxOutSurface->Data.MemId, (mfxHDL*)&pair);
             ID3D11Texture2D* texture = (ID3D11Texture2D*)pair.first;
             D3D11_TEXTURE2D_DESC desc2D;
             texture->GetDesc(&desc2D);

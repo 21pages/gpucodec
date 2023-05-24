@@ -67,26 +67,34 @@ fn main() {
             .files(["mfxloader.cpp", "mfxparser.cpp"].map(|f| mfx_path.join("linux").join(f)));
     }
 
+    let sample_path = sdk_path.join("samples").join("sample_common");
     builder
-        .define("DX11_D3D", None)
-        // .define("DX9_D3D", None)
+        .define("MFX_D3D11_SUPPORT", None)
         .includes([
             sdk_path.join("api").join("include"),
-            sdk_path.join("tutorials").join("common"),
+            sample_path.join("include"),
         ])
         .files(
             [
-                "common_utils.cpp",
+                "sample_utils.cpp",
+                "base_allocator.cpp",
                 #[cfg(windows)]
-                "common_utils_windows.cpp",
-                #[cfg(windows)]
-                "common_directx11.cpp",
-                #[cfg(target_os = "linux")]
-                "common_utils_linux.cpp",
-                #[cfg(target_os = "linux")]
-                "common_vaapi.cpp",
+                "d3d11_allocator.cpp",
+                "avc_bitstream.cpp",
+                "avc_spl.cpp",
+                "avc_nal_spl.cpp",
             ]
-            .map(|f| sdk_path.join("tutorials").join("common").join(f)),
+            .map(|f| sample_path.join("src").join(f)),
+        )
+        .files(
+            [
+                "time.cpp",
+                "atomic.cpp",
+                "shared_object.cpp",
+                #[cfg(windows)]
+                "thread_windows.cpp",
+            ]
+            .map(|f| sample_path.join("src").join("vm").join(f)),
         );
 
     let dxgi_path = externals_dir.join("nvEncDXGIOutputDuplicationSample");

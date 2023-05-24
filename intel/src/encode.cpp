@@ -1,14 +1,15 @@
 #include <cstring>
 #include <iostream>
-#include <common_utils.h>
+#include <sample_defs.h>
+#include <sample_utils.h>
 
 #include "common.h"
 #include "callback.h"
 #include "system.h"
 
-#define NEW_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return NULL;}}
-#define ENCODE_CHECK_RESULT(P, X, ERR)    {if ((X) > (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
-#define ENCODE_CHECK_ERROR(P, X, ERR)     {if ((X) == (P)) {MSDK_PRINT_RET_MSG(ERR); return -1;}}
+#define CHECK_STATUS_GOTO(X, MSG)          {if ((X) < MFX_ERR_NONE) {MSDK_PRINT_RET_MSG(X, MSG); goto _exit;}}
+#define CHECK_STATUS_RETURN(X, MSG)                {if ((X) < MFX_ERR_NONE) {MSDK_PRINT_RET_MSG(X, MSG); return X;}}
+
 struct Encoder
 {
     std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
@@ -87,6 +88,20 @@ static mfxFrameAllocator alloc{
     NULL
 };
 
+static mfxStatus InitMFX(Encoder *p)
+{
+    mfxStatus sts = MFX_ERR_NONE;
+
+    sts = InitSession(p->session);
+    MSDK_CHECK_STATUS(sts, "InitSession");
+    sts = p->session.SetHandle(MFX_HANDLE_D3D11_DEVICE, p->nativeDevice_->device_.Get());
+    MSDK_CHECK_STATUS(sts, "SetHandle");
+    sts = p->session.SetFrameAllocator(&alloc);
+    MSDK_CHECK_STATUS(sts, "SetFrameAllocator");
+
+    return MFX_ERR_NONE;
+}
+
 extern "C" void* intel_new_encoder(void *opaque, API api,
                         DataFormat dataFormat, int32_t w, int32_t h, 
                         int32_t kbs, int32_t framerate, int32_t gop)
@@ -141,12 +156,8 @@ extern "C" void* intel_new_encoder(void *opaque, API api,
     p->nativeDevice_ = std::make_unique<NativeDevice>();
     if (!p->nativeDevice_->Init(ADAPTER_VENDOR_INTEL, (ID3D11Device*)opaque)) goto _exit;
 
-    sts = InitSession(p->session);
-    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-    sts = p->session.SetHandle(MFX_HANDLE_D3D11_DEVICE, p->nativeDevice_->device_.Get());
-    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-    sts = p->session.SetFrameAllocator(&alloc);
-    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    sts = InitMFX(p);
+    CHECK_STATUS_GOTO(sts, "InitMFX");
 
     // Create Media SDK encoder
     p->mfxENC = new MFXVideoENCODE(p->session);
@@ -161,10 +172,10 @@ extern "C" void* intel_new_encoder(void *opaque, API api,
     //   instead the encoder will select suitable parameters closest matching the requested configuration
     sts = p->mfxENC->Query(&mfxEncParams, &mfxEncParams);
     MSDK_IGNORE_MFX_STS(sts, MFX_WRN_INCOMPATIBLE_VIDEO_PARAM);
-    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    CHECK_STATUS_GOTO(sts, "Query");
 
     sts = p->mfxENC->QueryIOSurf(&mfxEncParams, &EncRequest);
-    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    CHECK_STATUS_GOTO(sts, "QueryIOSurf");
 
     nEncSurfNum = EncRequest.NumFrameSuggested;
 
@@ -178,12 +189,12 @@ extern "C" void* intel_new_encoder(void *opaque, API api,
     // Initialize the Media SDK encoder
     sts = p->mfxENC->Init(&mfxEncParams);
     MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
-    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    CHECK_STATUS_GOTO(sts, "Init");
 
     // Retrieve video parameters selected by encoder.
     // - BufferSizeInKB parameter is required to set bit stream buffer size
     sts = p->mfxENC->GetVideoParam(&par);
-    NEW_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    CHECK_STATUS_GOTO(sts, "GetVideoParam");
 
     // Prepare Media SDK bit stream buffer
     memset(&p->mfxBS, 0, sizeof(p->mfxBS));
@@ -213,8 +224,10 @@ extern "C" int intel_encode(void *encoder,  ID3D11Texture2D* tex,
     p->mfxBS.DataLength = 0;
     p->mfxBS.DataOffset = 0;
 
-    nEncSurfIdx = GetFreeSurfaceIndex(p->pEncSurfaces);   // Find free frame surface
-    ENCODE_CHECK_ERROR(MFX_ERR_NOT_FOUND, nEncSurfIdx, MFX_ERR_MEMORY_ALLOC);
+    nEncSurfIdx = GetFreeSurfaceIndex(p->pEncSurfaces.data(), p->pEncSurfaces.size());   // Find free frame surface
+    if (nEncSurfIdx >= p->pEncSurfaces.size()) {
+        return -1;
+    }
 
     p->pEncSurfaces[nEncSurfIdx].Data.MemId = tex;
 
@@ -237,7 +250,7 @@ extern "C" int intel_encode(void *encoder,  ID3D11Texture2D* tex,
 
     if (MFX_ERR_NONE == sts) {
         sts = p->session.SyncOperation(syncp, 1000);      // Synchronize. Wait until encoded frame is ready
-        ENCODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+        CHECK_STATUS_RETURN(sts, "SyncOperation");
         if (p->mfxBS.DataLength > 0)
         {
             if(callback) callback(p->mfxBS.Data + p->mfxBS.DataOffset, p->mfxBS.DataLength, 0, 0, obj);
@@ -247,7 +260,7 @@ extern "C" int intel_encode(void *encoder,  ID3D11Texture2D* tex,
 
     // MFX_ERR_MORE_DATA means that the input file has ended, need to go to buffering loop, exit in case of other errors
     MSDK_IGNORE_MFX_STS(sts, MFX_ERR_MORE_DATA);
-    ENCODE_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    CHECK_STATUS_RETURN(sts, "");
     return encoded ? 0 : -1;
 
 }
