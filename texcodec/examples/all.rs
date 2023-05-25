@@ -39,6 +39,8 @@ fn main() {
             device: Some(render.device()),
             data_format: DataFormat::H264,
             output_surface_format: SURFACE_FORMAT_BGRA,
+            luid_low: 0,
+            luid_high: 0,
         };
 
         let mut enc = Encoder::new(en_ctx).unwrap();
