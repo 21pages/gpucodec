@@ -1,6 +1,7 @@
 use crate::native_codec_get_bin_file;
 use hw_common::{
     inner::DecodeCalls,
+    AdapterDesc,
     DataFormat::*,
     DecodeContext, DecodeDriver,
     SurfaceFormat::{self, *},
@@ -12,7 +13,6 @@ use std::{
     slice::from_raw_parts,
     sync::{Arc, Mutex},
     thread,
-    time::Instant,
 };
 use DecodeDriver::*;
 
@@ -152,6 +152,8 @@ fn available_() -> Vec<DecodeContext> {
         data_format: n.dataFormat,
         api: n.api,
         output_surface_format: SURFACE_FORMAT_BGRA,
+        luid_low: 0,
+        luid_high: 0,
     });
     let outputs = Arc::new(Mutex::new(Vec::<DecodeContext>::new()));
     let mut p_bin_264: *mut u8 = std::ptr::null_mut();
@@ -169,28 +171,45 @@ fn available_() -> Vec<DecodeContext> {
     let buf264 = Arc::new(buf264);
     let buf265 = Arc::new(buf265);
     let mut handles = vec![];
-    for ctx in inputs {
+    for input in inputs {
         let outputs = outputs.clone();
         let buf264 = buf264.clone();
         let buf265 = buf265.clone();
         let handle = thread::spawn(move || {
-            let start = Instant::now();
-            if let Ok(mut decoder) = Decoder::new(ctx.clone()) {
-                log::debug!("{:?} new:{:?}", ctx, start.elapsed());
-                let data = match ctx.data_format {
-                    H264 => &buf264[..],
-                    H265 => &buf265[..],
-                    _ => return,
-                };
-                let start = Instant::now();
-                if let Ok(_) = decoder.decode(data) {
-                    log::debug!("{:?} decode:{:?}", ctx, start.elapsed());
-                    outputs.lock().unwrap().push(ctx);
-                } else {
-                    log::debug!("{:?} decode failed:{:?}", ctx, start.elapsed());
+            let test = match input.driver {
+                CUVID => nvidia::decode_calls().test,
+                AMF => amf::decode_calls().test,
+                MFX => intel::decode_calls().test,
+            };
+            let mut descs: Vec<AdapterDesc> = vec![];
+            descs.resize(crate::MAX_ADATER_NUM_ONE_VENDER, unsafe {
+                std::mem::zeroed()
+            });
+            let mut desc_count: i32 = 0;
+            let data = match input.data_format {
+                H264 => &buf264[..],
+                H265 => &buf265[..],
+                _ => return,
+            };
+            if 0 == unsafe {
+                test(
+                    descs.as_mut_ptr() as _,
+                    descs.len() as _,
+                    &mut desc_count,
+                    input.api as _,
+                    input.data_format as i32,
+                    input.output_surface_format as i32,
+                    data.as_ptr() as *mut u8,
+                    data.len() as _,
+                )
+            } {
+                if desc_count as usize <= descs.len() {}
+                for i in 0..desc_count as usize {
+                    let mut input = input.clone();
+                    input.luid_low = descs[i].adapter_luid_low;
+                    input.luid_high = descs[i].adapter_luid_high;
+                    outputs.lock().unwrap().push(input);
                 }
-            } else {
-                log::debug!("{:?} new failed:{:?}", ctx, start.elapsed());
             }
         });
 

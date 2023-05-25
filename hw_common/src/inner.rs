@@ -47,6 +47,17 @@ pub type TestEncodeCall = unsafe extern "C" fn(
     gop: i32,
 ) -> c_int;
 
+pub type TestDecodeCall = unsafe extern "C" fn(
+    outDescs: *mut c_void,
+    maxDescNum: i32,
+    outDescNum: *mut i32,
+    api: i32,
+    dataFormat: i32,
+    outputSurfaceFormat: i32,
+    data: *mut u8,
+    length: i32,
+) -> c_int;
+
 pub type IVCall = unsafe extern "C" fn(v: *mut c_void) -> c_int;
 
 pub type IVICall = unsafe extern "C" fn(v: *mut c_void, v: i32) -> c_int;
@@ -63,6 +74,7 @@ pub struct DecodeCalls {
     pub new: NewDecoderCall,
     pub decode: DecodeCall,
     pub destroy: IVCall,
+    pub test: TestDecodeCall,
 }
 
 pub struct InnerEncodeContext {

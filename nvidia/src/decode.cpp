@@ -285,3 +285,34 @@ extern "C" int nvidia_decode(void* decoder, uint8_t *data, int len, DecodeCallba
     }
     return -1;
 }
+
+extern "C" int nvidia_test_decode(AdapterDesc *outDescs, int32_t maxDescNum, int32_t *outDescNum, 
+                                API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat,
+                                uint8_t *data, int32_t length)
+{
+    try
+    {
+        AdapterDesc *descs = (AdapterDesc*) outDescs;
+        Adapters adapters;
+        if (!adapters.Init(ADAPTER_VENDOR_NVIDIA)) return -1;
+        int count = 0;
+        for (auto& adapter : adapters.adapters_) {
+            Decoder *p = (Decoder *)nvidia_new_decoder((void*)adapter.get()->device_.Get(), api, dataFormat, outputSurfaceFormat);
+            if (!p) continue;
+            if (nvidia_decode(p, data, length, nullptr, nullptr) == 0) {
+                AdapterDesc *desc = descs + count;
+                desc->adapter_luid_high = adapter.get()->desc1_.AdapterLuid.HighPart;
+                desc->adapter_luid_low = adapter.get()->desc1_.AdapterLuid.LowPart;
+                count += 1;
+                if (count >= maxDescNum) break;
+            }
+        }
+        *outDescNum = count;
+        return 0;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
+}

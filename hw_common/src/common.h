@@ -52,7 +52,6 @@ enum Preset
 
 struct AdapterDesc
 {
-    wchar_t desc[128];
     unsigned long adapter_luid_low;
     long adapter_luid_high;
 };

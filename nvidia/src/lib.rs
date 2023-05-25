@@ -26,6 +26,7 @@ pub fn decode_calls() -> DecodeCalls {
         new: nvidia_new_decoder,
         decode: nvidia_decode,
         destroy: nvidia_destroy_decoder,
+        test: nvidia_test_decode,
     }
 }
 

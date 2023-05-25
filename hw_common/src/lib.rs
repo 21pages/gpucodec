@@ -58,6 +58,8 @@ pub struct DecodeContext {
     #[serde(skip)]
     pub device: Option<*mut c_void>,
     pub driver: DecodeDriver,
+    pub luid_low: ::std::os::raw::c_ulong,
+    pub luid_high: ::std::os::raw::c_long,
     pub api: API,
     pub data_format: DataFormat,
     pub output_surface_format: SurfaceFormat,

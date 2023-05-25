@@ -26,6 +26,10 @@ int nvidia_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
                     int32_t width, int32_t height,
                     int32_t kbs, int32_t framerate, int32_t gop);
 
+int nvidia_test_decode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum, 
+                    int32_t api, int32_t dataFormat, int32_t outputSurfaceFormat,
+                    uint8_t *data, int32_t length);
+
 int nvidia_set_bitrate(void *e, int32_t bitrate);
 
 int nvidia_set_framerate(void *e, int32_t framerate);

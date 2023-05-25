@@ -26,6 +26,7 @@ pub fn decode_calls() -> DecodeCalls {
         new: amf_new_decoder,
         decode: amf_decode,
         destroy: amf_destroy_decoder,
+        test: amf_test_decode,
     }
 }
 

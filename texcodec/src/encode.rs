@@ -167,7 +167,9 @@ fn available_(d: DynamicContext) -> Vec<FeatureContext> {
                 MFX => intel::encode_calls().test,
             };
             let mut descs: Vec<AdapterDesc> = vec![];
-            descs.resize(4, unsafe { std::mem::zeroed() });
+            descs.resize(crate::MAX_ADATER_NUM_ONE_VENDER, unsafe {
+                std::mem::zeroed()
+            });
             let mut desc_count: i32 = 0;
             if 0 == unsafe {
                 test(

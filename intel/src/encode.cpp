@@ -281,7 +281,6 @@ extern "C" int intel_test_encode(void *outDescs, int32_t maxDescNum, int32_t *ou
             if (!e->nativeDevice_->CreateTexture(e->width, e->height)) continue;
             if (intel_encode(e, e->nativeDevice_->texture_.Get(), nullptr, nullptr) == 0) {
                 AdapterDesc *desc = descs + count;
-                memcpy(desc->desc, adapter.get()->desc1_.Description, sizeof(desc->desc));
                 desc->adapter_luid_high = adapter.get()->desc1_.AdapterLuid.HighPart;
                 desc->adapter_luid_low = adapter.get()->desc1_.AdapterLuid.LowPart;
                 count += 1;

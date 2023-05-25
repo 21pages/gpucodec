@@ -20,7 +20,7 @@ public:
     AMF_RESULT init_result = AMF_FAIL;
 private:
     // system
-    void *m_hdl;
+    void *m_device;
     // amf
     AMFFactoryHelper m_AMFFactory;
     amf::AMFContextPtr m_AMFContext = NULL;
@@ -34,8 +34,8 @@ private:
     // buffer
     std::vector<std::vector<uint8_t>> m_buffer;
 public:
-    Decoder(void *hdl, amf::AMF_MEMORY_TYPE memoryTypeOut, amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut):
-        m_hdl(hdl),
+    Decoder(void *device, amf::AMF_MEMORY_TYPE memoryTypeOut, amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut):
+        m_device(device),
         m_AMFMemoryType(memoryTypeOut),
         m_textureFormatOut(textureFormatOut),
         m_codec(codec)
@@ -81,7 +81,7 @@ public:
                 case amf::AMF_MEMORY_DX11:
                     {
                         ID3D11Texture2D* surfaceDX11 = (ID3D11Texture2D*)native;
-                        callback(surfaceDX11, 0, 0, 0, obj, 0);
+                        if (callback) callback(surfaceDX11, 0, 0, 0, obj, 0);
                     }
                     break;
                 case amf::AMF_MEMORY_OPENCL:
@@ -142,7 +142,7 @@ private:
             AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitDX9");
             break;
         case amf::AMF_MEMORY_DX11:
-            res = m_AMFContext->InitDX11(m_hdl); // can be DX11 device
+            res = m_AMFContext->InitDX11(m_device); // can be DX11 device
             AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitDX11");
             break;
         case amf::AMF_MEMORY_DX12:
@@ -233,7 +233,7 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_decoder(void* hdl, API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat)
+extern "C" void* amf_new_decoder(void* device, API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat)
 {
     try
     {
@@ -252,7 +252,7 @@ extern "C" void* amf_new_decoder(void* hdl, API api, DataFormat dataFormat, Surf
         {
             return NULL;
         }
-        Decoder *dec = new Decoder(hdl, memory, codecStr, surfaceFormat);
+        Decoder *dec = new Decoder(device, memory, codecStr, surfaceFormat);
         if (dec && dec->init_result != AMF_OK)
         {
             dec->destroy();
@@ -274,6 +274,37 @@ extern "C" int amf_decode(void *decoder, uint8_t *data, int32_t length, DecodeCa
     {
         Decoder *dec = (Decoder*)decoder;
         return dec->decode(data, length, callback, obj);   
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
+}
+
+extern "C" int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum, int32_t *outDescNum, 
+                                API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat,
+                                uint8_t *data, int32_t length)
+{
+    try
+    {
+        AdapterDesc *descs = (AdapterDesc*) outDescs;
+        Adapters adapters;
+        if (!adapters.Init(ADAPTER_VENDOR_AMD)) return -1;
+        int count = 0;
+        for (auto& adapter : adapters.adapters_) {
+            Decoder *p = (Decoder *)amf_new_decoder((void*)adapter.get()->device_.Get(), api, dataFormat, outputSurfaceFormat);
+            if (!p) continue;
+            if (p->decode(data, length, nullptr, nullptr) == AMF_OK) {
+                AdapterDesc *desc = descs + count;
+                desc->adapter_luid_high = adapter.get()->desc1_.AdapterLuid.HighPart;
+                desc->adapter_luid_low = adapter.get()->desc1_.AdapterLuid.LowPart;
+                count += 1;
+                if (count >= maxDescNum) break;
+            }
+        }
+        *outDescNum = count;
+        return 0;
     }
     catch(const std::exception& e)
     {

@@ -232,7 +232,7 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
             p->nv12torgb->Convert(texture, p->bgraTexture.Get());
             p->bgraTexture->GetDesc(&desc2D);
             if (MFX_ERR_NONE == sts) {
-                callback(p->bgraTexture.Get(), SURFACE_FORMAT_BGRA, pmfxOutSurface->Info.CropW, pmfxOutSurface->Info.CropH, obj, 0);
+                if (callback) callback(p->bgraTexture.Get(), SURFACE_FORMAT_BGRA, pmfxOutSurface->Info.CropW, pmfxOutSurface->Info.CropH, obj, 0);
                 decoded = true;
             }
             break;
@@ -244,3 +244,33 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
     return decoded ? 0 : -1;
 }
 
+extern "C" int intel_test_decode(AdapterDesc *outDescs, int32_t maxDescNum, int32_t *outDescNum, 
+                                API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat,
+                                uint8_t *data, int32_t length)
+{
+    try
+    {
+        AdapterDesc *descs = (AdapterDesc*) outDescs;
+        Adapters adapters;
+        if (!adapters.Init(ADAPTER_VENDOR_INTEL)) return -1;
+        int count = 0;
+        for (auto& adapter : adapters.adapters_) {
+            Decoder *p = (Decoder *)intel_new_decoder((void*)adapter.get()->device_.Get(), api, dataFormat, outputSurfaceFormat);
+            if (!p) continue;
+            if (intel_decode(p, data, length, nullptr, nullptr) == 0) {
+                AdapterDesc *desc = descs + count;
+                desc->adapter_luid_high = adapter.get()->desc1_.AdapterLuid.HighPart;
+                desc->adapter_luid_low = adapter.get()->desc1_.AdapterLuid.LowPart;
+                count += 1;
+                if (count >= maxDescNum) break;
+            }
+        }
+        *outDescNum = count;
+        return 0;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return -1;
+}

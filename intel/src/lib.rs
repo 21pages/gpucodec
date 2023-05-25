@@ -26,6 +26,7 @@ pub fn decode_calls() -> DecodeCalls {
         new: intel_new_decoder,
         decode: intel_decode,
         destroy: intel_destroy_decoder,
+        test: intel_test_decode,
     }
 }
 
