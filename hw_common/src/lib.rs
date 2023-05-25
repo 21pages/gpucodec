@@ -30,7 +30,7 @@ pub struct FeatureContext {
     pub luid_low: ::std::os::raw::c_ulong,
     pub luid_high: ::std::os::raw::c_long,
     pub api: API,
-    pub dataFormat: DataFormat,
+    pub data_format: DataFormat,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]

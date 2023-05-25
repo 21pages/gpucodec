@@ -34,7 +34,7 @@ impl Encoder {
             let codec = (calls.new)(
                 ctx.d.device.unwrap_or(std::ptr::null_mut()),
                 ctx.f.api as _,
-                ctx.f.dataFormat as i32,
+                ctx.f.data_format as i32,
                 ctx.d.width,
                 ctx.d.height,
                 ctx.d.kbitrate,
@@ -150,7 +150,7 @@ fn available_(d: DynamicContext) -> Vec<FeatureContext> {
         f: FeatureContext {
             driver,
             api: n.api,
-            dataFormat: n.format,
+            data_format: n.format,
             luid_low: 0,
             luid_high: 0,
         },
@@ -177,7 +177,7 @@ fn available_(d: DynamicContext) -> Vec<FeatureContext> {
                     descs.len() as _,
                     &mut desc_count,
                     input.f.api as _,
-                    input.f.dataFormat as i32,
+                    input.f.data_format as i32,
                     input.d.width,
                     input.d.height,
                     input.d.kbitrate,
