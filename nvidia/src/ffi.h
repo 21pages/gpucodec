@@ -15,7 +15,7 @@ int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback, void* obj)
 
 int nvidia_destroy_encoder(void *encoder);
 
-void* nvidia_new_decoder(void *hdl, int32_t api, int32_t codecID, int32_t outputSurfaceFormat);
+void* nvidia_new_decoder(int64_t luid, int32_t api, int32_t codecID, int32_t outputSurfaceFormat);
 
 int nvidia_decode(void* decoder, uint8_t *data, int len, DecodeCallback callback, void* obj);
 

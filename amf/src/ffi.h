@@ -13,7 +13,7 @@ int amf_encode(void *self, void *tex, EncodeCallback callback, void* obj);
 
 int amf_destroy_encoder(void *self);
 
-void* amf_new_decoder(void* hdl, int32_t api, int32_t dataFormat, int32_t outputSurfaceFormat);
+void* amf_new_decoder(int64_t luid, int32_t api, int32_t dataFormat, int32_t outputSurfaceFormat);
 
 int amf_decode(void *decoder, uint8_t *data, int32_t length, DecodeCallback callback, void *obj);
 

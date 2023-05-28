@@ -121,7 +121,7 @@ static bool dataFormat_to_cuCodecID(DataFormat dataFormat, cudaVideoCodec &cuda)
     return true;
 }
 
-extern "C" void* nvidia_new_decoder(void *opaque, API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat) 
+extern "C" void* nvidia_new_decoder(int64_t luid, API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat) 
 {
     Decoder *p = NULL;
     try
@@ -144,7 +144,7 @@ extern "C" void* nvidia_new_decoder(void *opaque, API api, DataFormat dataFormat
         CUdevice cuDevice = 0;
 #ifdef _WIN32
         p->nativeDevice_ = std::make_unique<NativeDevice>();
-        if (!p->nativeDevice_->Init(ADAPTER_VENDOR_NVIDIA, (ID3D11Device*)opaque)) goto _exit;
+        if (!p->nativeDevice_->Init(luid, nullptr)) goto _exit;
         if(!ck(p->cudl->cuD3D11GetDevice(&cuDevice, p->nativeDevice_->adapter_.Get()))) goto _exit;
 #else
         int nGpu = 0, gpu = 0;
@@ -297,12 +297,11 @@ extern "C" int nvidia_test_decode(AdapterDesc *outDescs, int32_t maxDescNum, int
         if (!adapters.Init(ADAPTER_VENDOR_NVIDIA)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Decoder *p = (Decoder *)nvidia_new_decoder((void*)adapter.get()->device_.Get(), api, dataFormat, outputSurfaceFormat);
+            Decoder *p = (Decoder *)nvidia_new_decoder(LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
             if (!p) continue;
             if (nvidia_decode(p, data, length, nullptr, nullptr) == 0) {
                 AdapterDesc *desc = descs + count;
-                desc->adapter_luid_high = adapter.get()->desc1_.AdapterLuid.HighPart;
-                desc->adapter_luid_low = adapter.get()->desc1_.AdapterLuid.LowPart;
+                desc->luid =  LUID(adapter.get()->desc1_);
                 count += 1;
                 if (count >= maxDescNum) break;
             }

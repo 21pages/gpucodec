@@ -11,6 +11,7 @@ using Microsoft::WRL::ComPtr;
 
 #define SAFE_RELEASE(p) { if ((p)) { (p)->Release(); (p) = nullptr; } }
 #define HRB(hr) { if (FAILED((hr))) { std::cerr << "HR = " << (hr); return false; } }
+#define LUID(desc) (((int64_t)desc.AdapterLuid.HighPart << 32) | desc.AdapterLuid.LowPart)
 
 class Texture_Lifetime_Keeper {
 public:
@@ -23,10 +24,10 @@ private:
 
 class NativeDevice {
 public:
-    bool Init(AdapterVendor vendor, ID3D11Device *device);
+    bool Init(int64_t luid, ID3D11Device *device);
     bool CreateTexture(int width, int height);
 private:
-    bool Init(AdapterVendor vendor);
+    bool Init(int64_t luid);
     bool Init(ID3D11Device *device);
     bool SetMultithreadProtected();
 public:

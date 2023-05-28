@@ -11,20 +11,20 @@
 
 #include "win.h"
 
-bool NativeDevice::Init(AdapterVendor vendor, ID3D11Device *device)
+bool NativeDevice::Init(int64_t luid, ID3D11Device *device)
 {
 	if (device) {
 		if (!Init(device)) return false;
 	} else {
-		if (!Init(vendor)) return false;
+		if (!Init(luid)) return false;
 	}
-	if (vendor == AdapterVendor::ADAPTER_VENDOR_INTEL) {
+	// if (vendor == AdapterVendor::ADAPTER_VENDOR_INTEL) {
 		if (!SetMultithreadProtected()) return false;
-	}
+	// }
 	return true;
 }
 
-bool NativeDevice::Init(AdapterVendor vendor)
+bool NativeDevice::Init(int64_t luid)
 {
     HRESULT hr = S_OK;
 
@@ -34,7 +34,7 @@ bool NativeDevice::Init(AdapterVendor vendor)
 	for (int i = 0; !FAILED(factory1_->EnumAdapters1(i, tmpAdapter.ReleaseAndGetAddressOf())); i++) {
 		DXGI_ADAPTER_DESC1 desc = DXGI_ADAPTER_DESC1();
 		tmpAdapter->GetDesc1(&desc);
-		if (desc.VendorId == static_cast<int>(vendor)) {
+		if (LUID(desc) == luid) {
 			adapter1_.Swap(tmpAdapter);
 			break;
 		}

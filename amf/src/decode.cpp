@@ -20,7 +20,8 @@ public:
     AMF_RESULT init_result = AMF_FAIL;
 private:
     // system
-    void *m_device;
+    int64_t m_luid;
+    std::unique_ptr<NativeDevice> m_nativeDevice = nullptr;
     // amf
     AMFFactoryHelper m_AMFFactory;
     amf::AMFContextPtr m_AMFContext = NULL;
@@ -34,8 +35,8 @@ private:
     // buffer
     std::vector<std::vector<uint8_t>> m_buffer;
 public:
-    Decoder(void *device, amf::AMF_MEMORY_TYPE memoryTypeOut, amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut):
-        m_device(device),
+    Decoder(int64_t luid, amf::AMF_MEMORY_TYPE memoryTypeOut, amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut):
+        m_luid(luid),
         m_AMFMemoryType(memoryTypeOut),
         m_textureFormatOut(textureFormatOut),
         m_codec(codec)
@@ -80,8 +81,18 @@ public:
             {
                 case amf::AMF_MEMORY_DX11:
                     {
-                        ID3D11Texture2D* surfaceDX11 = (ID3D11Texture2D*)native;
-                        if (callback) callback(surfaceDX11, 0, 0, 0, obj, 0);
+                        ComPtr<ID3D11Texture2D> texture = (ID3D11Texture2D*)native;
+                        ComPtr<IDXGIResource> resource = nullptr;
+                        if(FAILED(texture.As(&resource))) {
+                            std::cerr << "Failed to get IDXGIResource" << std::endl;
+                            return AMF_FAIL;
+                        }
+                        HANDLE sharedHandle = nullptr;
+                        if (FAILED(resource->GetSharedHandle(&sharedHandle))) {
+                            std::cerr << "Failed to GetSharedHandle" << std::endl;
+                            return AMF_FAIL;
+                        }
+                        if (callback) callback(sharedHandle, 0, 0, 0, obj, 0);
                     }
                     break;
                 case amf::AMF_MEMORY_OPENCL:
@@ -142,7 +153,12 @@ private:
             AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitDX9");
             break;
         case amf::AMF_MEMORY_DX11:
-            res = m_AMFContext->InitDX11(m_device); // can be DX11 device
+            m_nativeDevice = std::make_unique<NativeDevice>();
+            if (!m_nativeDevice->Init(m_luid, nullptr)) {
+                std::cerr << "Init NativeDevice failed" << std::endl;
+                return AMF_FAIL;
+            }
+            res = m_AMFContext->InitDX11(m_nativeDevice->device_.Get()); // can be DX11 device
             AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitDX11");
             break;
         case amf::AMF_MEMORY_DX12:
@@ -233,7 +249,7 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_decoder(void* device, API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat)
+extern "C" void* amf_new_decoder(int64_t luid, API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat)
 {
     try
     {
@@ -252,7 +268,7 @@ extern "C" void* amf_new_decoder(void* device, API api, DataFormat dataFormat, S
         {
             return NULL;
         }
-        Decoder *dec = new Decoder(device, memory, codecStr, surfaceFormat);
+        Decoder *dec = new Decoder(luid, memory, codecStr, surfaceFormat);
         if (dec && dec->init_result != AMF_OK)
         {
             dec->destroy();
@@ -293,12 +309,11 @@ extern "C" int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum, int32_
         if (!adapters.Init(ADAPTER_VENDOR_AMD)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Decoder *p = (Decoder *)amf_new_decoder((void*)adapter.get()->device_.Get(), api, dataFormat, outputSurfaceFormat);
+            Decoder *p = (Decoder *)amf_new_decoder(LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
             if (!p) continue;
             if (p->decode(data, length, nullptr, nullptr) == AMF_OK) {
                 AdapterDesc *desc = descs + count;
-                desc->adapter_luid_high = adapter.get()->desc1_.AdapterLuid.HighPart;
-                desc->adapter_luid_low = adapter.get()->desc1_.AdapterLuid.LowPart;
+                desc->luid =  LUID(adapter.get()->desc1_);
                 count += 1;
                 if (count >= maxDescNum) break;
             }

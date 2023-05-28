@@ -151,8 +151,7 @@ fn available_(d: DynamicContext) -> Vec<FeatureContext> {
             driver,
             api: n.api,
             data_format: n.format,
-            luid_low: 0,
-            luid_high: 0,
+            luid: 0,
         },
         d,
     });
@@ -188,8 +187,7 @@ fn available_(d: DynamicContext) -> Vec<FeatureContext> {
                 if desc_count as usize <= descs.len() {}
                 for i in 0..desc_count as usize {
                     let mut input = input.clone();
-                    input.f.luid_low = descs[i].adapter_luid_low;
-                    input.f.luid_high = descs[i].adapter_luid_high;
+                    input.f.luid = descs[i].luid;
                     outputs.lock().unwrap().push(input);
                 }
             }

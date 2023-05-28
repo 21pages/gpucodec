@@ -27,8 +27,7 @@ pub enum DecodeDriver {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct FeatureContext {
     pub driver: EncodeDriver,
-    pub luid_low: ::std::os::raw::c_ulong,
-    pub luid_high: ::std::os::raw::c_long,
+    pub luid: i64,
     pub api: API,
     pub data_format: DataFormat,
 }
@@ -55,11 +54,8 @@ pub struct EncodeContext {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DecodeContext {
-    #[serde(skip)]
-    pub device: Option<*mut c_void>,
     pub driver: DecodeDriver,
-    pub luid_low: ::std::os::raw::c_ulong,
-    pub luid_high: ::std::os::raw::c_long,
+    pub luid: i64,
     pub api: API,
     pub data_format: DataFormat,
     pub output_surface_format: SurfaceFormat,

@@ -35,7 +35,7 @@ impl Decoder {
         };
         unsafe {
             let codec = (calls.new)(
-                ctx.device.unwrap_or(std::ptr::null_mut()),
+                ctx.luid,
                 ctx.api as i32,
                 ctx.data_format as i32,
                 ctx.output_surface_format as i32,
@@ -148,12 +148,10 @@ fn available_() -> Vec<DecodeContext> {
     );
     let inputs = natives.drain(..).map(|(driver, n)| DecodeContext {
         driver,
-        device: None,
         data_format: n.dataFormat,
         api: n.api,
         output_surface_format: SURFACE_FORMAT_BGRA,
-        luid_low: 0,
-        luid_high: 0,
+        luid: 0,
     });
     let outputs = Arc::new(Mutex::new(Vec::<DecodeContext>::new()));
     let mut p_bin_264: *mut u8 = std::ptr::null_mut();
@@ -206,8 +204,7 @@ fn available_() -> Vec<DecodeContext> {
                 if desc_count as usize <= descs.len() {}
                 for i in 0..desc_count as usize {
                     let mut input = input.clone();
-                    input.luid_low = descs[i].adapter_luid_low;
-                    input.luid_high = descs[i].adapter_luid_high;
+                    input.luid = descs[i].luid;
                     outputs.lock().unwrap().push(input);
                 }
             }

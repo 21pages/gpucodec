@@ -81,13 +81,13 @@ static mfxStatus InitializeMFX(Decoder *p)
     return MFX_ERR_NONE;
 }
 
-extern "C" void* intel_new_decoder(void* opaque, API api, DataFormat codecID, SurfaceFormat outputSurfaceFormat)
+extern "C" void* intel_new_decoder(int64_t luid, API api, DataFormat codecID, SurfaceFormat outputSurfaceFormat)
 {
     mfxStatus sts = MFX_ERR_NONE;
 
     Decoder *p = new Decoder();
     p->nativeDevice_ = std::make_unique<NativeDevice>();
-    if (!p->nativeDevice_->Init(ADAPTER_VENDOR_INTEL, (ID3D11Device*)opaque)) goto _exit;
+    if (!p->nativeDevice_->Init(luid, nullptr)) goto _exit;
     p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice_->device_.Get(), p->nativeDevice_->context_.Get());
     p->nv12torgb->Init();
     if (!p)
@@ -226,13 +226,24 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
             if (!p->bgraTexture) {
                 desc2D.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
                 desc2D.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+                desc2D.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
                 HRESULT hr = p->nativeDevice_->device_->CreateTexture2D(&desc2D, NULL, p->bgraTexture.ReleaseAndGetAddressOf());
                 if (FAILED(hr)) return -1;
             }
             p->nv12torgb->Convert(texture, p->bgraTexture.Get());
             p->bgraTexture->GetDesc(&desc2D);
+            ComPtr<IDXGIResource> resource = nullptr;
+            if(FAILED(p->bgraTexture.As(&resource))) {
+                std::cerr << "Failed to get IDXGIResource" << std::endl;
+                return -1;
+            }
+            HANDLE sharedHandle = nullptr;
+            if (FAILED(resource->GetSharedHandle(&sharedHandle))) {
+                std::cerr << "Failed to GetSharedHandle" << std::endl;
+                return -1;
+            }
             if (MFX_ERR_NONE == sts) {
-                if (callback) callback(p->bgraTexture.Get(), SURFACE_FORMAT_BGRA, pmfxOutSurface->Info.CropW, pmfxOutSurface->Info.CropH, obj, 0);
+                if (callback) callback(sharedHandle, SURFACE_FORMAT_BGRA, pmfxOutSurface->Info.CropW, pmfxOutSurface->Info.CropH, obj, 0);
                 decoded = true;
             }
             break;
@@ -255,12 +266,11 @@ extern "C" int intel_test_decode(AdapterDesc *outDescs, int32_t maxDescNum, int3
         if (!adapters.Init(ADAPTER_VENDOR_INTEL)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Decoder *p = (Decoder *)intel_new_decoder((void*)adapter.get()->device_.Get(), api, dataFormat, outputSurfaceFormat);
+            Decoder *p = (Decoder *)intel_new_decoder(LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
             if (!p) continue;
             if (intel_decode(p, data, length, nullptr, nullptr) == 0) {
                 AdapterDesc *desc = descs + count;
-                desc->adapter_luid_high = adapter.get()->desc1_.AdapterLuid.HighPart;
-                desc->adapter_luid_low = adapter.get()->desc1_.AdapterLuid.LowPart;
+                desc->luid =  LUID(adapter.get()->desc1_);
                 count += 1;
                 if (count >= maxDescNum) break;
             }

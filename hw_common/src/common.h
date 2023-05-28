@@ -52,8 +52,7 @@ enum Preset
 
 struct AdapterDesc
 {
-    unsigned long adapter_luid_low;
-    long adapter_luid_high;
+    int64_t luid;
 };
 
 #endif // COMMON_H

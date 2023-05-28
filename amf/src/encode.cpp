@@ -439,8 +439,7 @@ extern "C" int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outD
             if (!e) continue;
             if (e->test() == AMF_OK) {
                 AdapterDesc *desc = descs + count;
-                desc->adapter_luid_high = adapter.get()->desc1_.AdapterLuid.HighPart;
-                desc->adapter_luid_low = adapter.get()->desc1_.AdapterLuid.LowPart;
+                desc->luid =  LUID(adapter.get()->desc1_);
                 count += 1;
                 if (count >= maxDescNum) break;
             }
