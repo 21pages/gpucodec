@@ -15,14 +15,14 @@ fn main() {
     unsafe {
         let mut dup = dxgi::Duplicator::new().unwrap();
         let mut render = Render::new().unwrap();
+        let luid = 95063;
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
                 driver: EncodeDriver::AMF,
                 api: API_DX11,
-                dataFormat: DataFormat::H264,
-                luid_low: 0,
-                luid_high: 0,
+                data_format: DataFormat::H264,
+                luid,
             },
             d: DynamicContext {
                 device: Some(dup.device()),
@@ -36,11 +36,9 @@ fn main() {
         let de_ctx = DecodeContext {
             driver: DecodeDriver::AMF,
             api: API_DX11,
-            device: Some(render.device()),
             data_format: DataFormat::H264,
             output_surface_format: SURFACE_FORMAT_BGRA,
-            luid_low: 0,
-            luid_high: 0,
+            luid,
         };
 
         let mut enc = Encoder::new(en_ctx).unwrap();

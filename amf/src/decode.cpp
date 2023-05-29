@@ -81,18 +81,17 @@ public:
             {
                 case amf::AMF_MEMORY_DX11:
                     {
-                        ComPtr<ID3D11Texture2D> texture = (ID3D11Texture2D*)native;
-                        ComPtr<IDXGIResource> resource = nullptr;
-                        if(FAILED(texture.As(&resource))) {
-                            std::cerr << "Failed to get IDXGIResource" << std::endl;
-                            return AMF_FAIL;
+                        if (!m_nativeDevice->CopyTexture((ID3D11Texture2D*)native)) {
+                             std::cerr << "Failed to CopyTexture" << std::endl;
+                             return AMF_FAIL;
                         }
-                        HANDLE sharedHandle = nullptr;
-                        if (FAILED(resource->GetSharedHandle(&sharedHandle))) {
+                        HANDLE sharedHandle = m_nativeDevice->GetSharedHandle();
+                        if (!sharedHandle) {
                             std::cerr << "Failed to GetSharedHandle" << std::endl;
-                            return AMF_FAIL;
+                             return AMF_FAIL;
                         }
                         if (callback) callback(sharedHandle, 0, 0, 0, obj, 0);
+                        decoded = true;
                     }
                     break;
                 case amf::AMF_MEMORY_OPENCL:
@@ -103,7 +102,6 @@ public:
                 
             }
 
-            decoded = true;
             surface = NULL;
             convertData = NULL;
             convertSurface = NULL;

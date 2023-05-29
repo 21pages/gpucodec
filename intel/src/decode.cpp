@@ -223,22 +223,13 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
             ID3D11Texture2D* texture = (ID3D11Texture2D*)pair.first;
             D3D11_TEXTURE2D_DESC desc2D;
             texture->GetDesc(&desc2D);
-            if (!p->bgraTexture) {
-                desc2D.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-                desc2D.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-                desc2D.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
-                HRESULT hr = p->nativeDevice_->device_->CreateTexture2D(&desc2D, NULL, p->bgraTexture.ReleaseAndGetAddressOf());
-                if (FAILED(hr)) return -1;
-            }
-            p->nv12torgb->Convert(texture, p->bgraTexture.Get());
-            p->bgraTexture->GetDesc(&desc2D);
-            ComPtr<IDXGIResource> resource = nullptr;
-            if(FAILED(p->bgraTexture.As(&resource))) {
-                std::cerr << "Failed to get IDXGIResource" << std::endl;
+            if (!p->nativeDevice_->EnsureTexture(desc2D.Width, desc2D.Height)) {
+                std::cerr << "Failed to EnsureTexture" << std::endl;
                 return -1;
             }
-            HANDLE sharedHandle = nullptr;
-            if (FAILED(resource->GetSharedHandle(&sharedHandle))) {
+            HRI(p->nv12torgb->Convert(texture, p->nativeDevice_->texture_.Get()));
+            HANDLE sharedHandle = p->nativeDevice_->GetSharedHandle();
+            if (!sharedHandle) {
                 std::cerr << "Failed to GetSharedHandle" << std::endl;
                 return -1;
             }

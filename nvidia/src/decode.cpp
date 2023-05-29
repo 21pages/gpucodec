@@ -234,7 +234,7 @@ static bool create_register_texture(Decoder *p)
     ZeroMemory(&desc, sizeof(desc));
     desc.Width = width;
     desc.Height = height;
-    desc.MipLevels = 0;
+    desc.MipLevels = 1;
     desc.ArraySize = 1;
     desc.Format = DXGI_FORMAT_NV12;
     desc.SampleDesc.Count = 1;

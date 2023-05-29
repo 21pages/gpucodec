@@ -18,9 +18,7 @@ bool NativeDevice::Init(int64_t luid, ID3D11Device *device)
 	} else {
 		if (!Init(luid)) return false;
 	}
-	// if (vendor == AdapterVendor::ADAPTER_VENDOR_INTEL) {
-		if (!SetMultithreadProtected()) return false;
-	// }
+	if (!SetMultithreadProtected()) return false;
 	return true;
 }
 
@@ -95,14 +93,21 @@ bool NativeDevice::SetMultithreadProtected()
 	return true;
 }
 
-bool NativeDevice::CreateTexture(int width, int height)
-{
+bool NativeDevice::EnsureTexture(int width, int height) {
 	D3D11_TEXTURE2D_DESC desc;
-
-    ZeroMemory(&desc, sizeof(desc));
+	ZeroMemory(&desc, sizeof(desc));
+	if (texture_) {
+		texture_->GetDesc(&desc);
+		if (desc.Width == width && desc.Height == height 
+			&& desc.Format == DXGI_FORMAT_B8G8R8A8_UNORM 
+			&& desc.MiscFlags == D3D11_RESOURCE_MISC_SHARED
+			&& desc.Usage == D3D11_USAGE_DEFAULT) {
+				return true;
+			}
+	}
     desc.Width = width;
     desc.Height = height;
-    desc.MipLevels = 0;
+    desc.MipLevels = 1;
     desc.ArraySize = 1;
     desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     desc.SampleDesc.Count = 1;
@@ -115,6 +120,25 @@ bool NativeDevice::CreateTexture(int width, int height)
 	HRB(device_->CreateTexture2D(&desc, nullptr, texture_.ReleaseAndGetAddressOf()));
 
 	return true;
+}
+
+bool NativeDevice::CopyTexture(ID3D11Texture2D *texture) {
+	D3D11_TEXTURE2D_DESC desc;
+	ZeroMemory(&desc, sizeof(desc));
+	texture->GetDesc(&desc);
+	desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+	HRB(device_->CreateTexture2D(&desc, nullptr, texture_.ReleaseAndGetAddressOf()));
+	context_->CopyResource(texture_.Get(), texture);
+	
+	return true;
+}
+
+HANDLE NativeDevice::GetSharedHandle() {
+	ComPtr<IDXGIResource> resource = nullptr;
+	HRP(texture_.As(&resource));
+	HANDLE sharedHandle = nullptr;
+	HRP(resource->GetSharedHandle(&sharedHandle));
+	return sharedHandle;
 }
 
 bool Adapter::Init(IDXGIAdapter1 *adapter1)
