@@ -35,7 +35,7 @@ class NativeDevice {
 public:
     bool Init(int64_t luid, ID3D11Device *device);
     bool EnsureTexture(int width, int height);
-    bool CopyTexture(ID3D11Texture2D *texture);
+    bool SetTexture(ID3D11Texture2D *texture);
     HANDLE GetSharedHandle();
 private:
     bool Init(int64_t luid);

@@ -122,14 +122,9 @@ bool NativeDevice::EnsureTexture(int width, int height) {
 	return true;
 }
 
-bool NativeDevice::CopyTexture(ID3D11Texture2D *texture) {
-	D3D11_TEXTURE2D_DESC desc;
-	ZeroMemory(&desc, sizeof(desc));
-	texture->GetDesc(&desc);
-	desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
-	HRB(device_->CreateTexture2D(&desc, nullptr, texture_.ReleaseAndGetAddressOf()));
-	context_->CopyResource(texture_.Get(), texture);
-	
+bool NativeDevice::SetTexture(ID3D11Texture2D *texture) {
+	texture_.Reset();
+	texture_ = texture;
 	return true;
 }
 

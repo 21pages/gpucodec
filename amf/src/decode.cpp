@@ -81,7 +81,7 @@ public:
             {
                 case amf::AMF_MEMORY_DX11:
                     {
-                        if (!m_nativeDevice->CopyTexture((ID3D11Texture2D*)native)) {
+                        if (!m_nativeDevice->SetTexture((ID3D11Texture2D*)native)) {
                              std::cerr << "Failed to CopyTexture" << std::endl;
                              return AMF_FAIL;
                         }
