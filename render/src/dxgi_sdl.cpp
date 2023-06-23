@@ -482,6 +482,7 @@ static void run(Render *self)
     
     SDL_DestroyWindow(window);
     SDL_Quit();
+	exit(0);
 }
 
 int Render::Init()
