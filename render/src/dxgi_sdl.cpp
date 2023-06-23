@@ -36,6 +36,8 @@ using Microsoft::WRL::ComPtr;
     } while (false)
 #define MS_THROW(f, ...) MS_CHECK(f, throw std::runtime_error(#f);)
 
+#define LUID(desc) (((int64_t)desc.AdapterLuid.HighPart << 32) | desc.AdapterLuid.LowPart)
+
 struct AdatperOutputs {
 	IDXGIAdapter1* adapter;
 	DXGI_ADAPTER_DESC1 desc;
@@ -68,7 +70,7 @@ struct AdatperOutputs {
 	}
 };
 
-void get_first_adapter_output(IDXGIFactory2* factory2, IDXGIAdapter1** adapter_out, IDXGIOutput1** output_out)
+void get_first_adapter_output(IDXGIFactory2* factory2, IDXGIAdapter1** adapter_out, IDXGIOutput1** output_out, int64_t luid)
 {
 	UINT num_adapters = 0;
 	AdatperOutputs curent_adapter;
@@ -77,6 +79,12 @@ void get_first_adapter_output(IDXGIFactory2* factory2, IDXGIAdapter1** adapter_o
 	IDXGIOutput1* selected_output = nullptr;
 	HRESULT hr = S_OK;
 	while (factory2->EnumAdapters1(num_adapters, &curent_adapter.adapter) != DXGI_ERROR_NOT_FOUND) {
+		++num_adapters;
+		DXGI_ADAPTER_DESC1 desc = DXGI_ADAPTER_DESC1();
+		curent_adapter.adapter->GetDesc1(&desc);
+		if (LUID(desc) != luid) {
+			continue;
+		}
 		IDXGIOutput* output;
 		UINT num_outout = 0;
 		while (curent_adapter.adapter->EnumOutputs(num_outout, &output) != DXGI_ERROR_NOT_FOUND) {
@@ -98,7 +106,6 @@ void get_first_adapter_output(IDXGIFactory2* factory2, IDXGIAdapter1** adapter_o
 		//if(selected_output) break;
 		curent_adapter.adapter->GetDesc1(&curent_adapter.desc);
 		Adapters.push_back(std::move(curent_adapter));
-		++num_adapters;
 	}
 	*adapter_out = selected_adapter;
 	*output_out = selected_output;
@@ -107,13 +114,13 @@ void get_first_adapter_output(IDXGIFactory2* factory2, IDXGIAdapter1** adapter_o
 
 class dx_device_context {
 public:
-	dx_device_context()
+	dx_device_context(int64_t luid)
 	{
 		// This is what matters (the 1)
 		// Only a guid of fatory2 will not work
 		HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&factory2));
 		if (FAILED(hr)) exit(hr);
-		get_first_adapter_output(factory2, &adapter1, &output1);
+		get_first_adapter_output(factory2, &adapter1, &output1, luid);
 		D3D_FEATURE_LEVEL levels[]{
 			D3D_FEATURE_LEVEL_11_1
 		};
@@ -397,14 +404,15 @@ public:
     std::unique_ptr<std::thread> message_thread;
     std::unique_ptr<simplerenderer> renderer;
     bool running = false;
-    // std::unique_ptr<dx_device_context> ctx;
-    dx_device_context ctx;
+    std::unique_ptr<dx_device_context> ctx;
+    // dx_device_context ctx;
 	int64_t luid;
 };
 
 Render::Render(int64_t luid){
     // ctx.reset(new dx_device_context());
 	this->luid = luid;
+	ctx = std::make_unique<dx_device_context>(luid);
 };
 
 static void run(Render *self)
@@ -415,11 +423,11 @@ static void run(Render *self)
     SDL_SysWMinfo info{};
     SDL_GetWindowWMInfo(window, &info);
     {
-        self->renderer.reset(new simplerenderer(info.info.win.window, self->ctx));
+        self->renderer.reset(new simplerenderer(info.info.win.window, *self->ctx));
         MONITORINFOEX monitor_info{};
         monitor_info.cbSize = sizeof(monitor_info);
         DXGI_OUTPUT_DESC screen_desc;
-        HRESULT hr = self->ctx.output1->GetDesc(&screen_desc);
+        HRESULT hr = self->ctx->output1->GetDesc(&screen_desc);
         GetMonitorInfo(screen_desc.Monitor, &monitor_info);
         self->running = true;
         bool maximized = false;
@@ -511,7 +519,7 @@ extern "C" int DXGIRenderTexture(void *render,  HANDLE shared_handle)
     if (!self->running) return 0;
 	ComPtr<IDXGIResource> resource = nullptr;
     ComPtr<ID3D11Texture2D> tex_ = nullptr;
-    MS_THROW(self->ctx.device->OpenSharedResource(shared_handle, __uuidof(ID3D10Texture2D), (void**)resource.ReleaseAndGetAddressOf()));
+    MS_THROW(self->ctx->device->OpenSharedResource(shared_handle, __uuidof(ID3D10Texture2D), (void**)resource.ReleaseAndGetAddressOf()));
     MS_THROW(resource.As(&tex_));
     self->RenderTexture(tex_.Get());
     return 0;
@@ -524,8 +532,3 @@ extern "C" void DestroyDXGIRender(void *render)
     if(self->message_thread) self->message_thread->join();
 }
 
-extern "C" void* DXGIGetDevice(void *render)
-{
-    Render *self = (Render*)render;
-    return self->ctx.device;
-}
