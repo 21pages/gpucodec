@@ -279,7 +279,8 @@ extern "C" int intel_test_encode(void *outDescs, int32_t maxDescNum, int32_t *ou
             Encoder *e = (Encoder *)intel_new_encoder((void*)adapter.get()->device_.Get(), api, dataFormat, width, height, kbs, framerate, gop);
             if (!e) continue;
             if (!e->nativeDevice_->EnsureTexture(e->width, e->height)) continue;
-            if (intel_encode(e, e->nativeDevice_->texture_.Get(), nullptr, nullptr) == 0) {
+            e->nativeDevice_->next();
+            if (intel_encode(e, e->nativeDevice_->GetCurrentTexture(), nullptr, nullptr) == 0) {
                 AdapterDesc *desc = descs + count;
                 desc->luid =  LUID(adapter.get()->desc1_);
                 count += 1;

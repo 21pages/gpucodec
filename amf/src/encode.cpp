@@ -98,6 +98,8 @@ public:
         switch (m_AMFMemoryType)
         {
         case amf::AMF_MEMORY_DX11:
+            // https://github.com/GPUOpen-LibrariesAndSDKs/AMF/issues/280
+            // AMF will not copy the surface during the CreateSurfaceFromDX11Native call
             res = m_AMFContext->CreateSurfaceFromDX11Native(tex, &surface, NULL);
             AMF_RETURN_IF_FAILED(res, L"CreateSurfaceFromDX11Native() failed");
             break;
@@ -110,6 +112,7 @@ public:
         amf::AMFDataPtr data = NULL;
         do
         {
+            data = NULL;
             res = m_AMFEncoder->QueryOutput(&data);
             if (res == AMF_REPEAT)
             {

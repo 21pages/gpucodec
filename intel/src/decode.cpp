@@ -227,7 +227,8 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
                 std::cerr << "Failed to EnsureTexture" << std::endl;
                 return -1;
             }
-            HRI(p->nv12torgb->Convert(texture, p->nativeDevice_->texture_.Get()));
+            p->nativeDevice_->next();
+            HRI(p->nv12torgb->Convert(texture, p->nativeDevice_->GetCurrentTexture()));
             HANDLE sharedHandle = p->nativeDevice_->GetSharedHandle();
             if (!sharedHandle) {
                 std::cerr << "Failed to GetSharedHandle" << std::endl;

@@ -13,7 +13,8 @@ use texcodec::{decode::Decoder, encode::Encoder};
 
 fn main() {
     unsafe {
-        let luid = 63630;
+        let luid = 64474;
+        let data_format = DataFormat::H264;
         let mut dup = dxgi::Duplicator::new().unwrap();
         let mut render = Render::new(luid).unwrap();
 
@@ -21,7 +22,7 @@ fn main() {
             f: FeatureContext {
                 driver: EncodeDriver::AMF,
                 api: API_DX11,
-                data_format: DataFormat::H264,
+                data_format,
                 luid,
             },
             d: DynamicContext {
@@ -36,7 +37,7 @@ fn main() {
         let de_ctx = DecodeContext {
             driver: DecodeDriver::AMF,
             api: API_DX11,
-            data_format: DataFormat::H264,
+            data_format,
             output_surface_format: SURFACE_FORMAT_BGRA,
             luid,
         };
@@ -52,7 +53,7 @@ fn main() {
             let start = Instant::now();
             let texture = dup.duplicate(100);
             if texture.is_null() {
-                // println!("texture is null");
+                println!("texture is null");
                 continue;
             }
             dup_sum += start.elapsed();

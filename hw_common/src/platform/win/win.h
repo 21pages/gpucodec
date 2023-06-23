@@ -37,6 +37,8 @@ public:
     bool EnsureTexture(int width, int height);
     bool SetTexture(ID3D11Texture2D *texture);
     HANDLE GetSharedHandle();
+    ID3D11Texture2D* GetCurrentTexture();
+    void next();
 private:
     bool Init(int64_t luid);
     bool Init(ID3D11Device *device);
@@ -48,7 +50,10 @@ public:
     ComPtr<IDXGIAdapter1> adapter1_ = nullptr;
     ComPtr<ID3D11Device> device_ = nullptr;
     ComPtr<ID3D11DeviceContext> context_ = nullptr;
-    ComPtr<ID3D11Texture2D> texture_ = nullptr;
+    const int count_ = 8;
+    int index_ = 0;
+private:
+    std::vector<ComPtr<ID3D11Texture2D>> texture_;
 };
 
 class Adapter {

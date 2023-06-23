@@ -81,6 +81,7 @@ public:
             {
                 case amf::AMF_MEMORY_DX11:
                     {
+                        m_nativeDevice->next();
                         if (!m_nativeDevice->SetTexture((ID3D11Texture2D*)native)) {
                              std::cerr << "Failed to CopyTexture" << std::endl;
                              return AMF_FAIL;
@@ -269,7 +270,7 @@ extern "C" void* amf_new_decoder(int64_t luid, API api, DataFormat dataFormat, S
         Decoder *dec = new Decoder(luid, memory, codecStr, surfaceFormat);
         if (dec && dec->init_result != AMF_OK)
         {
-            dec->destroy();
+            dec->destroy(); //!!!!!!!!!!!!!!!!!!!! TODO crash
             delete dec;
             dec = NULL;
         }
