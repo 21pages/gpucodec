@@ -11,8 +11,8 @@ pub struct Render {
 }
 
 impl Render {
-    pub fn new() -> Result<Self, ()> {
-        let inner = unsafe { CreateDXGIRender() };
+    pub fn new(luid: i64) -> Result<Self, ()> {
+        let inner = unsafe { CreateDXGIRender(luid) };
         if inner.is_null() {
             Err(())
         } else {
@@ -29,10 +29,6 @@ impl Render {
         } else {
             Err(result)
         }
-    }
-
-    pub unsafe fn device(&mut self) -> *mut c_void {
-        DXGIGetDevice(self.inner.as_mut())
     }
 
     pub unsafe fn drop(&mut self) {

@@ -17,6 +17,25 @@
 #include <SDL.h>
 #include <SDL_syswm.h>
 
+#include <wrl/client.h>
+#include <iostream>
+
+using Microsoft::WRL::ComPtr;
+
+#define SAFE_RELEASE(p) { if ((p)) { (p)->Release(); (p) = nullptr; } }
+#define LUID(desc) (((int64_t)desc.AdapterLuid.HighPart << 32) | desc.AdapterLuid.LowPart)
+#define HRB(f) MS_CHECK(f, return false;)
+#define HRI(f) MS_CHECK(f, return -1;)
+#define HRP(f) MS_CHECK(f, return nullptr;)
+#define MS_CHECK(f, ...)  do { \
+        HRESULT __ms_hr__ = (f); \
+        if (FAILED(__ms_hr__)) { \
+            std::clog << #f "  ERROR@" << __LINE__ << __FUNCTION__ << ": (" << std::hex << __ms_hr__ << std::dec << ") " << std::error_code(__ms_hr__, std::system_category()).message() << std::endl << std::flush; \
+            __VA_ARGS__ \
+        } \
+    } while (false)
+#define MS_THROW(f, ...) MS_CHECK(f, throw std::runtime_error(#f);)
+
 struct AdatperOutputs {
 	IDXGIAdapter1* adapter;
 	DXGI_ADAPTER_DESC1 desc;
@@ -372,18 +391,20 @@ simplerenderer::atomic_packed_32x2::atomic_packed_32x2(void) {}
 
 class Render {
 public:
-    Render(int);
+    Render(int64_t luid);
     int Init();
     int RenderTexture(ID3D11Texture2D*);
     std::unique_ptr<std::thread> message_thread;
     std::unique_ptr<simplerenderer> renderer;
     bool running = false;
     // std::unique_ptr<dx_device_context> ctx;
-        dx_device_context ctx;
+    dx_device_context ctx;
+	int64_t luid;
 };
 
-Render::Render(int){
+Render::Render(int64_t luid){
     // ctx.reset(new dx_device_context());
+	this->luid = luid;
 };
 
 static void run(Render *self)
@@ -476,18 +497,22 @@ int Render::RenderTexture(ID3D11Texture2D* texture)
 }
 
 
-extern "C" void* CreateDXGIRender()
+extern "C" void* CreateDXGIRender(int64_t luid)
 {
-    Render *p = new Render(0);
+    Render *p = new Render(luid);
     p->Init();
     return p;
 }
 
-extern "C" int DXGIRenderTexture(void *render, void *tex)
+extern "C" int DXGIRenderTexture(void *render,  HANDLE shared_handle)
 {
     Render *self = (Render*)render;
     if (!self->running) return 0;
-    self->RenderTexture((ID3D11Texture2D*)tex);
+	ComPtr<IDXGIResource> resource = nullptr;
+    ComPtr<ID3D11Texture2D> tex_ = nullptr;
+    MS_THROW(self->ctx.device->OpenSharedResource(shared_handle, __uuidof(ID3D10Texture2D), (void**)resource.ReleaseAndGetAddressOf()));
+    MS_THROW(resource.As(&tex_));
+    self->RenderTexture(tex_.Get());
     return 0;
 }
 

@@ -5,7 +5,7 @@ use hw_common::{
 };
 use render::Render;
 use std::{
-    io::{Read, Write},
+    io::Write,
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -13,9 +13,9 @@ use texcodec::{decode::Decoder, encode::Encoder};
 
 fn main() {
     unsafe {
+        let luid = 63630;
         let mut dup = dxgi::Duplicator::new().unwrap();
-        let mut render = Render::new().unwrap();
-        let luid = 95063;
+        let mut render = Render::new(luid).unwrap();
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
@@ -48,8 +48,7 @@ fn main() {
         let mut dup_sum = Duration::ZERO;
         let mut enc_sum = Duration::ZERO;
         let mut dec_sum = Duration::ZERO;
-        let mut counter = 0;
-        for _ in 0..10000 {
+        loop {
             let start = Instant::now();
             let texture = dup.duplicate(100);
             if texture.is_null() {
@@ -60,23 +59,16 @@ fn main() {
             let start = Instant::now();
             let frame = enc.encode(texture).unwrap();
             enc_sum += start.elapsed();
-            counter += 1;
             for f in frame {
+                println!("len:{}", f.data.len());
                 file.write_all(&mut f.data).unwrap();
                 let start = Instant::now();
                 let frames = dec.decode(&f.data).unwrap();
                 dec_sum += start.elapsed();
                 for f in frames {
-                    render.render(f.texture);
+                    render.render(f.texture).unwrap();
                 }
             }
         }
-        println!(
-            "cnt:{}, dup_avg:{:?}, enc_avg:{:?}, dec_avg:{:?}",
-            counter,
-            dup_sum / counter,
-            enc_sum / counter,
-            dec_sum / counter,
-        );
     }
 }
