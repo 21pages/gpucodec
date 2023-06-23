@@ -254,7 +254,7 @@ private:
 		uint8_t* shader_bytecode = nullptr;
 		size_t bytecode_len = 0;
 		//read file
-		FILE* shader_file = fopen("frag.cso", "rb");
+		FILE* shader_file = fopen("render/res/frag.cso", "rb");
 		fseek(shader_file, 0, SEEK_END);
 		bytecode_len = ftell(shader_file);
 		fseek(shader_file, 0, SEEK_SET);
@@ -263,7 +263,7 @@ private:
 		HRESULT hr = ctx.device->CreatePixelShader(shader_bytecode, bytecode_len, nullptr, &frag);
 		if (FAILED(hr)) exit(hr);
 		// free(shader_bytecode);
-		shader_file = freopen("vert.cso", "rb", shader_file);
+		shader_file = freopen("render/res/vert.cso", "rb", shader_file);
 		fseek(shader_file, 0, SEEK_END);
 		bytecode_len = ftell(shader_file);
 		fseek(shader_file, 0, SEEK_SET);
