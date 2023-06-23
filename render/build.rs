@@ -32,6 +32,24 @@ fn main() {
         builder.file(manifest_dir.join("src").join("dxgi_sdl.cpp"));
         println!("cargo:rustc-link-search=native=D:\\lib\\SDL\\lib\\x64");
         println!("cargo:rustc-link-lib=SDL2");
+
+        // let imgui_dir = externals_dir.join("imgui");
+        // builder.includes([&imgui_dir, &imgui_dir.join("backends")]);
+
+        // builder.files(
+        //     [
+        //         "imgui.cpp",
+        //         "imgui_draw.cpp",
+        //         "imgui_tables.cpp",
+        //         "imgui_widgets.cpp",
+        //     ]
+        //     .map(|f| imgui_dir.join(f)),
+        // );
+        // builder.files(
+        //     ["imgui_impl_dx11.cpp", "imgui_impl_win32.cpp"]
+        //         .map(|f| imgui_dir.join("backends").join(f)),
+        // );
+        // builder.file("src/imgui.cpp");
     }
 
     // crate
