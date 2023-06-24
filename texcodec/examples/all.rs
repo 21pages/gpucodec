@@ -13,8 +13,9 @@ use texcodec::{decode::Decoder, encode::Encoder};
 
 fn main() {
     unsafe {
+        // one luid create render failed on my pc, wouldn't happen in rustdesk
         let luid = 64474;
-        let data_format = DataFormat::H264;
+        let data_format = DataFormat::H265;
         let mut dup = dxgi::Duplicator::new().unwrap();
         let mut render = Render::new(luid).unwrap();
 

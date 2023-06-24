@@ -82,9 +82,9 @@ void get_first_adapter_output(IDXGIFactory2* factory2, IDXGIAdapter1** adapter_o
 		++num_adapters;
 		DXGI_ADAPTER_DESC1 desc = DXGI_ADAPTER_DESC1();
 		curent_adapter.adapter->GetDesc1(&desc);
-		if (LUID(desc) != luid) {
-			continue;
-		}
+		// if (LUID(desc) != luid) {
+		// 	continue;
+		// }
 		IDXGIOutput* output;
 		UINT num_outout = 0;
 		while (curent_adapter.adapter->EnumOutputs(num_outout, &output) != DXGI_ERROR_NOT_FOUND) {
