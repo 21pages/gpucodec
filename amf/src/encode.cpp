@@ -55,12 +55,10 @@ private:
     void *m_hdl;
     // AMF Internals
     AMFFactoryHelper m_AMFFactory;
-    amf::AMFComputePtr m_AMFCompute = NULL;
     amf::AMF_MEMORY_TYPE    m_AMFMemoryType;
     amf::AMF_SURFACE_FORMAT m_AMFSurfaceFormat = amf::AMF_SURFACE_BGRA;
     std::pair<int32_t, int32_t> m_Resolution;
     amf_wstring m_codec;
-    bool m_OpenCLSubmission = false; // Possible memory leak
     // const
     AMF_COLOR_BIT_DEPTH_ENUM m_eDepth = AMF_COLOR_BIT_DEPTH_8;
     int m_query_timeout = 500;
@@ -145,10 +143,6 @@ public:
 
     AMF_RESULT destroy()
     {
-        if (m_AMFCompute)
-        {
-            m_AMFCompute = NULL;
-        }
         if (m_AMFEncoder)
         {
             m_AMFEncoder->Terminate();
@@ -199,7 +193,6 @@ private:
         case amf::AMF_MEMORY_DX11:
             res = m_AMFContext->InitDX11(m_hdl); // can be DX11 device
             AMF_RETURN_IF_FAILED(res, L"InitDX11(m_hdl) failed");
-            m_OpenCLSubmission = true;
             break;
         #endif
         case amf::AMF_MEMORY_VULKAN:
@@ -213,23 +206,6 @@ private:
         default:
             AMFTraceInfo(AMF_FACILITY, L"no init operation\n");
             break;
-        }
-        if (m_OpenCLSubmission)
-        {
-            if (m_AMFMemoryType != amf::AMF_MEMORY_OPENCL)
-            {
-                res = m_AMFContext->InitOpenCL(NULL);
-                AMF_RETURN_IF_FAILED(res, L"InitOpenCL(NULL) failed");
-            }
-            res = m_AMFContext->GetCompute(amf::AMF_MEMORY_OPENCL, &m_AMFCompute);
-            AMF_RETURN_IF_FAILED(res, L"OPENCL GetCompute failed, memoryType:%d", m_AMFMemoryType);
-        } 
-        else if (amf::AMF_MEMORY_DX11 == m_AMFMemoryType ||
-            amf::AMF_MEMORY_VULKAN == m_AMFMemoryType ||
-            amf::AMF_MEMORY_OPENCL == m_AMFMemoryType )
-        {
-            res = m_AMFContext->GetCompute(m_AMFMemoryType, &m_AMFCompute);
-            AMF_RETURN_IF_FAILED(res, L"GetCompute failed, memoryType:%d", m_AMFMemoryType);
         }
 
         // component: encoder
