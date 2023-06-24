@@ -38,6 +38,10 @@ using Microsoft::WRL::ComPtr;
 
 #define LUID(desc) (((int64_t)desc.AdapterLuid.HighPart << 32) | desc.AdapterLuid.LowPart)
 
+#ifndef CSO_DIR
+#define CSO_DIR "render/res"
+#endif
+
 struct AdatperOutputs {
 	IDXGIAdapter1* adapter;
 	DXGI_ADAPTER_DESC1 desc;
@@ -261,7 +265,7 @@ private:
 		uint8_t* shader_bytecode = nullptr;
 		size_t bytecode_len = 0;
 		//read file
-		FILE* shader_file = fopen("render/res/frag.cso", "rb");
+		FILE* shader_file = fopen(CSO_DIR"/frag.cso", "rb");
 		fseek(shader_file, 0, SEEK_END);
 		bytecode_len = ftell(shader_file);
 		fseek(shader_file, 0, SEEK_SET);
@@ -270,7 +274,7 @@ private:
 		HRESULT hr = ctx.device->CreatePixelShader(shader_bytecode, bytecode_len, nullptr, &frag);
 		if (FAILED(hr)) exit(hr);
 		// free(shader_bytecode);
-		shader_file = freopen("render/res/vert.cso", "rb", shader_file);
+		shader_file = freopen(CSO_DIR"/vert.cso", "rb", shader_file);
 		fseek(shader_file, 0, SEEK_END);
 		bytecode_len = ftell(shader_file);
 		fseek(shader_file, 0, SEEK_SET);
@@ -327,7 +331,7 @@ private:
 		VP.TopLeftY = 0;
 		ctx.context->RSSetViewports(1, &VP);
 	}
-	std::chrono::high_resolution_clock::time_point last_frame;
+	std::chrono::high_resolution_clock::time_point last_fps_time = std::chrono::high_resolution_clock::now();
 public:
 	void render_frame(ID3D11Texture2D* texture)
 	{
@@ -345,9 +349,14 @@ public:
 			if (hr == DXGI_STATUS_OCCLUDED) {
 				occluded = true;
 			}
+			frame_count++;
 			std::chrono::high_resolution_clock::time_point current = std::chrono::high_resolution_clock::now();
-			printf("%f Hz\n", 1.0 / std::chrono::duration_cast<std::chrono::duration<double>>(current - last_frame).count());
-			last_frame = current;
+			if (current - last_fps_time >= std::chrono::seconds(1)) {
+				int fps = frame_count - last_frame_count;
+				last_frame_count = frame_count;
+				last_fps_time = current;
+				std::cout << fps << " Hz" << std::endl;
+			}
 		}
 		else {
 			HRESULT hr = swapchain->Present(0, DXGI_PRESENT_TEST);
@@ -381,6 +390,8 @@ public:
 	std::atomic_bool running;
 	std::atomic_bool need_resize;
 	bool occluded = false;
+	int frame_count = 0;
+	int last_frame_count = 0;
 	struct atomic_packed_32x2 {
 		union {
 			struct detail {

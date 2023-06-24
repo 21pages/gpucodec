@@ -1,4 +1,6 @@
 #include <public/common/TraceAdapter.h>
+#include <stdio.h>
+#include <iostream>
 #include "common.h"
 
 #ifndef AMF_FACILITY

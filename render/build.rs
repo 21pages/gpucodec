@@ -28,9 +28,11 @@ fn main() {
 
     #[cfg(windows)]
     {
-        builder.include("D:\\lib\\SDL\\include");
+        let sdl_dir = externals_dir.join("SDL");
+        builder.include(sdl_dir.join("include"));
+        let sdl_lib_path = sdl_dir.join("lib").join("x64");
         builder.file(manifest_dir.join("src").join("dxgi_sdl.cpp"));
-        println!("cargo:rustc-link-search=native=D:\\lib\\SDL\\lib\\x64");
+        println!("cargo:rustc-link-search=native={}", sdl_lib_path.display());
         println!("cargo:rustc-link-lib=SDL2");
     }
 

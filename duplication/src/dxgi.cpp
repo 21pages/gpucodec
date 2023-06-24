@@ -1,17 +1,18 @@
 #include <DDA.h>
 #include <string>
+#include <Windows.h>
+#include <chrono>
+#include <ctime>
 
-bool SaveTextureToFile(ID3D11Texture2D* texture, const std::string& filename)
+static bool SaveTextureToFile(ID3D11Texture2D* texture, const std::string& filename)
 {   
     if (!texture) return false;
 
-    // 获取设备和设备上下文
     ID3D11Device* device = nullptr;
     texture->GetDevice(&device);
     ID3D11DeviceContext* context = nullptr;
     device->GetImmediateContext(&context);
 
-    // 创建系统内存中的纹理
     D3D11_TEXTURE2D_DESC desc;
     texture->GetDesc(&desc);
     desc.Usage = D3D11_USAGE_STAGING;
@@ -25,10 +26,8 @@ bool SaveTextureToFile(ID3D11Texture2D* texture, const std::string& filename)
         return false;
     }
 
-    // 复制纹理数据到系统内存中
     context->CopyResource(stagingTexture, texture);
 
-    // 从系统内存中读取纹理数据
     D3D11_MAPPED_SUBRESOURCE resource;
     hr = context->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &resource);
     if (FAILED(hr))
@@ -37,7 +36,6 @@ bool SaveTextureToFile(ID3D11Texture2D* texture, const std::string& filename)
         return false;
     }
 
-    // 写入 BMP 文件头部数据
     BITMAPFILEHEADER bmpHeader;
     bmpHeader.bfType = 0x4d42;
     bmpHeader.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
@@ -45,7 +43,6 @@ bool SaveTextureToFile(ID3D11Texture2D* texture, const std::string& filename)
     bmpHeader.bfReserved1 = 0;
     bmpHeader.bfReserved2 = 0;
 
-    // 写入 BMP 信息头部数据
     BITMAPINFOHEADER bmpInfoHeader;
     bmpInfoHeader.biSize = sizeof(BITMAPINFOHEADER);
     bmpInfoHeader.biWidth = desc.Width;
@@ -59,7 +56,6 @@ bool SaveTextureToFile(ID3D11Texture2D* texture, const std::string& filename)
     bmpInfoHeader.biClrUsed = 0;
     bmpInfoHeader.biClrImportant = 0;
 
-    // 打开文件并写入 BMP 文件头部和信息头部数据
     std::ofstream file(filename, std::ios::out | std::ios::binary);
     if (!file.is_open())
     {
@@ -70,7 +66,6 @@ bool SaveTextureToFile(ID3D11Texture2D* texture, const std::string& filename)
     file.write(reinterpret_cast<const char*>(&bmpHeader), sizeof(BITMAPFILEHEADER));
     file.write(reinterpret_cast<const char*>(&bmpInfoHeader), sizeof(BITMAPINFOHEADER));
 
-    // 写入像素数据
     char* pixels = static_cast<char*>(resource.pData);
     for (UINT row = 0; row < desc.Height; ++row)
     {
@@ -78,10 +73,8 @@ bool SaveTextureToFile(ID3D11Texture2D* texture, const std::string& filename)
         pixels += resource.RowPitch;
     }
 
-    // 关闭文件
     file.close();
 
-    // 解除映射和释放资源
     context->Unmap(stagingTexture, 0);
     stagingTexture->Release();
 
@@ -106,18 +99,42 @@ extern "C" void* dxgi_device(void *self) {
     return d->Device();
 }
 
+static void save_bmp(void *texture) {
+    const char* dir = "texture_bmp";
+    DWORD attrib = GetFileAttributesA(dir);
+    if (attrib == INVALID_FILE_ATTRIBUTES || !(attrib & FILE_ATTRIBUTE_DIRECTORY)) {
+        if (!CreateDirectoryA(dir, NULL)) {
+            std::cout << "Failed to create directory: " << dir  << std::endl;
+            return;
+        } else {
+            std::cout << "Directory created: " << dir << std::endl;
+        }
+    } else {
+        // already exists
+    }
+    static int index = 0;
+    if (index++ % 1000 ==0) {
+        auto now = std::chrono::system_clock::now();
+        auto time_t_now = std::chrono::system_clock::to_time_t(now);
+
+        std::tm local_tm;
+        localtime_s(&local_tm, &time_t_now);
+
+        char buffer[80];
+        std::strftime(buffer, 80, "%H_%M_%S", &local_tm);
+        std::string filename = std::string(dir)  + "/" + buffer + ".bmp";
+        SaveTextureToFile((ID3D11Texture2D*)texture, filename);
+    }
+}
+
 extern "C" void* dxgi_duplicate(void *self, int wait_ms)
 {
     DemoApplication *d = (DemoApplication *)self;
-    void *result =  d->Capture(wait_ms);
-#if 0
-    static int index = 0;
-    if (index++ % 2000 ==0) {
-        std::string filename = "D:\\tmp\\bmp\\" + std::to_string(index) + ".bmp";
-        SaveTextureToFile((ID3D11Texture2D*)result, filename);
-    }
+    void *texture =  d->Capture(wait_ms);
+#if 1
+    save_bmp(texture);
 #endif
-    return result;
+    return texture;
 }
 
 extern "C" void destroy_dxgi_duplicator(void *self)
