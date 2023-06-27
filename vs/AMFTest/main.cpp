@@ -9,7 +9,7 @@ extern "C" void* dxgi_device(void* self);
 extern "C" void* dxgi_duplicate(void* self, int wait_ms);
 extern "C" void destroy_dxgi_duplicator(void* self);
 
-extern "C"  void* amf_new_encoder(void* hdl, API api, DataFormat dataFormat, int32_t width, int32_t height, int32_t kbs, int32_t framerate, int32_t gop);
+extern "C"  void* amf_new_encoder(void* hdl, int64_t luid, API api, DataFormat dataFormat, int32_t width, int32_t height, int32_t kbs, int32_t framerate, int32_t gop);
 extern "C" int amf_encode(void* e, void* tex, EncodeCallback callback, void* obj);
 extern "C" int amf_destroy_encoder(void* e);
 
@@ -37,7 +37,7 @@ extern "C" static void decode_callback(void* shared_handle, int32_t surfaceForma
 
 
 int main() {
-    int64_t luid = 64474;   // get from texcodec/example/available
+    int64_t luid = 64239;   // get from texcodec/example/available
     DataFormat dataFormat = H265;
     int width = 2880;
     int height = 1800;
@@ -48,7 +48,7 @@ int main() {
         return -1;
     }
     void* device = dxgi_device(dup);
-    void* encoder = amf_new_encoder(device, API_DX11, dataFormat, width, height, 4000, 30, 0xFFFF);
+    void* encoder = amf_new_encoder(device, luid, API_DX11, dataFormat, width, height, 4000, 30, 0xFFFF);
     if (!encoder) {
         std::cerr << "create encoder failed" << std::endl;
         return -1;
