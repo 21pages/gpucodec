@@ -3,6 +3,7 @@ use std::os::raw::{c_int, c_void};
 
 pub type NewEncoderCall = unsafe extern "C" fn(
     hdl: *mut c_void,
+    luid: i64,
     deviceType: i32,
     codecID: i32,
     width: i32,

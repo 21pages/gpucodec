@@ -20,6 +20,7 @@ bool NativeDevice::Init(int64_t luid, ID3D11Device *device)
 	}
 	if (!SetMultithreadProtected()) return false;
 	texture_.resize(count_);
+	std::fill(texture_.begin(), texture_.end(), nullptr);
 	return true;
 }
 

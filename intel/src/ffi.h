@@ -5,7 +5,7 @@
 
 int intel_driver_support();
 
-void* intel_new_encoder(void* device, int32_t api, int32_t dataFormat,
+void* intel_new_encoder(void* device, int64_t luid, int32_t api, int32_t dataFormat,
                         int32_t width, int32_t height, 
                         int32_t kbs, int32_t framerate, int32_t gop);
 

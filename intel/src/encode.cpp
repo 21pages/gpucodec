@@ -102,7 +102,7 @@ static mfxStatus InitMFX(Encoder *p)
     return MFX_ERR_NONE;
 }
 
-extern "C" void* intel_new_encoder(void *opaque, API api,
+extern "C" void* intel_new_encoder(void *opaque, int64_t luid, API api,
                         DataFormat dataFormat, int32_t w, int32_t h, 
                         int32_t kbs, int32_t framerate, int32_t gop)
 {
@@ -154,7 +154,7 @@ extern "C" void* intel_new_encoder(void *opaque, API api,
     p->width = w;
     p->height = h;
     p->nativeDevice_ = std::make_unique<NativeDevice>();
-    if (!p->nativeDevice_->Init(ADAPTER_VENDOR_INTEL, (ID3D11Device*)opaque)) goto _exit;
+    if (!p->nativeDevice_->Init(luid, (ID3D11Device*)opaque)) goto _exit;
 
     sts = InitMFX(p);
     CHECK_STATUS_GOTO(sts, "InitMFX");
@@ -276,7 +276,7 @@ extern "C" int intel_test_encode(void *outDescs, int32_t maxDescNum, int32_t *ou
         if (!adapters.Init(ADAPTER_VENDOR_INTEL)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Encoder *e = (Encoder *)intel_new_encoder((void*)adapter.get()->device_.Get(), api, dataFormat, width, height, kbs, framerate, gop);
+            Encoder *e = (Encoder *)intel_new_encoder((void*)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_), api, dataFormat, width, height, kbs, framerate, gop);
             if (!e) continue;
             if (!e->nativeDevice_->EnsureTexture(e->width, e->height)) continue;
             e->nativeDevice_->next();

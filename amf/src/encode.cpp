@@ -326,7 +326,7 @@ static bool convert_codec(DataFormat lhs, amf_wstring& rhs)
 
 #include "common.cpp"
 
-extern "C" void* amf_new_encoder(void* hdl, API api, DataFormat dataFormat,
+extern "C" void* amf_new_encoder(void* hdl, int64_t luid, API api, DataFormat dataFormat,
                                 int32_t width, int32_t height,
                                 int32_t kbs, int32_t framerate, int32_t gop) 
 {
@@ -420,7 +420,7 @@ extern "C" int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outD
         if (!adapters.Init(ADAPTER_VENDOR_AMD)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Encoder *e = (Encoder *)amf_new_encoder((void*)adapter.get()->device_.Get(), api, dataFormat, width, height, kbs, framerate, gop);
+            Encoder *e = (Encoder *)amf_new_encoder((void*)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_), api, dataFormat, width, height, kbs, framerate, gop);
             if (!e) continue;
             if (e->test() == AMF_OK) {
                 AdapterDesc *desc = descs + count;

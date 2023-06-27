@@ -25,6 +25,8 @@ using Microsoft::WRL::ComPtr;
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
+// #define CONFIG_NV_OPTIMUS
+
 static void load_driver(CudaFunctions **pp_cuda_dl, NvencFunctions **pp_nvenc_dl)
 {
     if (cuda_load_functions(pp_cuda_dl, NULL) < 0)
@@ -69,6 +71,7 @@ extern "C" int nvidia_encode_driver_support()
 
 struct Encoder
 {
+    void *m_hdl;
     #ifdef _WIN32
     std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
     NvEncoderD3D11 *pEnc = NULL;
@@ -98,6 +101,7 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
             {
                 e->pEnc->DestroyEncoder();
                 delete e->pEnc;
+                e->pEnc = nullptr;
             }
             if (e->cuContext)
             {
@@ -114,7 +118,7 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
     return -1;
 }
 
-extern "C" void* nvidia_new_encoder(void *hdl, API api,
+extern "C" void* nvidia_new_encoder(void *hdl, int64_t luid, API api,
                                     DataFormat dataFormat, int32_t width, int32_t height, 
                                     int32_t kbs, int32_t framerate, int32_t gop)
 {
@@ -150,7 +154,11 @@ extern "C" void* nvidia_new_encoder(void *hdl, API api,
         if (API_DX11 == api)
         {
             e->nativeDevice_ = std::make_unique<NativeDevice>();
-            if (!e->nativeDevice_->Init(ADAPTER_VENDOR_NVIDIA, (ID3D11Device*)hdl)) goto _exit;
+            #ifdef CONFIG_NV_OPTIMUS
+            if (!e->nativeDevice_->Init(luid, nullptr)) goto _exit;
+            #else
+            if (!e->nativeDevice_->Init(luid, (ID3D11Device*)hdl)) goto _exit;
+            #endif
         } 
         else
         {
@@ -207,6 +215,7 @@ extern "C" void* nvidia_new_encoder(void *hdl, API api,
 
 
         e->pEnc->CreateEncoder(&initializeParams);
+        e->m_hdl = hdl;
 
         return e;
     }
@@ -225,9 +234,10 @@ _exit:
     return NULL;
 }
 
+#ifdef CONFIG_NV_OPTIMUS
 static int copy_texture(Encoder *e, void* src, void* dst)
 {
-    ComPtr<ID3D11Device> src_device = e->nativeDevice_->device_.Get();
+    ComPtr<ID3D11Device> src_device = (ID3D11Device*)e->m_hdl;
     ComPtr<ID3D11DeviceContext> src_deviceContext;
     src_device->GetImmediateContext(src_deviceContext.ReleaseAndGetAddressOf());
     ComPtr<ID3D11Texture2D> src_tex = (ID3D11Texture2D *)src;
@@ -262,6 +272,7 @@ static int copy_texture(Encoder *e, void* src, void* dst)
 
     return 0;
 }
+#endif
 
 extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback, void* obj)
 {
@@ -274,7 +285,11 @@ extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback,
         std::vector<NvPacket> vPacket;
         const NvEncInputFrame* pEncInput = pEnc->GetNextInputFrame();
 
+#ifdef CONFIG_NV_OPTIMUS
         copy_texture(e, tex, pEncInput->inputPtr);
+#else
+        pEncInput->inputPtr = tex;
+#endif
 
         pEnc->EncodeFrame(vPacket);
         for (NvPacket &packet : vPacket)
@@ -321,7 +336,7 @@ extern "C" int nvidia_test_encode(void *outDescs, int32_t maxDescNum, int32_t *o
         if (!adapters.Init(ADAPTER_VENDOR_NVIDIA)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Encoder *e = (Encoder *)nvidia_new_encoder((void*)adapter.get()->device_.Get(), api, dataFormat, width, height, kbs, framerate, gop);
+            Encoder *e = (Encoder *)nvidia_new_encoder((void*)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_), api, dataFormat, width, height, kbs, framerate, gop);
             if (!e) continue;
             if (!e->nativeDevice_->EnsureTexture(e->width, e->height)) continue;
             e->nativeDevice_->next();

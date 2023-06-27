@@ -5,7 +5,7 @@
 
 int amf_driver_support();
 
-void* amf_new_encoder(void* hdl, int32_t api, int32_t data_format, 
+void* amf_new_encoder(void* hdl, int64_t luid, int32_t api, int32_t data_format, 
                         int32_t width, int32_t height, 
                         int32_t bitrate, int32_t framerate, int32_t gop);
 
