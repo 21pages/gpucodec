@@ -100,6 +100,11 @@ public:
             // AMF will not copy the surface during the CreateSurfaceFromDX11Native call
             res = m_AMFContext->CreateSurfaceFromDX11Native(tex, &surface, NULL);
             AMF_RETURN_IF_FAILED(res, L"CreateSurfaceFromDX11Native() failed");
+            {
+                amf::AMFDataPtr data1;
+                surface->Duplicate(surface->GetMemoryType(), &data1);
+                surface = amf::AMFSurfacePtr(data1);
+            }
             break;
         default:
             break;
