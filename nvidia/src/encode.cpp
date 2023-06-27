@@ -288,7 +288,8 @@ extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback,
 #ifdef CONFIG_NV_OPTIMUS
         copy_texture(e, tex, pEncInput->inputPtr);
 #else
-        pEncInput->inputPtr = tex;
+        ID3D11Texture2D *pBgraTextyure = reinterpret_cast<ID3D11Texture2D*>(pEncInput->inputPtr);
+        e->nativeDevice_->context_->CopyResource(pBgraTextyure, reinterpret_cast<ID3D11Texture2D*>(tex));
 #endif
 
         pEnc->EncodeFrame(vPacket);
