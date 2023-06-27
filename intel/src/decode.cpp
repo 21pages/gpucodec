@@ -195,9 +195,15 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
     mfxBS.DataLength = len;
     mfxBS.MaxLength = len;
     mfxBS.DataFlag = MFX_BITSTREAM_COMPLETE_FRAME;
+    int loop_counter = 0;
 
     do
     {
+        if (loop_counter++ > 100) {
+            printf("mfx decode loop two many times\n");
+            break;
+        }
+
         if (MFX_WRN_DEVICE_BUSY == sts)
             MSDK_SLEEP(1);  // Wait if device is busy, then repeat the same call to DecodeFrameAsync
         if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_NONE == sts) {
@@ -214,7 +220,7 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
             sts = MFX_ERR_NONE;
 
         if (MFX_ERR_NONE == sts)
-            sts = p->session.SyncOperation(syncp, 60000);      // Synchronize. Wait until decoded frame is ready
+            sts = p->session.SyncOperation(syncp, 1000);      // Synchronize. Wait until decoded frame is ready
 
         if (MFX_ERR_NONE == sts)
         {
@@ -242,7 +248,7 @@ extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallbac
         }
 
     } 
-    while(MFX_ERR_NONE <= sts || MFX_ERR_MORE_DATA == sts || MFX_ERR_MORE_SURFACE == sts);
+    while(MFX_ERR_NONE <= sts || MFX_ERR_MORE_SURFACE == sts);
 
     return decoded ? 0 : -1;
 }
