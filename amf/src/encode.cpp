@@ -91,7 +91,6 @@ public:
         amf::AMFComputeSyncPointPtr pSyncPoint = NULL;
         AMF_RESULT res;
         bool encoded = false;
-        Texture_Lifetime_Keeper keeper(tex);
         
         switch (m_AMFMemoryType)
         {
@@ -232,7 +231,7 @@ private:
         if (codecStr == amf_wstring(AMFVideoEncoderVCE_AVC))
         {
             // ------------- Encoder params usage---------------
-            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_USAGE, AMF_VIDEO_ENCODER_USAGE_LOW_LATENCY);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_USAGE, AMF_VIDEO_ENCODER_USAGE_LOW_LATENCY_HIGH_QUALITY);
             AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_USAGE, AMF_VIDEO_ENCODER_USAGE_LOW_LATENCY) failed");
 
             // ------------- Encoder params static---------------
@@ -240,10 +239,12 @@ private:
             AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_FRAMESIZE, %dx%d) failed", m_Resolution.first, m_Resolution.second);
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_LOWLATENCY_MODE, true);
             AMF_RETURN_IF_FAILED(res, L"encoder->SetProperty(AMF_VIDEO_ENCODER_LOWLATENCY_MODE, true) failed");
-            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_QUALITY_PRESET, AMF_VIDEO_ENCODER_QUALITY_PRESET_SPEED);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_QUALITY_PRESET, AMF_VIDEO_ENCODER_QUALITY_PRESET_BALANCED);
             AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_QUALITY_PRESET, AMF_VIDEO_ENCODER_QUALITY_PRESET_SPEED) failed");
             res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_COLOR_BIT_DEPTH, m_eDepth);
             AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_COLOR_BIT_DEPTH, %d) failed", m_eDepth);
+            // res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD, AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR);
+            // AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD, %d) failed", AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR);
 
             // ------------- Encoder params dynamic ---------------
             m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_B_PIC_PATTERN, 0);
@@ -260,7 +261,7 @@ private:
         else if (codecStr == amf_wstring(AMFVideoEncoder_HEVC))
         {
             // ------------- Encoder params usage---------------
-            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_USAGE, AMF_VIDEO_ENCODER_HEVC_USAGE_LOW_LATENCY);
+            res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_USAGE, AMF_VIDEO_ENCODER_HEVC_USAGE_LOW_LATENCY_HIGH_QUALITY);
             AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_USAGE, AMF_VIDEO_ENCODER_HEVC_USAGE_TRANSCODING)");
 
             // ------------- Encoder params static---------------
@@ -439,7 +440,7 @@ extern "C" int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outD
     return -1;
 }
 
-extern "C" int amf_set_bitrate(void *e, int32_t bitrate)
+extern "C" int amf_set_bitrate(void *e, int32_t kbs)
 {
     try
     {
@@ -448,10 +449,10 @@ extern "C" int amf_set_bitrate(void *e, int32_t bitrate)
         switch (enc->m_dataFormat)
         {
         case H264:
-            res = enc->m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_TARGET_BITRATE, bitrate);
+            res = enc->m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_TARGET_BITRATE, kbs * 1000);
             break;
         case H265:
-            res = enc->m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE, bitrate);
+            res = enc->m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE, kbs * 1000);
             break;
         }
         return res == AMF_OK ? 0 : -1;

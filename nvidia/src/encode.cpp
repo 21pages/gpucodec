@@ -343,12 +343,12 @@ extern "C" int nvidia_test_encode(void *outDescs, int32_t maxDescNum, int32_t *o
     return -1;
 }
 
-extern "C" int nvidia_set_bitrate(void *e, int32_t bitrate)
+extern "C" int nvidia_set_bitrate(void *e, int32_t kbs)
 {
     try
     {
         RECONFIGURE_HEAD
-        params.reInitEncodeParams.encodeConfig->rcParams.averageBitRate = bitrate;
+        params.reInitEncodeParams.encodeConfig->rcParams.averageBitRate = kbs * 1000;
         RECONFIGURE_TAIL
     }
     catch(const std::exception& e)
