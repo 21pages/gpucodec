@@ -54,12 +54,12 @@ int main() {
         return -1;
     }
     void* decoder = amf_new_decoder(luid, API_DX11, dataFormat, SURFACE_FORMAT_BGRA);
-    if (!encoder) {
+    if (!decoder) {
         std::cerr << "create decoder failed" << std::endl;
         return -1;
     }
     void* render = CreateDXGIRender(luid);
-    if (!encoder) {
+    if (!render) {
         std::cerr << "create render failed" << std::endl;
         return -1;
     }
