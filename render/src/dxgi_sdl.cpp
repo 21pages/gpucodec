@@ -45,30 +45,21 @@ using Microsoft::WRL::ComPtr;
 struct AdatperOutputs {
 	IDXGIAdapter1* adapter;
 	DXGI_ADAPTER_DESC1 desc;
-	std::vector<IDXGIOutput*> outputs;
 	AdatperOutputs():adapter(nullptr) {};
 	AdatperOutputs(AdatperOutputs&& src) noexcept
 	{
 		adapter = src.adapter;
 		src.adapter = nullptr;
 		desc = src.desc;
-		outputs = std::move(src.outputs);
 	}
 	AdatperOutputs(const AdatperOutputs& src)
 	{
 		adapter = src.adapter;
 		adapter->AddRef();
 		desc = src.desc;
-		outputs = src.outputs;
-		for (size_t i = 0; i < outputs.size(); ++i) {
-			outputs[i]->AddRef();
-		}
 	}
 	~AdatperOutputs()
 	{
-		for (size_t i = 0; i < outputs.size(); ++i) {
-			outputs[i]->Release();
-		}
 		if (adapter)
 			adapter->Release();
 	}
@@ -78,7 +69,6 @@ void get_first_adapter_output(IDXGIFactory2* factory2, IDXGIAdapter1** adapter_o
 {
 	UINT num_adapters = 0;
 	AdatperOutputs curent_adapter;
-	std::vector<AdatperOutputs> Adapters;
 	IDXGIAdapter1* selected_adapter = nullptr;
 	IDXGIOutput1* selected_output = nullptr;
 	HRESULT hr = S_OK;
@@ -86,30 +76,20 @@ void get_first_adapter_output(IDXGIFactory2* factory2, IDXGIAdapter1** adapter_o
 		++num_adapters;
 		DXGI_ADAPTER_DESC1 desc = DXGI_ADAPTER_DESC1();
 		curent_adapter.adapter->GetDesc1(&desc);
-		// if (LUID(desc) != luid) {
-		// 	continue;
-		// }
+		if (LUID(desc) != luid) {
+			continue;
+		}
+		selected_adapter = curent_adapter.adapter;
+		selected_adapter->AddRef();
 		IDXGIOutput* output;
-		UINT num_outout = 0;
-		while (curent_adapter.adapter->EnumOutputs(num_outout, &output) != DXGI_ERROR_NOT_FOUND) {
-			if (!selected_output) {
+		if (curent_adapter.adapter->EnumOutputs(0, &output) != DXGI_ERROR_NOT_FOUND) {
 				IDXGIOutput1* temp;
 				hr = output->QueryInterface(IID_PPV_ARGS(&temp));
 				if (SUCCEEDED(hr)) {
 					selected_output = temp;
-					selected_adapter = curent_adapter.adapter;
-					selected_adapter->AddRef();
-			//		break;
 				}
-			}
-			curent_adapter.outputs.push_back(output);
-			DXGI_OUTPUT_DESC desc;
-			output->GetDesc(&desc);
-			++num_outout;
 		}
-		//if(selected_output) break;
-		curent_adapter.adapter->GetDesc1(&curent_adapter.desc);
-		Adapters.push_back(std::move(curent_adapter));
+		break;
 	}
 	*adapter_out = selected_adapter;
 	*output_out = selected_output;
@@ -126,7 +106,7 @@ public:
 		if (FAILED(hr)) exit(hr);
 		get_first_adapter_output(factory2, &adapter1, &output1, luid);
 		D3D_FEATURE_LEVEL levels[]{
-			D3D_FEATURE_LEVEL_11_1
+			D3D_FEATURE_LEVEL_11_0
 		};
 		hr = D3D11CreateDevice(adapter1, D3D_DRIVER_TYPE_UNKNOWN, NULL,
 			D3D11_CREATE_DEVICE_VIDEO_SUPPORT | D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_DEBUG,
@@ -153,15 +133,15 @@ public:
 		if (adapter1) adapter1->Release();
 		if (factory2) factory2->Release();
 	}
-	IDXGIFactory2* factory2;
-	IDXGIAdapter1* adapter1;
-	IDXGIOutput1* output1;
-	ID3D11Device* device;
-	ID3D11DeviceContext* context;
-	ID3D11VideoDevice* video_device;
-	ID3D11VideoContext* video_context;
-	ID3D10Multithread* hmt;
-	HMODULE debug_mod = NULL;
+	IDXGIFactory2* factory2 = nullptr;
+	IDXGIAdapter1* adapter1 = nullptr;
+	IDXGIOutput1* output1 = nullptr;
+	ID3D11Device* device = nullptr;
+	ID3D11DeviceContext* context = nullptr;
+	ID3D11VideoDevice* video_device = nullptr;
+	ID3D11VideoContext* video_context = nullptr;
+	ID3D10Multithread* hmt = nullptr;
+	HMODULE debug_mod = nullptr;
 };
 
 class simplerenderer {
@@ -438,8 +418,10 @@ static void run(Render *self)
         MONITORINFOEX monitor_info{};
         monitor_info.cbSize = sizeof(monitor_info);
         DXGI_OUTPUT_DESC screen_desc;
-        HRESULT hr = self->ctx->output1->GetDesc(&screen_desc);
-        GetMonitorInfo(screen_desc.Monitor, &monitor_info);
+		if (self->ctx->output1) {
+			HRESULT hr = self->ctx->output1->GetDesc(&screen_desc);
+        	GetMonitorInfo(screen_desc.Monitor, &monitor_info);
+		}
         self->running = true;
         bool maximized = false;
         while (self->running) {
@@ -453,7 +435,7 @@ static void run(Render *self)
                             self->running = false;
                             break;
                         case SDL_WINDOWEVENT_MAXIMIZED:
-                            {
+                            if (self->ctx->output1) {
                                 int border_l, border_r, border_t, border_b;
                                 SDL_GetWindowBordersSize(window, &border_t, &border_l, &border_b, &border_r);
                                 int max_w = monitor_info.rcWork.right - monitor_info.rcWork.left;
@@ -467,7 +449,7 @@ static void run(Render *self)
                             maximized = false;
                             break;
                         case SDL_WINDOWEVENT_RESIZED:
-                            {
+                            if (self->ctx->output1) {
                                 int max_w, max_h;
                                 SDL_GetWindowMaximumSize(window, &max_w, &max_h);
                                 double aspect = double(screen_desc.DesktopCoordinates.right - screen_desc.DesktopCoordinates.left)

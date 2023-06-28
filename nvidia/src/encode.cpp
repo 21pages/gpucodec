@@ -25,7 +25,7 @@ using Microsoft::WRL::ComPtr;
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
-// #define CONFIG_NV_OPTIMUS
+#define CONFIG_NV_OPTIMUS
 
 static void load_driver(CudaFunctions **pp_cuda_dl, NvencFunctions **pp_nvenc_dl)
 {

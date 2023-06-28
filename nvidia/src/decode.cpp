@@ -6,6 +6,7 @@
 #include <thread>
 #include <Samples/NvCodec/NvDecoder/NvDecoder.h>
 #include <Samples/Utils/NvCodecUtils.h>
+#include <Preproc.h>
 
 #include "common.h"
 #include "callback.h"
@@ -62,7 +63,8 @@ public:
     NvDecoder *dec = NULL;
     CUcontext cuContext = NULL;
     CUgraphicsResource cuResource = NULL;
-    ComPtr<ID3D11Texture2D> d3d11_texture = NULL;
+    ComPtr<ID3D11Texture2D> nv12Texture = NULL;
+    std::unique_ptr<RGBToNV12> nv12torgb = NULL;
     std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
 
     CuvidDecoder(int)
@@ -180,6 +182,10 @@ extern "C" void* nvidia_new_decoder(int64_t luid, API api, DataFormat dataFormat
         /* Set operating point for AV1 SVC. It has no impact for other profiles or codecs
         * PFNVIDOPPOINTCALLBACK Callback from video parser will pick operating point set to NvDecoder  */
         p->dec->SetOperatingPoint(opPoint, bDispAllLayers);
+        p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice_->device_.Get(), p->nativeDevice_->context_.Get());
+        if (FAILED(p->nv12torgb->Init())) {
+            goto _exit;
+        }
         return p;
     }
     catch (const std::exception& ex)
@@ -197,35 +203,33 @@ _exit:
     return NULL;
 }
 
-// static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12, int nPitch) {
-//     NvDecoder *dec = p->dec;
-//     int width = dec->GetWidth();
-//     int height = dec->GetHeight();
+static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12) {
+    NvDecoder *dec = p->dec;
+    int width = dec->GetWidth();
+    int height = dec->GetHeight();
 
-//     if(!ck(p->cudl->cuCtxPushCurrent(p->cuContext))) return false;
-//     ck(p->cudl->cuGraphicsMapResources(1, &p->cuResource, 0));
-//     CUarray dstArray;
-//     ck(p->cudl->cuGraphicsSubResourceGetMappedArray(&dstArray, p->cuResource, 0, 0));
+    if(!ck(p->cudl->cuCtxPushCurrent(p->cuContext))) return false;
+    ck(p->cudl->cuGraphicsMapResources(1, &p->cuResource, 0));
+    CUarray dstArray;
+    ck(p->cudl->cuGraphicsSubResourceGetMappedArray(&dstArray, p->cuResource, 0, 0));
 
-//     CUDA_MEMCPY2D m = { 0 };
-//     m.srcMemoryType = CU_MEMORYTYPE_DEVICE;
-//     m.srcDevice = (CUdeviceptr)dpNv12;
-//     m.srcPitch = nPitch;
-//     m.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-//     m.dstArray = dstArray;
-//     m.WidthInBytes = width * 4;
-//     m.Height = height;
-//     ck(p->cudl->cuMemcpy2D(&m));
+    CUDA_MEMCPY2D m = { 0 };
+    m.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+    m.srcDevice = (CUdeviceptr)dpNv12;
+    m.srcPitch = dec->GetWidth();//nPitch;
+    m.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+    m.dstArray = dstArray;
+    m.WidthInBytes = dec->GetWidth();
+    m.Height = height;
+    ck(p->cudl->cuMemcpy2D(&m));
 
-//     ck(p->cudl->cuGraphicsUnmapResources(1, &p->cuResource, 0));
-//     if(!ck(p->cudl->cuCtxPopCurrent(NULL))) return false;
-// }
-
-// #include "ColorSpace.h"
+    ck(p->cudl->cuGraphicsUnmapResources(1, &p->cuResource, 0));
+    if(!ck(p->cudl->cuCtxPopCurrent(NULL))) return false;
+}
 
 static bool create_register_texture(CuvidDecoder *p)
 {
-    if (p->d3d11_texture) return true;
+    if (p->nv12Texture) return true;
     D3D11_TEXTURE2D_DESC desc;
     NvDecoder *dec = p->dec;
     int width = dec->GetWidth();
@@ -241,12 +245,12 @@ static bool create_register_texture(CuvidDecoder *p)
     desc.SampleDesc.Quality = 0;
     desc.MiscFlags = 0;
     desc.Usage = D3D11_USAGE_DEFAULT;
-    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    desc.BindFlags = D3D11_BIND_RENDER_TARGET;
     desc.CPUAccessFlags = 0;
 
-    HRB(p->nativeDevice_->device_->CreateTexture2D(&desc, nullptr, p->d3d11_texture.ReleaseAndGetAddressOf()));
+    HRB(p->nativeDevice_->device_->CreateTexture2D(&desc, nullptr, p->nv12Texture.ReleaseAndGetAddressOf()));
     if(!ck(p->cudl->cuCtxPushCurrent(p->cuContext))) return false;
-    if(!ck(p->cudl->cuGraphicsD3D11RegisterResource(&p->cuResource, p->d3d11_texture.Get(), CU_GRAPHICS_REGISTER_FLAGS_NONE))) return false;
+    if(!ck(p->cudl->cuGraphicsD3D11RegisterResource(&p->cuResource, p->nv12Texture.Get(), CU_GRAPHICS_REGISTER_FLAGS_NONE))) return false;
     if(!ck(p->cudl->cuGraphicsResourceSetMapFlags(p->cuResource, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD))) return false;
     if(!ck(p->cudl->cuCtxPopCurrent(NULL))) return false;
     return true;
@@ -261,20 +265,31 @@ extern "C" int nvidia_decode(void* decoder, uint8_t *data, int len, DecodeCallba
         NvDecoder *dec = p->dec;
 
         int nFrameReturned = dec->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
+        if (!nFrameReturned) return -1;
         cudaVideoSurfaceFormat format = dec->GetOutputFormat();
         int width = dec->GetWidth();
         int height = dec->GetHeight();
         bool decoded = false;
         for (int i = 0; i < nFrameReturned; i++) {
             uint8_t *pFrame = dec->GetFrame();
-            if (!p->d3d11_texture) {
+            if (!p->nv12Texture) {
                 if (!create_register_texture(p)) { //TODO: failed on available
                     return -1;
                 }
-                // if (!CopyDeviceFrame())
-
             }
-            // Nv12ToColor32<BGRA32>(pFrame, dec.GetWidth(), (uint8_t *)dpFrame, 4 * nRGBWidth, dec.GetWidth(), dec.GetHeight(), iMatrix);
+            if (!CopyDeviceFrame(p, pFrame)) return -1;
+            if (!p->nativeDevice_->EnsureTexture(width, height)) {
+                std::cerr << "Failed to EnsureTexture" << std::endl;
+                return -1;
+            }
+            p->nativeDevice_->next();
+            HRI(p->nv12torgb->Convert(p->nv12Texture.Get(), p->nativeDevice_->GetCurrentTexture()));
+            HANDLE sharedHandle = p->nativeDevice_->GetSharedHandle();
+            if (!sharedHandle) {
+                std::cerr << "Failed to GetSharedHandle" << std::endl;
+                return -1;
+            }
+            callback(sharedHandle, SURFACE_FORMAT_BGRA, width, height, obj, 0);
             decoded = true;
         }
         return decoded ? 0 : -1;

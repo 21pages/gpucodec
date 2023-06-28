@@ -24,7 +24,6 @@ public:
     bool initialized = false;
     D3D11FrameAllocator d3d11FrameAllocator;
     std::unique_ptr<RGBToNV12> nv12torgb = NULL;
-    ComPtr<ID3D11Texture2D> bgraTexture = NULL; 
     mfxFrameAllocResponse mfxResponse;
 };
 
@@ -89,7 +88,9 @@ extern "C" void* intel_new_decoder(int64_t luid, API api, DataFormat codecID, Su
     p->nativeDevice_ = std::make_unique<NativeDevice>();
     if (!p->nativeDevice_->Init(luid, nullptr)) goto _exit;
     p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice_->device_.Get(), p->nativeDevice_->context_.Get());
-    p->nv12torgb->Init();
+    if (FAILED(p->nv12torgb->Init())) {
+        goto _exit;
+    }
     if (!p)
     {
         goto _exit;

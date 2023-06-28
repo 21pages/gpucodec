@@ -67,6 +67,9 @@ fn main() {
         );
     }
 
+    let dxgi_path = externals_dir.join("nvEncDXGIOutputDuplicationSample");
+    builder.include(&dxgi_path);
+
     // crate
     builder.include("../hw_common/src");
     // #[cfg(windows)]
