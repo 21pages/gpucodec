@@ -15,7 +15,7 @@
 
 #define AMF_FACILITY        L"AMFDecoder"
 
-class Decoder {
+class AMFDecoder {
 public:
     AMF_RESULT init_result = AMF_FAIL;
 private:
@@ -35,7 +35,7 @@ private:
     // buffer
     std::vector<std::vector<uint8_t>> m_buffer;
 public:
-    Decoder(int64_t luid, amf::AMF_MEMORY_TYPE memoryTypeOut, amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut):
+    AMFDecoder(int64_t luid, amf::AMF_MEMORY_TYPE memoryTypeOut, amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut):
         m_luid(luid),
         m_AMFMemoryType(memoryTypeOut),
         m_textureFormatOut(textureFormatOut),
@@ -267,7 +267,7 @@ extern "C" void* amf_new_decoder(int64_t luid, API api, DataFormat dataFormat, S
         {
             return NULL;
         }
-        Decoder *dec = new Decoder(luid, memory, codecStr, surfaceFormat);
+        AMFDecoder *dec = new AMFDecoder(luid, memory, codecStr, surfaceFormat);
         if (dec && dec->init_result != AMF_OK)
         {
             dec->destroy(); //!!!!!!!!!!!!!!!!!!!! TODO crash
@@ -287,7 +287,7 @@ extern "C" int amf_decode(void *decoder, uint8_t *data, int32_t length, DecodeCa
 {
     try
     {
-        Decoder *dec = (Decoder*)decoder;
+        AMFDecoder *dec = (AMFDecoder*)decoder;
         return dec->decode(data, length, callback, obj);   
     }
     catch(const std::exception& e)
@@ -308,7 +308,7 @@ extern "C" int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum, int32_
         if (!adapters.Init(ADAPTER_VENDOR_AMD)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Decoder *p = (Decoder *)amf_new_decoder(LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
+            AMFDecoder *p = (AMFDecoder *)amf_new_decoder(LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
             if (!p) continue;
             if (p->decode(data, length, nullptr, nullptr) == AMF_OK) {
                 AdapterDesc *desc = descs + count;
@@ -331,7 +331,7 @@ extern "C" int amf_destroy_decoder(void *decoder)
 {
     try
     {
-        Decoder *dec = (Decoder*)decoder;
+        AMFDecoder *dec = (AMFDecoder*)decoder;
         if (dec)
         {
             return dec->destroy();

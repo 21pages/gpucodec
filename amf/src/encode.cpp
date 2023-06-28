@@ -43,7 +43,7 @@ struct encoder_packet {
 };
 
 
-class Encoder {
+class AMFEncoder {
 
 public:
     AMF_RESULT init_result = AMF_FAIL;
@@ -70,7 +70,7 @@ private:
 	std::vector<uint8_t> m_PacketDataBuffer;
 
 public:
-    Encoder(void* hdl, amf::AMF_MEMORY_TYPE memoryType, amf_wstring codec, 
+    AMFEncoder(void* hdl, amf::AMF_MEMORY_TYPE memoryType, amf_wstring codec, 
             DataFormat dataFormat,int32_t width, int32_t height, 
             int32_t bitrate, int32_t framerate, int32_t gop)
     {
@@ -346,7 +346,7 @@ extern "C" void* amf_new_encoder(void* hdl, int64_t luid, API api, DataFormat da
         {
             return NULL;
         }
-        Encoder *enc = new Encoder(hdl, memoryType, codecStr, dataFormat,
+        AMFEncoder *enc = new AMFEncoder(hdl, memoryType, codecStr, dataFormat,
                                     width, height,
                                     kbs * 1000, framerate, gop);
         if (enc && enc->init_result != AMF_OK) {
@@ -367,7 +367,7 @@ extern "C" int amf_encode(void *e, void *tex, EncodeCallback callback, void* obj
 {
     try
     {
-        Encoder *enc = (Encoder*)e;
+        AMFEncoder *enc = (AMFEncoder*)e;
         return enc->encode(tex, callback, obj);
     }
     catch(const std::exception& e)
@@ -381,7 +381,7 @@ extern "C" int amf_destroy_encoder(void *e)
 {
     try
     {
-        Encoder *enc = (Encoder*)e;
+        AMFEncoder *enc = (AMFEncoder*)e;
         return enc->destroy();
     }
     catch(const std::exception& e)
@@ -420,7 +420,7 @@ extern "C" int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outD
         if (!adapters.Init(ADAPTER_VENDOR_AMD)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Encoder *e = (Encoder *)amf_new_encoder((void*)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_), api, dataFormat, width, height, kbs, framerate, gop);
+            AMFEncoder *e = (AMFEncoder *)amf_new_encoder((void*)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_), api, dataFormat, width, height, kbs, framerate, gop);
             if (!e) continue;
             if (e->test() == AMF_OK) {
                 AdapterDesc *desc = descs + count;
@@ -444,7 +444,7 @@ extern "C" int amf_set_bitrate(void *e, int32_t kbs)
 {
     try
     {
-        Encoder *enc = (Encoder*)e;
+        AMFEncoder *enc = (AMFEncoder*)e;
         AMF_RESULT res = AMF_FAIL;
         switch (enc->m_dataFormat)
         {
@@ -468,7 +468,7 @@ extern "C" int amf_set_framerate(void *e, int32_t framerate)
 {
     try
     {
-        Encoder *enc = (Encoder*)e;
+        AMFEncoder *enc = (AMFEncoder*)e;
         AMF_RESULT res = AMF_FAIL;
         AMFRate rate = ::AMFConstructRate(framerate, 1);
         switch (enc->m_dataFormat)

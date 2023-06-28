@@ -69,7 +69,7 @@ extern "C" int nvidia_encode_driver_support()
     return -1;
 }
 
-struct Encoder
+struct NvencEncoder
 {
     void *m_hdl;
     #ifdef _WIN32
@@ -83,7 +83,7 @@ struct Encoder
     NV_ENC_BUFFER_FORMAT format;
     CUcontext cuContext = NULL;
 
-    Encoder(int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format):
+    NvencEncoder(int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format):
             width(width), height(height), format(format)
     {
         load_driver(&cuda_dl, &nvenc_dl);
@@ -94,7 +94,7 @@ extern "C" int nvidia_destroy_encoder(void *encoder)
 {
     try
     {
-        Encoder *e = (Encoder*)encoder;
+        NvencEncoder *e = (NvencEncoder*)encoder;
         if (e)
         {
             if (e->pEnc)
@@ -122,7 +122,7 @@ extern "C" void* nvidia_new_encoder(void *hdl, int64_t luid, API api,
                                     DataFormat dataFormat, int32_t width, int32_t height, 
                                     int32_t kbs, int32_t framerate, int32_t gop)
 {
-    Encoder * e = NULL;
+    NvencEncoder * e = NULL;
     try 
     {
         if (width % 2 != 0 || height % 2 != 0)
@@ -140,10 +140,10 @@ extern "C" void* nvidia_new_encoder(void *hdl, int64_t luid, API api,
         }
         NV_ENC_BUFFER_FORMAT surfaceFormat = NV_ENC_BUFFER_FORMAT_ARGB;//NV_ENC_BUFFER_FORMAT_ABGR;
 
-        e = new Encoder(width, height, surfaceFormat);
+        e = new NvencEncoder(width, height, surfaceFormat);
         if (!e)
         {
-            std::cout << "failed to new Encoder" << std::endl;
+            std::cout << "failed to new NvencEncoder" << std::endl;
             goto _exit;
         }
         if(!ck(e->cuda_dl->cuInit(0)))
@@ -235,7 +235,7 @@ _exit:
 }
 
 #ifdef CONFIG_NV_OPTIMUS
-static int copy_texture(Encoder *e, void* src, void* dst)
+static int copy_texture(NvencEncoder *e, void* src, void* dst)
 {
     ComPtr<ID3D11Device> src_device = (ID3D11Device*)e->m_hdl;
     ComPtr<ID3D11DeviceContext> src_deviceContext;
@@ -278,7 +278,7 @@ extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback,
 {
     try
     {
-        Encoder *e = (Encoder*)encoder;
+        NvencEncoder *e = (NvencEncoder*)encoder;
         NvEncoderD3D11 *pEnc = e->pEnc;
         CUcontext cuContext = e->cuContext;
         bool encoded = false;
@@ -311,7 +311,7 @@ extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback,
 }
 
 #define RECONFIGURE_HEAD                            \
-Encoder *enc = (Encoder*)e;                         \
+NvencEncoder *enc = (NvencEncoder*)e;                         \
 NV_ENC_CONFIG sEncodeConfig = { 0 };                \
 NV_ENC_INITIALIZE_PARAMS sInitializeParams = { 0 }; \
 sInitializeParams.encodeConfig = &sEncodeConfig;    \
@@ -337,7 +337,7 @@ extern "C" int nvidia_test_encode(void *outDescs, int32_t maxDescNum, int32_t *o
         if (!adapters.Init(ADAPTER_VENDOR_NVIDIA)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Encoder *e = (Encoder *)nvidia_new_encoder((void*)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_), api, dataFormat, width, height, kbs, framerate, gop);
+            NvencEncoder *e = (NvencEncoder *)nvidia_new_encoder((void*)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_), api, dataFormat, width, height, kbs, framerate, gop);
             if (!e) continue;
             if (!e->nativeDevice_->EnsureTexture(e->width, e->height)) continue;
             e->nativeDevice_->next();

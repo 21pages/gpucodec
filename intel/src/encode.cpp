@@ -10,7 +10,7 @@
 #define CHECK_STATUS_GOTO(X, MSG)          {if ((X) < MFX_ERR_NONE) {MSDK_PRINT_RET_MSG(X, MSG); goto _exit;}}
 #define CHECK_STATUS_RETURN(X, MSG)                {if ((X) < MFX_ERR_NONE) {MSDK_PRINT_RET_MSG(X, MSG); return X;}}
 
-struct Encoder
+struct MFXEncoder
 {
     std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
     MFXVideoSession session;
@@ -42,7 +42,7 @@ extern "C" int intel_driver_support()
 
 extern "C" int intel_destroy_encoder(void *encoder)
 {
-    Encoder *p = (Encoder*)encoder;
+    MFXEncoder *p = (MFXEncoder*)encoder;
     if (p)
     {
         if (p->mfxENC)
@@ -88,7 +88,7 @@ static mfxFrameAllocator alloc{
     NULL
 };
 
-static mfxStatus InitMFX(Encoder *p)
+static mfxStatus InitMFX(MFXEncoder *p)
 {
     mfxStatus sts = MFX_ERR_NONE;
 
@@ -148,7 +148,7 @@ extern "C" void* intel_new_encoder(void *opaque, int64_t luid, API api,
     mfxEncParams.AsyncDepth = 1;        //1 is best for low latency
     mfxEncParams.mfx.GopRefDist = 1;    //1 is best for low latency, I and P frames only
 
-    Encoder *p = new Encoder();
+    MFXEncoder *p = new MFXEncoder();
     if (!p) goto _exit;
 
     p->width = w;
@@ -217,7 +217,7 @@ extern "C" int intel_encode(void *encoder,  ID3D11Texture2D* tex,
 {
     mfxStatus sts = MFX_ERR_NONE;
     bool encoded = false;
-    Encoder *p = (Encoder*)encoder;
+    MFXEncoder *p = (MFXEncoder*)encoder;
     int nEncSurfIdx = 0;
     mfxSyncPoint syncp;
 
@@ -276,7 +276,7 @@ extern "C" int intel_test_encode(void *outDescs, int32_t maxDescNum, int32_t *ou
         if (!adapters.Init(ADAPTER_VENDOR_INTEL)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Encoder *e = (Encoder *)intel_new_encoder((void*)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_), api, dataFormat, width, height, kbs, framerate, gop);
+            MFXEncoder *e = (MFXEncoder *)intel_new_encoder((void*)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_), api, dataFormat, width, height, kbs, framerate, gop);
             if (!e) continue;
             if (!e->nativeDevice_->EnsureTexture(e->width, e->height)) continue;
             e->nativeDevice_->next();

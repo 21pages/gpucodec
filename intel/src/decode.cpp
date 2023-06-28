@@ -12,7 +12,7 @@
 #define CHECK_STATUS_GOTO(X, MSG)          {if ((X) < MFX_ERR_NONE) {MSDK_PRINT_RET_MSG(X, MSG); goto _exit;}}
 #define CHECK_STATUS_RETURN(X, MSG)                {if ((X) < MFX_ERR_NONE) {MSDK_PRINT_RET_MSG(X, MSG); return X;}}
 
-class Decoder
+class MFXDecoder
 {
 public:
     std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
@@ -30,7 +30,7 @@ public:
 
 extern "C" int intel_destroy_decoder(void* decoder)
 {
-    Decoder *p = (Decoder *)decoder;
+    MFXDecoder *p = (MFXDecoder *)decoder;
     if (p)
     {
         if (p->mfxDEC)
@@ -56,7 +56,7 @@ static bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId)
     return false;
 }
 
-static mfxStatus InitializeMFX(Decoder *p)
+static mfxStatus InitializeMFX(MFXDecoder *p)
 {
     mfxStatus sts = MFX_ERR_NONE;
     mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
@@ -85,7 +85,7 @@ extern "C" void* intel_new_decoder(int64_t luid, API api, DataFormat codecID, Su
 {
     mfxStatus sts = MFX_ERR_NONE;
 
-    Decoder *p = new Decoder();
+    MFXDecoder *p = new MFXDecoder();
     p->nativeDevice_ = std::make_unique<NativeDevice>();
     if (!p->nativeDevice_->Init(luid, nullptr)) goto _exit;
     p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice_->device_.Get(), p->nativeDevice_->context_.Get());
@@ -122,7 +122,7 @@ _exit:
     return NULL;
 }
 
-static mfxStatus initialize(Decoder *p, mfxBitstream *mfxBS)
+static mfxStatus initialize(MFXDecoder *p, mfxBitstream *mfxBS)
 {
     mfxStatus sts = MFX_ERR_NONE;
     mfxFrameAllocRequest Request;
@@ -166,7 +166,7 @@ static mfxStatus initialize(Decoder *p, mfxBitstream *mfxBS)
 
 extern "C" int intel_decode(void* decoder, uint8_t *data, int len, DecodeCallback callback, void* obj)
 {
-    Decoder *p = (Decoder *)decoder;
+    MFXDecoder *p = (MFXDecoder *)decoder;
     mfxStatus sts = MFX_ERR_NONE;
     mfxSyncPoint syncp;
     mfxFrameSurface1* pmfxOutSurface = NULL;
@@ -264,7 +264,7 @@ extern "C" int intel_test_decode(AdapterDesc *outDescs, int32_t maxDescNum, int3
         if (!adapters.Init(ADAPTER_VENDOR_INTEL)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Decoder *p = (Decoder *)intel_new_decoder(LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
+            MFXDecoder *p = (MFXDecoder *)intel_new_decoder(LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
             if (!p) continue;
             if (intel_decode(p, data, length, nullptr, nullptr) == 0) {
                 AdapterDesc *desc = descs + count;

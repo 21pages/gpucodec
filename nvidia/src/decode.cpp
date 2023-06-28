@@ -54,7 +54,7 @@ extern "C" int nvidia_decode_driver_support()
 }
 
 
-class Decoder
+class CuvidDecoder
 {
 public:
     CudaFunctions *cudl = NULL;
@@ -65,7 +65,7 @@ public:
     ComPtr<ID3D11Texture2D> d3d11_texture = NULL;
     std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
 
-    Decoder(int)
+    CuvidDecoder(int)
     {
         load_driver(&cudl, &cvdl);
     }
@@ -75,7 +75,7 @@ extern "C" int nvidia_destroy_decoder(void* decoder)
 {
     try
     {
-        Decoder *p = (Decoder*)decoder;
+        CuvidDecoder *p = (CuvidDecoder*)decoder;
         if (p)
         {
             if (p->dec)
@@ -123,11 +123,11 @@ static bool dataFormat_to_cuCodecID(DataFormat dataFormat, cudaVideoCodec &cuda)
 
 extern "C" void* nvidia_new_decoder(int64_t luid, API api, DataFormat dataFormat, SurfaceFormat outputSurfaceFormat) 
 {
-    Decoder *p = NULL;
+    CuvidDecoder *p = NULL;
     try
     {
         (void)api;
-        p = new Decoder(0);
+        p = new CuvidDecoder(0);
         if (!p)
         {
             goto _exit;
@@ -197,7 +197,7 @@ _exit:
     return NULL;
 }
 
-// static bool CopyDeviceFrame(Decoder *p, unsigned char *dpNv12, int nPitch) {
+// static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12, int nPitch) {
 //     NvDecoder *dec = p->dec;
 //     int width = dec->GetWidth();
 //     int height = dec->GetHeight();
@@ -223,7 +223,7 @@ _exit:
 
 // #include "ColorSpace.h"
 
-static bool create_register_texture(Decoder *p)
+static bool create_register_texture(CuvidDecoder *p)
 {
     if (p->d3d11_texture) return true;
     D3D11_TEXTURE2D_DESC desc;
@@ -257,7 +257,7 @@ extern "C" int nvidia_decode(void* decoder, uint8_t *data, int len, DecodeCallba
 {
     try
     {
-        Decoder *p = (Decoder*)decoder;
+        CuvidDecoder *p = (CuvidDecoder*)decoder;
         NvDecoder *dec = p->dec;
 
         int nFrameReturned = dec->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
@@ -297,7 +297,7 @@ extern "C" int nvidia_test_decode(AdapterDesc *outDescs, int32_t maxDescNum, int
         if (!adapters.Init(ADAPTER_VENDOR_NVIDIA)) return -1;
         int count = 0;
         for (auto& adapter : adapters.adapters_) {
-            Decoder *p = (Decoder *)nvidia_new_decoder(LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
+            CuvidDecoder *p = (CuvidDecoder *)nvidia_new_decoder(LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
             if (!p) continue;
             if (nvidia_decode(p, data, length, nullptr, nullptr) == 0) {
                 AdapterDesc *desc = descs + count;
