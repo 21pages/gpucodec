@@ -351,7 +351,7 @@ extern "C" void* amf_new_encoder(void* hdl, int64_t luid, API api, DataFormat da
                                     kbs * 1000, framerate, gop);
         if (enc && enc->init_result != AMF_OK) {
             enc->destroy();
-            delete enc; // TODO: run all in non-amf crash
+            delete enc;
             enc = NULL;
         }
         return enc;

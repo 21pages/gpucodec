@@ -270,7 +270,7 @@ extern "C" void* amf_new_decoder(int64_t luid, API api, DataFormat dataFormat, S
         AMFDecoder *dec = new AMFDecoder(luid, memory, codecStr, surfaceFormat);
         if (dec && dec->init_result != AMF_OK)
         {
-            dec->destroy(); //!!!!!!!!!!!!!!!!!!!! TODO crash
+            dec->destroy();
             delete dec;
             dec = NULL;
         }
