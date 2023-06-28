@@ -22,15 +22,6 @@ using Microsoft::WRL::ComPtr;
         } \
     } while (false)
 
-class Texture_Lifetime_Keeper {
-public:
-    Texture_Lifetime_Keeper(void *texture) {
-        d3d11_texture = (ID3D11Texture2D*)texture;
-    }
-private:
-    ComPtr<ID3D11Texture2D> d3d11_texture;
-};
-
 class NativeDevice {
 public:
     bool Init(int64_t luid, ID3D11Device *device);
