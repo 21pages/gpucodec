@@ -31,7 +31,10 @@ bool NativeDevice::Init(int64_t luid)
 	HRB(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)factory1_.ReleaseAndGetAddressOf()));
 
 	ComPtr<IDXGIAdapter1> tmpAdapter = nullptr;
-	for (int i = 0; !FAILED(factory1_->EnumAdapters1(i, tmpAdapter.ReleaseAndGetAddressOf())); i++) {
+	UINT i = 0;
+	while (!FAILED(factory1_->EnumAdapters1(i, tmpAdapter.ReleaseAndGetAddressOf())))
+	{
+		i++;
 		DXGI_ADAPTER_DESC1 desc = DXGI_ADAPTER_DESC1();
 		tmpAdapter->GetDesc1(&desc);
 		if (LUID(desc) == luid) {
@@ -207,7 +210,9 @@ bool Adapters::Init(AdapterVendor vendor)
 	HRB(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)factory1_.ReleaseAndGetAddressOf()));
 
 	ComPtr<IDXGIAdapter1> tmpAdapter = nullptr;
-	for (int i = 0; !FAILED(factory1_->EnumAdapters1(i, tmpAdapter.ReleaseAndGetAddressOf())); i++) {
+	UINT i = 0;
+	while(!FAILED(factory1_->EnumAdapters1(i, tmpAdapter.ReleaseAndGetAddressOf()))) {
+		i++;
 		DXGI_ADAPTER_DESC1 desc = DXGI_ADAPTER_DESC1();
 		tmpAdapter->GetDesc1(&desc);
 		if (desc.VendorId == static_cast<int>(vendor)) {
