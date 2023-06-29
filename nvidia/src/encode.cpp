@@ -25,7 +25,7 @@ using Microsoft::WRL::ComPtr;
 
 simplelogger::Logger *logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
-#define CONFIG_NV_OPTIMUS
+// #define CONFIG_NV_OPTIMUS_FOR_DEV
 
 static void load_driver(CudaFunctions **pp_cuda_dl, NvencFunctions **pp_nvenc_dl)
 {
@@ -154,7 +154,7 @@ extern "C" void* nvidia_new_encoder(void *hdl, int64_t luid, API api,
         if (API_DX11 == api)
         {
             e->nativeDevice_ = std::make_unique<NativeDevice>();
-            #ifdef CONFIG_NV_OPTIMUS
+            #ifdef CONFIG_NV_OPTIMUS_FOR_DEV
             if (!e->nativeDevice_->Init(luid, nullptr)) goto _exit;
             #else
             if (!e->nativeDevice_->Init(luid, (ID3D11Device*)hdl)) goto _exit;
@@ -234,7 +234,7 @@ _exit:
     return NULL;
 }
 
-#ifdef CONFIG_NV_OPTIMUS
+#ifdef CONFIG_NV_OPTIMUS_FOR_DEV
 static int copy_texture(NvencEncoder *e, void* src, void* dst)
 {
     ComPtr<ID3D11Device> src_device = (ID3D11Device*)e->m_hdl;
@@ -285,7 +285,7 @@ extern "C" int nvidia_encode(void *encoder,  void* tex, EncodeCallback callback,
         std::vector<NvPacket> vPacket;
         const NvEncInputFrame* pEncInput = pEnc->GetNextInputFrame();
 
-#ifdef CONFIG_NV_OPTIMUS
+#ifdef CONFIG_NV_OPTIMUS_FOR_DEV
         copy_texture(e, tex, pEncInput->inputPtr);
 #else
         ID3D11Texture2D *pBgraTextyure = reinterpret_cast<ID3D11Texture2D*>(pEncInput->inputPtr);
