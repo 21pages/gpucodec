@@ -52,7 +52,7 @@ public:
 
 private:
   // system
-  void *m_hdl;
+  void *m_handle;
   // AMF Internals
   AMFFactoryHelper m_AMFFactory;
   amf::AMF_MEMORY_TYPE m_AMFMemoryType;
@@ -70,10 +70,10 @@ private:
   std::vector<uint8_t> m_PacketDataBuffer;
 
 public:
-  AMFEncoder(void *hdl, amf::AMF_MEMORY_TYPE memoryType, amf_wstring codec,
+  AMFEncoder(void *handle, amf::AMF_MEMORY_TYPE memoryType, amf_wstring codec,
              DataFormat dataFormat, int32_t width, int32_t height,
              int32_t bitrate, int32_t framerate, int32_t gop) {
-    m_hdl = hdl;
+    m_handle = handle;
     m_dataFormat = dataFormat;
     m_AMFMemoryType = memoryType;
     m_Resolution = std::make_pair(width, height);
@@ -189,12 +189,12 @@ private:
     switch (m_AMFMemoryType) {
 #ifdef _WIN32
     case amf::AMF_MEMORY_DX11:
-      res = m_AMFContext->InitDX11(m_hdl); // can be DX11 device
+      res = m_AMFContext->InitDX11(m_handle); // can be DX11 device
       AMF_RETURN_IF_FAILED(res, L"InitDX11(m_hdl) failed");
       break;
 #endif
     case amf::AMF_MEMORY_VULKAN:
-      res = amf::AMFContext1Ptr(m_AMFContext)->InitVulkan(m_hdl);
+      res = amf::AMFContext1Ptr(m_AMFContext)->InitVulkan(m_handle);
       AMF_RETURN_IF_FAILED(res, L"InitVulkan(NULL) failed");
       break;
     case amf::AMF_MEMORY_OPENCL:
@@ -375,7 +375,7 @@ static bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
 
 #include "common.cpp"
 
-extern "C" void *amf_new_encoder(void *hdl, int64_t luid, API api,
+extern "C" void *amf_new_encoder(void *handle, int64_t luid, API api,
                                  DataFormat dataFormat, int32_t width,
                                  int32_t height, int32_t kbs, int32_t framerate,
                                  int32_t gop) {
@@ -391,7 +391,7 @@ extern "C" void *amf_new_encoder(void *hdl, int64_t luid, API api,
     if (!convert_api(api, memoryType)) {
       return NULL;
     }
-    AMFEncoder *enc = new AMFEncoder(hdl, memoryType, codecStr, dataFormat,
+    AMFEncoder *enc = new AMFEncoder(handle, memoryType, codecStr, dataFormat,
                                      width, height, kbs * 1000, framerate, gop);
     if (enc && enc->init_result != AMF_OK) {
       enc->destroy();
@@ -405,10 +405,10 @@ extern "C" void *amf_new_encoder(void *hdl, int64_t luid, API api,
   return NULL;
 }
 
-extern "C" int amf_encode(void *e, void *tex, EncodeCallback callback,
+extern "C" int amf_encode(void *encoder, void *tex, EncodeCallback callback,
                           void *obj) {
   try {
-    AMFEncoder *enc = (AMFEncoder *)e;
+    AMFEncoder *enc = (AMFEncoder *)encoder;
     return enc->encode(tex, callback, obj);
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
@@ -416,9 +416,9 @@ extern "C" int amf_encode(void *e, void *tex, EncodeCallback callback,
   return -1;
 }
 
-extern "C" int amf_destroy_encoder(void *e) {
+extern "C" int amf_destroy_encoder(void *encoder) {
   try {
-    AMFEncoder *enc = (AMFEncoder *)e;
+    AMFEncoder *enc = (AMFEncoder *)encoder;
     return enc->destroy();
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
@@ -473,9 +473,9 @@ extern "C" int amf_test_encode(void *outDescs, int32_t maxDescNum,
   return -1;
 }
 
-extern "C" int amf_set_bitrate(void *e, int32_t kbs) {
+extern "C" int amf_set_bitrate(void *encoder, int32_t kbs) {
   try {
-    AMFEncoder *enc = (AMFEncoder *)e;
+    AMFEncoder *enc = (AMFEncoder *)encoder;
     AMF_RESULT res = AMF_FAIL;
     switch (enc->m_dataFormat) {
     case H264:
@@ -494,9 +494,9 @@ extern "C" int amf_set_bitrate(void *e, int32_t kbs) {
   return -1;
 }
 
-extern "C" int amf_set_framerate(void *e, int32_t framerate) {
+extern "C" int amf_set_framerate(void *encoder, int32_t framerate) {
   try {
-    AMFEncoder *enc = (AMFEncoder *)e;
+    AMFEncoder *enc = (AMFEncoder *)encoder;
     AMF_RESULT res = AMF_FAIL;
     AMFRate rate = ::AMFConstructRate(framerate, 1);
     switch (enc->m_dataFormat) {

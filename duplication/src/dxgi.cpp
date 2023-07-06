@@ -92,8 +92,8 @@ extern "C" void *dxgi_new_duplicator() {
   return d;
 }
 
-extern "C" void *dxgi_device(void *self) {
-  DemoApplication *d = (DemoApplication *)self;
+extern "C" void *dxgi_device(void *dup) {
+  DemoApplication *d = (DemoApplication *)dup;
   return d->Device();
 }
 
@@ -126,8 +126,8 @@ static void save_bmp(void *texture) {
   }
 }
 
-extern "C" void *dxgi_duplicate(void *self, int wait_ms) {
-  DemoApplication *d = (DemoApplication *)self;
+extern "C" void *dxgi_duplicate(void *dup, int wait_ms) {
+  DemoApplication *d = (DemoApplication *)dup;
   void *texture = d->Capture(wait_ms);
 #if 1
   save_bmp(texture);
@@ -135,8 +135,8 @@ extern "C" void *dxgi_duplicate(void *self, int wait_ms) {
   return texture;
 }
 
-extern "C" void destroy_dxgi_duplicator(void *self) {
-  DemoApplication *d = (DemoApplication *)self;
+extern "C" void destroy_dxgi_duplicator(void *dup) {
+  DemoApplication *d = (DemoApplication *)dup;
   if (d)
     delete d;
 }

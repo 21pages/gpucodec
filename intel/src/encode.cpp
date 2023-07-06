@@ -100,7 +100,7 @@ static mfxStatus InitMFX(MFXEncoder *p) {
   return MFX_ERR_NONE;
 }
 
-extern "C" void *intel_new_encoder(void *opaque, int64_t luid, API api,
+extern "C" void *intel_new_encoder(void *handle, int64_t luid, API api,
                                    DataFormat dataFormat, int32_t w, int32_t h,
                                    int32_t kbs, int32_t framerate,
                                    int32_t gop) {
@@ -156,7 +156,7 @@ extern "C" void *intel_new_encoder(void *opaque, int64_t luid, API api,
   p->width = w;
   p->height = h;
   p->nativeDevice_ = std::make_unique<NativeDevice>();
-  if (!p->nativeDevice_->Init(luid, (ID3D11Device *)opaque))
+  if (!p->nativeDevice_->Init(luid, (ID3D11Device *)handle))
     goto _exit;
 
   sts = InitMFX(p);
@@ -311,6 +311,8 @@ extern "C" int intel_test_encode(void *outDescs, int32_t maxDescNum,
   return -1;
 }
 
-extern "C" int intel_set_bitrate(void *e, int32_t kbs) { return -1; }
+extern "C" int intel_set_bitrate(void *encoder, int32_t kbs) { return -1; }
 
-extern "C" int intel_set_framerate(void *e, int32_t framerate) { return -1; }
+extern "C" int intel_set_framerate(void *encoder, int32_t framerate) {
+  return -1;
+}

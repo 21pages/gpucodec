@@ -103,7 +103,7 @@ extern "C" int nvidia_destroy_encoder(void *encoder) {
   return -1;
 }
 
-extern "C" void *nvidia_new_encoder(void *hdl, int64_t luid, API api,
+extern "C" void *nvidia_new_encoder(void *handle, int64_t luid, API api,
                                     DataFormat dataFormat, int32_t width,
                                     int32_t height, int32_t kbs,
                                     int32_t framerate, int32_t gop) {
@@ -137,7 +137,7 @@ extern "C" void *nvidia_new_encoder(void *hdl, int64_t luid, API api,
       if (!e->nativeDevice_->Init(luid, nullptr))
         goto _exit;
 #else
-      if (!e->nativeDevice_->Init(luid, (ID3D11Device *)hdl))
+      if (!e->nativeDevice_->Init(luid, (ID3D11Device *)handle))
         goto _exit;
 #endif
     } else {
@@ -194,7 +194,7 @@ extern "C" void *nvidia_new_encoder(void *hdl, int64_t luid, API api,
     initializeParams.encodeConfig->gopLength = gop;
 
     e->pEnc->CreateEncoder(&initializeParams);
-    e->m_hdl = hdl;
+    e->m_hdl = handle;
 
     return e;
   } catch (const std::exception &ex) {
@@ -252,8 +252,8 @@ static int copy_texture(NvencEncoder *e, void *src, void *dst) {
 }
 #endif
 
-extern "C" int nvidia_encode(void *encoder, void *tex, EncodeCallback callback,
-                             void *obj) {
+extern "C" int nvidia_encode(void *encoder, void *texture,
+                             EncodeCallback callback, void *obj) {
   try {
     NvencEncoder *e = (NvencEncoder *)encoder;
     NvEncoderD3D11 *pEnc = e->pEnc;
@@ -263,12 +263,12 @@ extern "C" int nvidia_encode(void *encoder, void *tex, EncodeCallback callback,
     const NvEncInputFrame *pEncInput = pEnc->GetNextInputFrame();
 
 #ifdef CONFIG_NV_OPTIMUS_FOR_DEV
-    copy_texture(e, tex, pEncInput->inputPtr);
+    copy_texture(e, texture, pEncInput->inputPtr);
 #else
     ID3D11Texture2D *pBgraTextyure =
         reinterpret_cast<ID3D11Texture2D *>(pEncInput->inputPtr);
     e->nativeDevice_->context_->CopyResource(
-        pBgraTextyure, reinterpret_cast<ID3D11Texture2D *>(tex));
+        pBgraTextyure, reinterpret_cast<ID3D11Texture2D *>(texture));
 #endif
 
     pEnc->EncodeFrame(vPacket);
