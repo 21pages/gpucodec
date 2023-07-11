@@ -148,9 +148,10 @@ ID3D11Texture2D *NativeDevice::GetCurrentTexture() {
   return texture_[index_].Get();
 }
 
-void NativeDevice::next() {
+int NativeDevice::next() {
   index_++;
   index_ = index_ % count_;
+  return index_;
 }
 
 bool Adapter::Init(IDXGIAdapter1 *adapter1) {

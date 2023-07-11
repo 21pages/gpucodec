@@ -42,7 +42,7 @@ public:
   bool SetTexture(ID3D11Texture2D *texture);
   HANDLE GetSharedHandle();
   ID3D11Texture2D *GetCurrentTexture();
-  void next();
+  int next();
 
 private:
   bool Init(int64_t luid);

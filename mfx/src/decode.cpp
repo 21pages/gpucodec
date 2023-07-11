@@ -246,7 +246,7 @@ extern "C" int mfx_decode(void *decoder, uint8_t *data, int len,
         std::cerr << "Failed to EnsureTexture" << std::endl;
         return -1;
       }
-      p->nativeDevice->next();
+      // p->nativeDevice->next(); // comment out to remove picture shaking
       HRI(p->nv12torgb->Convert(texture, p->nativeDevice->GetCurrentTexture()));
       HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
       if (!sharedHandle) {
