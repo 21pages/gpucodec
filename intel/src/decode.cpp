@@ -24,7 +24,7 @@
     }                                                                          \
   }
 
-class MFXDecoder {
+struct MFXDecoder {
 public:
   std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
   MFXVideoSession session;

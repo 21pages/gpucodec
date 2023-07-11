@@ -44,7 +44,7 @@ extern "C" int nvidia_decode_driver_support() {
   return -1;
 }
 
-class CuvidDecoder {
+struct CuvidDecoder {
 public:
   CudaFunctions *cudl = NULL;
   CuvidFunctions *cvdl = NULL;
@@ -55,7 +55,7 @@ public:
   std::unique_ptr<RGBToNV12> nv12torgb = NULL;
   std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
 
-  CuvidDecoder(int) { load_driver(&cudl, &cvdl); }
+  CuvidDecoder() { load_driver(&cudl, &cvdl); }
 };
 
 extern "C" int nvidia_destroy_decoder(void *decoder) {
@@ -106,7 +106,7 @@ extern "C" void *nvidia_new_decoder(int64_t luid, API api,
   CuvidDecoder *p = NULL;
   try {
     (void)api;
-    p = new CuvidDecoder(0);
+    p = new CuvidDecoder();
     if (!p) {
       goto _exit;
     }
@@ -119,25 +119,12 @@ extern "C" void *nvidia_new_decoder(int64_t luid, API api,
     }
 
     CUdevice cuDevice = 0;
-#ifdef _WIN32
     p->nativeDevice_ = std::make_unique<NativeDevice>();
     if (!p->nativeDevice_->Init(luid, nullptr))
       goto _exit;
     if (!ck(p->cudl->cuD3D11GetDevice(&cuDevice,
                                       p->nativeDevice_->adapter_.Get())))
       goto _exit;
-#else
-    int nGpu = 0, gpu = 0;
-    ck(p->cudl->cuDeviceGetCount(&nGpu));
-    if (gpu >= nGpu) {
-      std::cout << "GPU ordinal out of range. Should be within [" << 0 << ", "
-                << nGpu - 1 << "]" << std::endl;
-      goto _exit;
-    }
-    if (!ck(p->cudl->cuDeviceGet(&cuDevice, gpu))) {
-      goto _exit;
-    }
-#endif
     char szDeviceName[80];
     if (!ck(p->cudl->cuDeviceGetName(szDeviceName, sizeof(szDeviceName),
                                      cuDevice))) {

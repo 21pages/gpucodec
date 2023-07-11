@@ -17,31 +17,31 @@
 
 class AMFDecoder {
 public:
-  AMF_RESULT init_result = AMF_FAIL;
+  AMF_RESULT init_result_ = AMF_FAIL;
 
 private:
   // system
-  int64_t m_luid;
-  std::unique_ptr<NativeDevice> m_nativeDevice = nullptr;
+  int64_t luid_;
+  std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
   // amf
-  AMFFactoryHelper m_AMFFactory;
-  amf::AMFContextPtr m_AMFContext = NULL;
-  amf::AMFComponentPtr m_AMFDecoder = NULL;
-  amf::AMF_MEMORY_TYPE m_AMFMemoryType;
-  amf::AMF_SURFACE_FORMAT m_decodeFormatOut = amf::AMF_SURFACE_NV12;
-  amf::AMF_SURFACE_FORMAT m_textureFormatOut;
-  amf::AMFComponentPtr m_AMFConverter = NULL;
-  amf_wstring m_codec;
+  AMFFactoryHelper AMFFactory_;
+  amf::AMFContextPtr AMFContext_ = NULL;
+  amf::AMFComponentPtr AMFDecoder_ = NULL;
+  amf::AMF_MEMORY_TYPE AMFMemoryType_;
+  amf::AMF_SURFACE_FORMAT decodeFormatOut_ = amf::AMF_SURFACE_NV12;
+  amf::AMF_SURFACE_FORMAT textureFormatOut_;
+  amf::AMFComponentPtr AMFConverter_ = NULL;
+  amf_wstring codec_;
 
   // buffer
-  std::vector<std::vector<uint8_t>> m_buffer;
+  std::vector<std::vector<uint8_t>> buffer_;
 
 public:
   AMFDecoder(int64_t luid, amf::AMF_MEMORY_TYPE memoryTypeOut,
              amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut)
-      : m_luid(luid), m_AMFMemoryType(memoryTypeOut),
-        m_textureFormatOut(textureFormatOut), m_codec(codec) {
-    init_result = initialize();
+      : luid_(luid), AMFMemoryType_(memoryTypeOut),
+        textureFormatOut_(textureFormatOut), codec_(codec) {
+    init_result_ = initialize();
   }
 
   AMF_RESULT decode(uint8_t *iData, uint32_t iDataSize, DecodeCallback callback,
@@ -50,14 +50,14 @@ public:
     bool decoded = false;
     amf::AMFBufferPtr iDataWrapBuffer = NULL;
 
-    res = m_AMFContext->CreateBufferFromHostNative(iData, iDataSize,
-                                                   &iDataWrapBuffer, NULL);
+    res = AMFContext_->CreateBufferFromHostNative(iData, iDataSize,
+                                                  &iDataWrapBuffer, NULL);
     AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateBufferFromHostNative");
-    res = m_AMFDecoder->SubmitInput(iDataWrapBuffer);
+    res = AMFDecoder_->SubmitInput(iDataWrapBuffer);
     AMF_RETURN_IF_FAILED(res, L"SubmitInput failed");
     amf::AMFDataPtr oData = NULL;
     do {
-      res = m_AMFDecoder->QueryOutput(&oData);
+      res = AMFDecoder_->QueryOutput(&oData);
       if (res == AMF_REPEAT) {
         amf_sleep(1);
       }
@@ -80,12 +80,12 @@ public:
       void *native = convertSurface->GetPlaneAt(0)->GetNative();
       switch (convertSurface->GetMemoryType()) {
       case amf::AMF_MEMORY_DX11: {
-        m_nativeDevice->next();
-        if (!m_nativeDevice->SetTexture((ID3D11Texture2D *)native)) {
+        nativeDevice_->next();
+        if (!nativeDevice_->SetTexture((ID3D11Texture2D *)native)) {
           std::cerr << "Failed to CopyTexture" << std::endl;
           return AMF_FAIL;
         }
-        HANDLE sharedHandle = m_nativeDevice->GetSharedHandle();
+        HANDLE sharedHandle = nativeDevice_->GetSharedHandle();
         if (!sharedHandle) {
           std::cerr << "Failed to GetSharedHandle" << std::endl;
           return AMF_FAIL;
@@ -110,15 +110,15 @@ public:
   }
 
   AMF_RESULT destroy() {
-    if (m_AMFDecoder != NULL) {
-      m_AMFDecoder->Terminate();
-      m_AMFDecoder = NULL;
+    if (AMFDecoder_ != NULL) {
+      AMFDecoder_->Terminate();
+      AMFDecoder_ = NULL;
     }
-    if (m_AMFContext != NULL) {
-      m_AMFContext->Terminate();
-      m_AMFContext = NULL; // context is the last
+    if (AMFContext_ != NULL) {
+      AMFContext_->Terminate();
+      AMFContext_ = NULL; // context is the last
     }
-    m_AMFFactory.Terminate();
+    AMFFactory_.Terminate();
     return AMF_OK;
   }
 
@@ -126,35 +126,35 @@ private:
   AMF_RESULT initialize() {
     AMF_RESULT res;
 
-    res = m_AMFFactory.Init();
+    res = AMFFactory_.Init();
     if (res != AMF_OK) {
       std::cerr << "AMF init failed, error code = " << res << "\n";
       return res;
     }
-    amf::AMFSetCustomTracer(m_AMFFactory.GetTrace());
+    amf::AMFSetCustomTracer(AMFFactory_.GetTrace());
     amf::AMFTraceEnableWriter(AMF_TRACE_WRITER_CONSOLE, true);
     amf::AMFTraceSetWriterLevel(AMF_TRACE_WRITER_CONSOLE, AMF_TRACE_WARNING);
 
-    res = m_AMFFactory.GetFactory()->CreateContext(&m_AMFContext);
+    res = AMFFactory_.GetFactory()->CreateContext(&AMFContext_);
     AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateContext");
 
-    switch (m_AMFMemoryType) {
+    switch (AMFMemoryType_) {
     case amf::AMF_MEMORY_DX9:
-      res = m_AMFContext->InitDX9(NULL); // can be DX9 or DX9Ex device
+      res = AMFContext_->InitDX9(NULL); // can be DX9 or DX9Ex device
       AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitDX9");
       break;
     case amf::AMF_MEMORY_DX11:
-      m_nativeDevice = std::make_unique<NativeDevice>();
-      if (!m_nativeDevice->Init(m_luid, nullptr)) {
+      nativeDevice_ = std::make_unique<NativeDevice>();
+      if (!nativeDevice_->Init(luid_, nullptr)) {
         std::cerr << "Init NativeDevice failed" << std::endl;
         return AMF_FAIL;
       }
-      res = m_AMFContext->InitDX11(
-          m_nativeDevice->device_.Get()); // can be DX11 device
+      res = AMFContext_->InitDX11(
+          nativeDevice_->device_.Get()); // can be DX11 device
       AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitDX11");
       break;
     case amf::AMF_MEMORY_DX12: {
-      amf::AMFContext2Ptr context2(m_AMFContext);
+      amf::AMFContext2Ptr context2(AMFContext_);
       if (context2 == nullptr) {
         AMFTraceError(AMF_FACILITY, L"amf::AMFContext2 is missing");
         return AMF_FAIL;
@@ -163,7 +163,7 @@ private:
       AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitDX12");
     } break;
     case amf::AMF_MEMORY_VULKAN:
-      res = amf::AMFContext1Ptr(m_AMFContext)
+      res = amf::AMFContext1Ptr(AMFContext_)
                 ->InitVulkan(NULL); // can be Vulkan device
       AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitVulkan");
       break;
@@ -171,14 +171,14 @@ private:
       break;
     }
 
-    res = m_AMFFactory.GetFactory()->CreateComponent(
-        m_AMFContext, m_codec.c_str(), &m_AMFDecoder);
+    res = AMFFactory_.GetFactory()->CreateComponent(AMFContext_, codec_.c_str(),
+                                                    &AMFDecoder_);
     AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateComponent");
 
     res = setParameters();
     AMF_RETURN_IF_FAILED(res, L"AMF Failed to setParameters");
 
-    res = m_AMFDecoder->Init(m_decodeFormatOut, 0, 0);
+    res = AMFDecoder_->Init(decodeFormatOut_, 0, 0);
     AMF_RETURN_IF_FAILED(res, L"AMF Failed to Init decoder");
 
     return AMF_OK;
@@ -186,16 +186,16 @@ private:
 
   AMF_RESULT setParameters() {
     AMF_RESULT res;
-    res = m_AMFDecoder->SetProperty(
+    res = AMFDecoder_->SetProperty(
         AMF_TIMESTAMP_MODE,
         amf_int64(
             AMF_TS_DECODE)); // our sample H264 parser provides decode order
                              // timestamps - change this depend on demuxer
     AMF_RETURN_IF_FAILED(
         res, L"SetProperty AMF_TIMESTAMP_MODE to AMF_TS_DECODE failed");
-    res = m_AMFDecoder->SetProperty(
-        AMF_VIDEO_DECODER_REORDER_MODE,
-        amf_int64(AMF_VIDEO_DECODER_MODE_LOW_LATENCY));
+    res =
+        AMFDecoder_->SetProperty(AMF_VIDEO_DECODER_REORDER_MODE,
+                                 amf_int64(AMF_VIDEO_DECODER_MODE_LOW_LATENCY));
     AMF_RETURN_IF_FAILED(res, L"SetProperty AMF_VIDEO_DECODER_REORDER_MODE to "
                               L"AMF_VIDEO_DECODER_MODE_LOW_LATENCY failed");
     return AMF_OK;
@@ -203,29 +203,29 @@ private:
 
   AMF_RESULT Convert(IN amf::AMFSurfacePtr &surface,
                      OUT amf::AMFDataPtr &convertData) {
-    if (m_decodeFormatOut == m_textureFormatOut)
+    if (decodeFormatOut_ == textureFormatOut_)
       return AMF_OK;
     AMF_RESULT res;
 
-    if (!m_AMFConverter) {
-      res = m_AMFFactory.GetFactory()->CreateComponent(
-          m_AMFContext, AMFVideoConverter, &m_AMFConverter);
+    if (!AMFConverter_) {
+      res = AMFFactory_.GetFactory()->CreateComponent(
+          AMFContext_, AMFVideoConverter, &AMFConverter_);
       AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateComponent");
       int width = surface->GetPlaneAt(0)->GetWidth();
       int height = surface->GetPlaneAt(0)->GetWidth();
-      res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_MEMORY_TYPE,
-                                        m_AMFMemoryType);
-      res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_FORMAT,
-                                        m_textureFormatOut);
-      res = m_AMFConverter->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_SIZE,
-                                        ::AMFConstructSize(width, height));
+      res = AMFConverter_->SetProperty(AMF_VIDEO_CONVERTER_MEMORY_TYPE,
+                                       AMFMemoryType_);
+      res = AMFConverter_->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_FORMAT,
+                                       textureFormatOut_);
+      res = AMFConverter_->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_SIZE,
+                                       ::AMFConstructSize(width, height));
       AMF_RETURN_IF_FAILED(res, L"AMF Failed to SetProperty");
-      res = m_AMFConverter->Init(m_decodeFormatOut, width, height);
+      res = AMFConverter_->Init(decodeFormatOut_, width, height);
       AMF_RETURN_IF_FAILED(res, L"AMF Failed to Init converter");
     }
-    res = m_AMFConverter->SubmitInput(surface);
+    res = AMFConverter_->SubmitInput(surface);
     AMF_RETURN_IF_FAILED(res, L"Convert SubmitInput failed");
-    res = m_AMFConverter->QueryOutput(&convertData);
+    res = AMFConverter_->QueryOutput(&convertData);
     AMF_RETURN_IF_FAILED(res, L"Convert QueryOutput failed");
     return AMF_OK;
   }
@@ -264,7 +264,7 @@ extern "C" void *amf_new_decoder(int64_t luid, API api, DataFormat dataFormat,
       return NULL;
     }
     AMFDecoder *dec = new AMFDecoder(luid, memory, codecStr, surfaceFormat);
-    if (dec && dec->init_result != AMF_OK) {
+    if (dec && dec->init_result_ != AMF_OK) {
       dec->destroy();
       delete dec;
       dec = NULL;

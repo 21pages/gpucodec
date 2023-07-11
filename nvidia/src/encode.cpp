@@ -12,13 +12,11 @@
 #include <iostream>
 #include <memory>
 
-#ifdef _WIN32
 #include <d3d11.h>
 #include <d3d9.h>
 #include <wrl/client.h>
 
 using Microsoft::WRL::ComPtr;
-#endif
 
 #include "callback.h"
 #include "common.h"
@@ -64,11 +62,9 @@ extern "C" int nvidia_encode_driver_support() {
 }
 
 struct NvencEncoder {
-  void *m_hdl;
-#ifdef _WIN32
-  std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
+  void *handle;
+  std::unique_ptr<NativeDevice> nativeDevice = nullptr;
   NvEncoderD3D11 *pEnc = NULL;
-#endif
   CudaFunctions *cuda_dl = NULL;
   NvencFunctions *nvenc_dl = NULL;
   int32_t width;
@@ -132,12 +128,12 @@ extern "C" void *nvidia_new_encoder(void *handle, int64_t luid, API api,
     }
 
     if (API_DX11 == api) {
-      e->nativeDevice_ = std::make_unique<NativeDevice>();
+      e->nativeDevice = std::make_unique<NativeDevice>();
 #ifdef CONFIG_NV_OPTIMUS_FOR_DEV
-      if (!e->nativeDevice_->Init(luid, nullptr))
+      if (!e->nativeDevice->Init(luid, nullptr))
         goto _exit;
 #else
-      if (!e->nativeDevice_->Init(luid, (ID3D11Device *)handle))
+      if (!e->nativeDevice->Init(luid, (ID3D11Device *)handle))
         goto _exit;
 #endif
     } else {
@@ -167,7 +163,7 @@ extern "C" void *nvidia_new_encoder(void *handle, int64_t luid, API api,
 
     int nExtraOutputDelay = 0;
     e->pEnc = new NvEncoderD3D11(
-        e->cuda_dl, e->nvenc_dl, e->nativeDevice_->device_.Get(), e->width,
+        e->cuda_dl, e->nvenc_dl, e->nativeDevice->device_.Get(), e->width,
         e->height, e->format, nExtraOutputDelay, false, false); // no delay
     NV_ENC_INITIALIZE_PARAMS initializeParams = {0};
     NV_ENC_CONFIG encodeConfig = {0};
@@ -194,7 +190,7 @@ extern "C" void *nvidia_new_encoder(void *handle, int64_t luid, API api,
     initializeParams.encodeConfig->gopLength = gop;
 
     e->pEnc->CreateEncoder(&initializeParams);
-    e->m_hdl = handle;
+    e->handle = handle;
 
     return e;
   } catch (const std::exception &ex) {
@@ -212,7 +208,7 @@ _exit:
 
 #ifdef CONFIG_NV_OPTIMUS_FOR_DEV
 static int copy_texture(NvencEncoder *e, void *src, void *dst) {
-  ComPtr<ID3D11Device> src_device = (ID3D11Device *)e->m_hdl;
+  ComPtr<ID3D11Device> src_device = (ID3D11Device *)e->handle;
   ComPtr<ID3D11DeviceContext> src_deviceContext;
   src_device->GetImmediateContext(src_deviceContext.ReleaseAndGetAddressOf());
   ComPtr<ID3D11Texture2D> src_tex = (ID3D11Texture2D *)src;
@@ -244,9 +240,9 @@ static int copy_texture(NvencEncoder *e, void *src, void *dst) {
   Box.bottom = desc.Height;
   Box.front = 0;
   Box.back = 1;
-  e->nativeDevice_->context_->UpdateSubresource(dst_tex.Get(), 0, &Box,
-                                                buffer.get(), desc.Width * 4,
-                                                desc.Width * desc.Height * 4);
+  e->nativeDevice->context_->UpdateSubresource(dst_tex.Get(), 0, &Box,
+                                               buffer.get(), desc.Width * 4,
+                                               desc.Width * desc.Height * 4);
 
   return 0;
 }
@@ -267,7 +263,7 @@ extern "C" int nvidia_encode(void *encoder, void *texture,
 #else
     ID3D11Texture2D *pBgraTextyure =
         reinterpret_cast<ID3D11Texture2D *>(pEncInput->inputPtr);
-    e->nativeDevice_->context_->CopyResource(
+    e->nativeDevice->context_->CopyResource(
         pBgraTextyure, reinterpret_cast<ID3D11Texture2D *>(texture));
 #endif
 
@@ -319,10 +315,10 @@ extern "C" int nvidia_test_encode(void *outDescs, int32_t maxDescNum,
           api, dataFormat, width, height, kbs, framerate, gop);
       if (!e)
         continue;
-      if (!e->nativeDevice_->EnsureTexture(e->width, e->height))
+      if (!e->nativeDevice->EnsureTexture(e->width, e->height))
         continue;
-      e->nativeDevice_->next();
-      if (nvidia_encode(e, e->nativeDevice_->GetCurrentTexture(), nullptr,
+      e->nativeDevice->next();
+      if (nvidia_encode(e, e->nativeDevice->GetCurrentTexture(), nullptr,
                         nullptr) == 0) {
         AdapterDesc *desc = descs + count;
         desc->luid = LUID(adapter.get()->desc1_);
