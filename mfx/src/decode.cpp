@@ -38,7 +38,7 @@ public:
   mfxFrameAllocResponse mfxResponse;
 };
 
-extern "C" int intel_destroy_decoder(void *decoder) {
+extern "C" int mfx_destroy_decoder(void *decoder) {
   MFXDecoder *p = (MFXDecoder *)decoder;
   if (p) {
     if (p->mfxDEC) {
@@ -86,8 +86,8 @@ static mfxStatus InitializeMFX(MFXDecoder *p) {
   return MFX_ERR_NONE;
 }
 
-extern "C" void *intel_new_decoder(int64_t luid, API api, DataFormat codecID,
-                                   SurfaceFormat outputSurfaceFormat) {
+extern "C" void *mfx_new_decoder(int64_t luid, API api, DataFormat codecID,
+                                 SurfaceFormat outputSurfaceFormat) {
   mfxStatus sts = MFX_ERR_NONE;
 
   MFXDecoder *p = new MFXDecoder();
@@ -122,7 +122,7 @@ extern "C" void *intel_new_decoder(int64_t luid, API api, DataFormat codecID,
 
 _exit:
   if (p) {
-    intel_destroy_decoder(p);
+    mfx_destroy_decoder(p);
     delete p;
   }
   return NULL;
@@ -172,8 +172,8 @@ static mfxStatus initialize(MFXDecoder *p, mfxBitstream *mfxBS) {
   return MFX_ERR_NONE;
 }
 
-extern "C" int intel_decode(void *decoder, uint8_t *data, int len,
-                            DecodeCallback callback, void *obj) {
+extern "C" int mfx_decode(void *decoder, uint8_t *data, int len,
+                          DecodeCallback callback, void *obj) {
   MFXDecoder *p = (MFXDecoder *)decoder;
   mfxStatus sts = MFX_ERR_NONE;
   mfxSyncPoint syncp;
@@ -269,11 +269,11 @@ extern "C" int intel_decode(void *decoder, uint8_t *data, int len,
   return decoded ? 0 : -1;
 }
 
-extern "C" int intel_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
-                                 int32_t *outDescNum, API api,
-                                 DataFormat dataFormat,
-                                 SurfaceFormat outputSurfaceFormat,
-                                 uint8_t *data, int32_t length) {
+extern "C" int mfx_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
+                               int32_t *outDescNum, API api,
+                               DataFormat dataFormat,
+                               SurfaceFormat outputSurfaceFormat, uint8_t *data,
+                               int32_t length) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -281,11 +281,11 @@ extern "C" int intel_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
       return -1;
     int count = 0;
     for (auto &adapter : adapters.adapters_) {
-      MFXDecoder *p = (MFXDecoder *)intel_new_decoder(
+      MFXDecoder *p = (MFXDecoder *)mfx_new_decoder(
           LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
       if (!p)
         continue;
-      if (intel_decode(p, data, length, nullptr, nullptr) == 0) {
+      if (mfx_decode(p, data, length, nullptr, nullptr) == 0) {
         AdapterDesc *desc = descs + count;
         desc->luid = LUID(adapter.get()->desc1_);
         count += 1;

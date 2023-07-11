@@ -44,12 +44,12 @@ static mfxStatus InitSession(MFXVideoSession &session) {
   return session.InitEx(mfxparams);
 }
 
-extern "C" int intel_driver_support() {
+extern "C" int mfx_driver_support() {
   MFXVideoSession session;
   return InitSession(session) == MFX_ERR_NONE ? 0 : -1;
 }
 
-extern "C" int intel_destroy_encoder(void *encoder) {
+extern "C" int mfx_destroy_encoder(void *encoder) {
   MFXEncoder *p = (MFXEncoder *)encoder;
   if (p) {
     if (p->mfxENC) {
@@ -100,10 +100,9 @@ static mfxStatus InitMFX(MFXEncoder *p) {
   return MFX_ERR_NONE;
 }
 
-extern "C" void *intel_new_encoder(void *handle, int64_t luid, API api,
-                                   DataFormat dataFormat, int32_t w, int32_t h,
-                                   int32_t kbs, int32_t framerate,
-                                   int32_t gop) {
+extern "C" void *mfx_new_encoder(void *handle, int64_t luid, API api,
+                                 DataFormat dataFormat, int32_t w, int32_t h,
+                                 int32_t kbs, int32_t framerate, int32_t gop) {
   mfxStatus sts = MFX_ERR_NONE;
   mfxVersion ver = {{0, 1}};
   mfxVideoParam mfxEncParams;
@@ -209,14 +208,14 @@ extern "C" void *intel_new_encoder(void *handle, int64_t luid, API api,
   return p;
 _exit:
   if (p) {
-    intel_destroy_encoder(p);
+    mfx_destroy_encoder(p);
     delete p;
   }
   return NULL;
 }
 
-extern "C" int intel_encode(void *encoder, ID3D11Texture2D *tex,
-                            EncodeCallback callback, void *obj) {
+extern "C" int mfx_encode(void *encoder, ID3D11Texture2D *tex,
+                          EncodeCallback callback, void *obj) {
   mfxStatus sts = MFX_ERR_NONE;
   bool encoded = false;
   MFXEncoder *p = (MFXEncoder *)encoder;
@@ -273,11 +272,11 @@ extern "C" int intel_encode(void *encoder, ID3D11Texture2D *tex,
   return encoded ? 0 : -1;
 }
 
-extern "C" int intel_test_encode(void *outDescs, int32_t maxDescNum,
-                                 int32_t *outDescNum, API api,
-                                 DataFormat dataFormat, int32_t width,
-                                 int32_t height, int32_t kbs, int32_t framerate,
-                                 int32_t gop) {
+extern "C" int mfx_test_encode(void *outDescs, int32_t maxDescNum,
+                               int32_t *outDescNum, API api,
+                               DataFormat dataFormat, int32_t width,
+                               int32_t height, int32_t kbs, int32_t framerate,
+                               int32_t gop) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -285,7 +284,7 @@ extern "C" int intel_test_encode(void *outDescs, int32_t maxDescNum,
       return -1;
     int count = 0;
     for (auto &adapter : adapters.adapters_) {
-      MFXEncoder *e = (MFXEncoder *)intel_new_encoder(
+      MFXEncoder *e = (MFXEncoder *)mfx_new_encoder(
           (void *)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_),
           api, dataFormat, width, height, kbs, framerate, gop);
       if (!e)
@@ -293,8 +292,8 @@ extern "C" int intel_test_encode(void *outDescs, int32_t maxDescNum,
       if (!e->nativeDevice_->EnsureTexture(e->width, e->height))
         continue;
       e->nativeDevice_->next();
-      if (intel_encode(e, e->nativeDevice_->GetCurrentTexture(), nullptr,
-                       nullptr) == 0) {
+      if (mfx_encode(e, e->nativeDevice_->GetCurrentTexture(), nullptr,
+                     nullptr) == 0) {
         AdapterDesc *desc = descs + count;
         desc->luid = LUID(adapter.get()->desc1_);
         count += 1;
@@ -311,8 +310,8 @@ extern "C" int intel_test_encode(void *outDescs, int32_t maxDescNum,
   return -1;
 }
 
-extern "C" int intel_set_bitrate(void *encoder, int32_t kbs) { return -1; }
+extern "C" int mfx_set_bitrate(void *encoder, int32_t kbs) { return -1; }
 
-extern "C" int intel_set_framerate(void *encoder, int32_t framerate) {
+extern "C" int mfx_set_framerate(void *encoder, int32_t framerate) {
   return -1;
 }

@@ -31,7 +31,7 @@ impl Decoder {
         let calls = match ctx.driver {
             CUVID => nvidia::decode_calls(),
             AMF => amf::decode_calls(),
-            MFX => intel::decode_calls(),
+            MFX => mfx::decode_calls(),
         };
         unsafe {
             let codec = (calls.new)(
@@ -141,7 +141,7 @@ fn available_() -> Vec<DecodeContext> {
             .collect(),
     );
     natives.append(
-        &mut intel::possible_support_decoders()
+        &mut mfx::possible_support_decoders()
             .drain(..)
             .map(|n| (MFX, n))
             .collect(),
@@ -177,7 +177,7 @@ fn available_() -> Vec<DecodeContext> {
             let test = match input.driver {
                 CUVID => nvidia::decode_calls().test,
                 AMF => amf::decode_calls().test,
-                MFX => intel::decode_calls().test,
+                MFX => mfx::decode_calls().test,
             };
             let mut descs: Vec<AdapterDesc> = vec![];
             descs.resize(crate::MAX_ADATER_NUM_ONE_VENDER, unsafe {

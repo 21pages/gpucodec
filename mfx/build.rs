@@ -16,7 +16,7 @@ fn main() {
         .rustified_enum("*")
         .generate()
         .unwrap()
-        .write_to_file(Path::new(&env::var_os("OUT_DIR").unwrap()).join("intel_ffi.rs"))
+        .write_to_file(Path::new(&env::var_os("OUT_DIR").unwrap()).join("mfx_ffi.rs"))
         .unwrap();
 
     let mut builder = Build::new();
