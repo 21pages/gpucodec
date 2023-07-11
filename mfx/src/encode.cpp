@@ -23,7 +23,7 @@
   }
 
 struct MFXEncoder {
-  std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
+  std::unique_ptr<NativeDevice> nativeDevice = nullptr;
   MFXVideoSession session;
   MFXVideoENCODE *mfxENC = NULL;
   std::vector<mfxFrameSurface1> pEncSurfaces;
@@ -92,7 +92,7 @@ static mfxStatus InitMFX(MFXEncoder *p) {
   sts = InitSession(p->session);
   MSDK_CHECK_STATUS(sts, "InitSession");
   sts = p->session.SetHandle(MFX_HANDLE_D3D11_DEVICE,
-                             p->nativeDevice_->device_.Get());
+                             p->nativeDevice->device_.Get());
   MSDK_CHECK_STATUS(sts, "SetHandle");
   sts = p->session.SetFrameAllocator(&alloc);
   MSDK_CHECK_STATUS(sts, "SetFrameAllocator");
@@ -154,8 +154,8 @@ extern "C" void *mfx_new_encoder(void *handle, int64_t luid, API api,
 
   p->width = w;
   p->height = h;
-  p->nativeDevice_ = std::make_unique<NativeDevice>();
-  if (!p->nativeDevice_->Init(luid, (ID3D11Device *)handle))
+  p->nativeDevice = std::make_unique<NativeDevice>();
+  if (!p->nativeDevice->Init(luid, (ID3D11Device *)handle))
     goto _exit;
 
   sts = InitMFX(p);
@@ -289,10 +289,10 @@ extern "C" int mfx_test_encode(void *outDescs, int32_t maxDescNum,
           api, dataFormat, width, height, kbs, framerate, gop);
       if (!e)
         continue;
-      if (!e->nativeDevice_->EnsureTexture(e->width, e->height))
+      if (!e->nativeDevice->EnsureTexture(e->width, e->height))
         continue;
-      e->nativeDevice_->next();
-      if (mfx_encode(e, e->nativeDevice_->GetCurrentTexture(), nullptr,
+      e->nativeDevice->next();
+      if (mfx_encode(e, e->nativeDevice->GetCurrentTexture(), nullptr,
                      nullptr) == 0) {
         AdapterDesc *desc = descs + count;
         desc->luid = LUID(adapter.get()->desc1_);

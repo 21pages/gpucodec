@@ -26,7 +26,7 @@
 
 struct MFXDecoder {
 public:
-  std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
+  std::unique_ptr<NativeDevice> nativeDevice = nullptr;
   MFXVideoSession session;
   MFXVideoDECODE *mfxDEC = NULL;
   std::vector<mfxU8> surfaceBuffersData;
@@ -71,11 +71,11 @@ static mfxStatus InitializeMFX(MFXDecoder *p) {
   MSDK_CHECK_STATUS(sts, "session Init");
 
   sts = p->session.SetHandle(MFX_HANDLE_D3D11_DEVICE,
-                             p->nativeDevice_->device_.Get());
+                             p->nativeDevice->device_.Get());
   MSDK_CHECK_STATUS(sts, "SetHandle");
 
   allocParams.bUseSingleTexture = true;
-  allocParams.pDevice = p->nativeDevice_->device_.Get();
+  allocParams.pDevice = p->nativeDevice->device_.Get();
   allocParams.uncompressedResourceMiscFlags = 0;
   sts = p->d3d11FrameAllocator.Init(&allocParams);
   MSDK_CHECK_STATUS(sts, "init D3D11FrameAllocator");
@@ -91,11 +91,11 @@ extern "C" void *mfx_new_decoder(int64_t luid, API api, DataFormat codecID,
   mfxStatus sts = MFX_ERR_NONE;
 
   MFXDecoder *p = new MFXDecoder();
-  p->nativeDevice_ = std::make_unique<NativeDevice>();
-  if (!p->nativeDevice_->Init(luid, nullptr))
+  p->nativeDevice = std::make_unique<NativeDevice>();
+  if (!p->nativeDevice->Init(luid, nullptr))
     goto _exit;
-  p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice_->device_.Get(),
-                                             p->nativeDevice_->context_.Get());
+  p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice->device_.Get(),
+                                             p->nativeDevice->context_.Get());
   if (FAILED(p->nv12torgb->Init())) {
     goto _exit;
   }
@@ -242,14 +242,13 @@ extern "C" int mfx_decode(void *decoder, uint8_t *data, int len,
       ID3D11Texture2D *texture = (ID3D11Texture2D *)pair.first;
       D3D11_TEXTURE2D_DESC desc2D;
       texture->GetDesc(&desc2D);
-      if (!p->nativeDevice_->EnsureTexture(desc2D.Width, desc2D.Height)) {
+      if (!p->nativeDevice->EnsureTexture(desc2D.Width, desc2D.Height)) {
         std::cerr << "Failed to EnsureTexture" << std::endl;
         return -1;
       }
-      p->nativeDevice_->next();
-      HRI(p->nv12torgb->Convert(texture,
-                                p->nativeDevice_->GetCurrentTexture()));
-      HANDLE sharedHandle = p->nativeDevice_->GetSharedHandle();
+      p->nativeDevice->next();
+      HRI(p->nv12torgb->Convert(texture, p->nativeDevice->GetCurrentTexture()));
+      HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
       if (!sharedHandle) {
         std::cerr << "Failed to GetSharedHandle" << std::endl;
         return -1;

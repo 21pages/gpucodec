@@ -53,7 +53,7 @@ public:
   CUgraphicsResource cuResource = NULL;
   ComPtr<ID3D11Texture2D> nv12Texture = NULL;
   std::unique_ptr<RGBToNV12> nv12torgb = NULL;
-  std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
+  std::unique_ptr<NativeDevice> nativeDevice = nullptr;
 
   CuvidDecoder() { load_driver(&cudl, &cvdl); }
 };
@@ -118,11 +118,11 @@ extern "C" void *nv_new_decoder(int64_t luid, API api, DataFormat dataFormat,
     }
 
     CUdevice cuDevice = 0;
-    p->nativeDevice_ = std::make_unique<NativeDevice>();
-    if (!p->nativeDevice_->Init(luid, nullptr))
+    p->nativeDevice = std::make_unique<NativeDevice>();
+    if (!p->nativeDevice->Init(luid, nullptr))
       goto _exit;
     if (!ck(p->cudl->cuD3D11GetDevice(&cuDevice,
-                                      p->nativeDevice_->adapter_.Get())))
+                                      p->nativeDevice->adapter_.Get())))
       goto _exit;
     char szDeviceName[80];
     if (!ck(p->cudl->cuDeviceGetName(szDeviceName, sizeof(szDeviceName),
@@ -147,8 +147,8 @@ extern "C" void *nv_new_decoder(int64_t luid, API api, DataFormat dataFormat,
      * codecs PFNVIDOPPOINTCALLBACK Callback from video parser will pick
      * operating point set to NvDecoder  */
     p->dec->SetOperatingPoint(opPoint, bDispAllLayers);
-    p->nv12torgb = std::make_unique<RGBToNV12>(
-        p->nativeDevice_->device_.Get(), p->nativeDevice_->context_.Get());
+    p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice->device_.Get(),
+                                               p->nativeDevice->context_.Get());
     if (FAILED(p->nv12torgb->Init())) {
       goto _exit;
     }
@@ -214,7 +214,7 @@ static bool create_register_texture(CuvidDecoder *p) {
   desc.BindFlags = D3D11_BIND_RENDER_TARGET;
   desc.CPUAccessFlags = 0;
 
-  HRB(p->nativeDevice_->device_->CreateTexture2D(
+  HRB(p->nativeDevice->device_->CreateTexture2D(
       &desc, nullptr, p->nv12Texture.ReleaseAndGetAddressOf()));
   if (!ck(p->cudl->cuCtxPushCurrent(p->cuContext)))
     return false;
@@ -252,14 +252,14 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
       }
       if (!CopyDeviceFrame(p, pFrame))
         return -1;
-      if (!p->nativeDevice_->EnsureTexture(width, height)) {
+      if (!p->nativeDevice->EnsureTexture(width, height)) {
         std::cerr << "Failed to EnsureTexture" << std::endl;
         return -1;
       }
-      p->nativeDevice_->next();
+      p->nativeDevice->next();
       HRI(p->nv12torgb->Convert(p->nv12Texture.Get(),
-                                p->nativeDevice_->GetCurrentTexture()));
-      HANDLE sharedHandle = p->nativeDevice_->GetSharedHandle();
+                                p->nativeDevice->GetCurrentTexture()));
+      HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
       if (!sharedHandle) {
         std::cerr << "Failed to GetSharedHandle" << std::endl;
         return -1;
