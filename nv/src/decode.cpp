@@ -32,7 +32,7 @@ static void free_driver(CudaFunctions **pp_cudl, CuvidFunctions **pp_cvdl) {
   }
 }
 
-extern "C" int nvidia_decode_driver_support() {
+extern "C" int nv_decode_driver_support() {
   try {
     CudaFunctions *cudl = NULL;
     CuvidFunctions *cvdl = NULL;
@@ -58,7 +58,7 @@ public:
   CuvidDecoder() { load_driver(&cudl, &cvdl); }
 };
 
-extern "C" int nvidia_destroy_decoder(void *decoder) {
+extern "C" int nv_destroy_decoder(void *decoder) {
   try {
     CuvidDecoder *p = (CuvidDecoder *)decoder;
     if (p) {
@@ -100,9 +100,8 @@ static bool dataFormat_to_cuCodecID(DataFormat dataFormat,
   return true;
 }
 
-extern "C" void *nvidia_new_decoder(int64_t luid, API api,
-                                    DataFormat dataFormat,
-                                    SurfaceFormat outputSurfaceFormat) {
+extern "C" void *nv_new_decoder(int64_t luid, API api, DataFormat dataFormat,
+                                SurfaceFormat outputSurfaceFormat) {
   CuvidDecoder *p = NULL;
   try {
     (void)api;
@@ -161,7 +160,7 @@ extern "C" void *nvidia_new_decoder(int64_t luid, API api,
 
 _exit:
   if (p) {
-    nvidia_destroy_decoder(p);
+    nv_destroy_decoder(p);
     delete p;
   }
   return NULL;
@@ -231,8 +230,8 @@ static bool create_register_texture(CuvidDecoder *p) {
   return true;
 }
 
-extern "C" int nvidia_decode(void *decoder, uint8_t *data, int len,
-                             DecodeCallback callback, void *obj) {
+extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
+                         DecodeCallback callback, void *obj) {
   try {
     CuvidDecoder *p = (CuvidDecoder *)decoder;
     NvDecoder *dec = p->dec;
@@ -275,11 +274,11 @@ extern "C" int nvidia_decode(void *decoder, uint8_t *data, int len,
   return -1;
 }
 
-extern "C" int nvidia_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
-                                  int32_t *outDescNum, API api,
-                                  DataFormat dataFormat,
-                                  SurfaceFormat outputSurfaceFormat,
-                                  uint8_t *data, int32_t length) {
+extern "C" int nv_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
+                              int32_t *outDescNum, API api,
+                              DataFormat dataFormat,
+                              SurfaceFormat outputSurfaceFormat, uint8_t *data,
+                              int32_t length) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -287,11 +286,11 @@ extern "C" int nvidia_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
       return -1;
     int count = 0;
     for (auto &adapter : adapters.adapters_) {
-      CuvidDecoder *p = (CuvidDecoder *)nvidia_new_decoder(
+      CuvidDecoder *p = (CuvidDecoder *)nv_new_decoder(
           LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
       if (!p)
         continue;
-      if (nvidia_decode(p, data, length, nullptr, nullptr) == 0) {
+      if (nv_decode(p, data, length, nullptr, nullptr) == 0) {
         AdapterDesc *desc = descs + count;
         desc->luid = LUID(adapter.get()->desc1_);
         count += 1;

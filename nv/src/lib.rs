@@ -2,7 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-include!(concat!(env!("OUT_DIR"), "/nvidia_ffi.rs"));
+include!(concat!(env!("OUT_DIR"), "/nv_ffi.rs"));
 
 use hw_common::{
     inner::{DecodeCalls, EncodeCalls, InnerDecodeContext, InnerEncodeContext},
@@ -12,26 +12,26 @@ use hw_common::{
 
 pub fn encode_calls() -> EncodeCalls {
     EncodeCalls {
-        new: nvidia_new_encoder,
-        encode: nvidia_encode,
-        destroy: nvidia_destroy_encoder,
-        test: nvidia_test_encode,
-        set_bitrate: nvidia_set_bitrate,
-        set_framerate: nvidia_set_framerate,
+        new: nv_new_encoder,
+        encode: nv_encode,
+        destroy: nv_destroy_encoder,
+        test: nv_test_encode,
+        set_bitrate: nv_set_bitrate,
+        set_framerate: nv_set_framerate,
     }
 }
 
 pub fn decode_calls() -> DecodeCalls {
     DecodeCalls {
-        new: nvidia_new_decoder,
-        decode: nvidia_decode,
-        destroy: nvidia_destroy_decoder,
-        test: nvidia_test_decode,
+        new: nv_new_decoder,
+        decode: nv_decode,
+        destroy: nv_destroy_decoder,
+        test: nv_test_decode,
     }
 }
 
 pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
-    if unsafe { nvidia_encode_driver_support() } != 0 {
+    if unsafe { nv_encode_driver_support() } != 0 {
         return vec![];
     }
     let devices = vec![API_DX11];
@@ -50,7 +50,7 @@ pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
 
 pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
     vec![]
-    // if unsafe { nvidia_encode_driver_support() } != 0 {
+    // if unsafe { nv_encode_driver_support() } != 0 {
     //     return vec![];
     // }
     // let devices = vec![API_DX11];

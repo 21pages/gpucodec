@@ -26,7 +26,7 @@ impl Encoder {
             return Err(());
         }
         let calls = match ctx.f.driver {
-            NVENC => nvidia::encode_calls(),
+            NVENC => nv::encode_calls(),
             AMF => amf::encode_calls(),
             MFX => mfx::encode_calls(),
         };
@@ -130,7 +130,7 @@ pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
 fn available_(d: DynamicContext) -> Vec<FeatureContext> {
     let mut natives: Vec<_> = vec![];
     natives.append(
-        &mut nvidia::possible_support_encoders()
+        &mut nv::possible_support_encoders()
             .drain(..)
             .map(|n| (NVENC, n))
             .collect(),
@@ -162,7 +162,7 @@ fn available_(d: DynamicContext) -> Vec<FeatureContext> {
         let outputs = outputs.clone();
         let handle = thread::spawn(move || {
             let test = match input.f.driver {
-                NVENC => nvidia::encode_calls().test,
+                NVENC => nv::encode_calls().test,
                 AMF => amf::encode_calls().test,
                 MFX => mfx::encode_calls().test,
             };

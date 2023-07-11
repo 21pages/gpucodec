@@ -49,7 +49,7 @@ static void free_driver(CudaFunctions **pp_cuda_dl,
   }
 }
 
-extern "C" int nvidia_encode_driver_support() {
+extern "C" int nv_encode_driver_support() {
   try {
     CudaFunctions *cuda_dl = NULL;
     NvencFunctions *nvenc_dl = NULL;
@@ -78,7 +78,7 @@ struct NvencEncoder {
   }
 };
 
-extern "C" int nvidia_destroy_encoder(void *encoder) {
+extern "C" int nv_destroy_encoder(void *encoder) {
   try {
     NvencEncoder *e = (NvencEncoder *)encoder;
     if (e) {
@@ -99,10 +99,10 @@ extern "C" int nvidia_destroy_encoder(void *encoder) {
   return -1;
 }
 
-extern "C" void *nvidia_new_encoder(void *handle, int64_t luid, API api,
-                                    DataFormat dataFormat, int32_t width,
-                                    int32_t height, int32_t kbs,
-                                    int32_t framerate, int32_t gop) {
+extern "C" void *nv_new_encoder(void *handle, int64_t luid, API api,
+                                DataFormat dataFormat, int32_t width,
+                                int32_t height, int32_t kbs, int32_t framerate,
+                                int32_t gop) {
   NvencEncoder *e = NULL;
   try {
     if (width % 2 != 0 || height % 2 != 0) {
@@ -200,7 +200,7 @@ extern "C" void *nvidia_new_encoder(void *handle, int64_t luid, API api,
 
 _exit:
   if (e) {
-    nvidia_destroy_encoder(e);
+    nv_destroy_encoder(e);
     delete e;
   }
   return NULL;
@@ -248,8 +248,8 @@ static int copy_texture(NvencEncoder *e, void *src, void *dst) {
 }
 #endif
 
-extern "C" int nvidia_encode(void *encoder, void *texture,
-                             EncodeCallback callback, void *obj) {
+extern "C" int nv_encode(void *encoder, void *texture, EncodeCallback callback,
+                         void *obj) {
   try {
     NvencEncoder *e = (NvencEncoder *)encoder;
     NvEncoderD3D11 *pEnc = e->pEnc;
@@ -298,11 +298,11 @@ extern "C" int nvidia_encode(void *encoder, void *texture,
     return 0;                                                                  \
   }
 
-extern "C" int nvidia_test_encode(void *outDescs, int32_t maxDescNum,
-                                  int32_t *outDescNum, API api,
-                                  DataFormat dataFormat, int32_t width,
-                                  int32_t height, int32_t kbs,
-                                  int32_t framerate, int32_t gop) {
+extern "C" int nv_test_encode(void *outDescs, int32_t maxDescNum,
+                              int32_t *outDescNum, API api,
+                              DataFormat dataFormat, int32_t width,
+                              int32_t height, int32_t kbs, int32_t framerate,
+                              int32_t gop) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -310,7 +310,7 @@ extern "C" int nvidia_test_encode(void *outDescs, int32_t maxDescNum,
       return -1;
     int count = 0;
     for (auto &adapter : adapters.adapters_) {
-      NvencEncoder *e = (NvencEncoder *)nvidia_new_encoder(
+      NvencEncoder *e = (NvencEncoder *)nv_new_encoder(
           (void *)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_),
           api, dataFormat, width, height, kbs, framerate, gop);
       if (!e)
@@ -318,8 +318,8 @@ extern "C" int nvidia_test_encode(void *outDescs, int32_t maxDescNum,
       if (!e->nativeDevice->EnsureTexture(e->width, e->height))
         continue;
       e->nativeDevice->next();
-      if (nvidia_encode(e, e->nativeDevice->GetCurrentTexture(), nullptr,
-                        nullptr) == 0) {
+      if (nv_encode(e, e->nativeDevice->GetCurrentTexture(), nullptr,
+                    nullptr) == 0) {
         AdapterDesc *desc = descs + count;
         desc->luid = LUID(adapter.get()->desc1_);
         count += 1;
@@ -336,7 +336,7 @@ extern "C" int nvidia_test_encode(void *outDescs, int32_t maxDescNum,
   return -1;
 }
 
-extern "C" int nvidia_set_bitrate(void *e, int32_t kbs) {
+extern "C" int nv_set_bitrate(void *e, int32_t kbs) {
   try {
     RECONFIGURE_HEAD
     params.reInitEncodeParams.encodeConfig->rcParams.averageBitRate =
@@ -348,7 +348,7 @@ extern "C" int nvidia_set_bitrate(void *e, int32_t kbs) {
   return -1;
 }
 
-extern "C" int nvidia_set_framerate(void *e, int32_t kbs) {
+extern "C" int nv_set_framerate(void *e, int32_t kbs) {
   try {
     RECONFIGURE_HEAD
     params.reInitEncodeParams.frameRateNum = kbs * 1000;

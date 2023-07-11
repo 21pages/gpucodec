@@ -29,7 +29,7 @@ unsafe impl Sync for Decoder {}
 impl Decoder {
     pub fn new(ctx: DecodeContext) -> Result<Self, ()> {
         let calls = match ctx.driver {
-            CUVID => nvidia::decode_calls(),
+            CUVID => nv::decode_calls(),
             AMF => amf::decode_calls(),
             MFX => mfx::decode_calls(),
         };
@@ -129,7 +129,7 @@ fn available_() -> Vec<DecodeContext> {
     // to-do: log control
     let mut natives: Vec<_> = vec![];
     natives.append(
-        &mut nvidia::possible_support_decoders()
+        &mut nv::possible_support_decoders()
             .drain(..)
             .map(|n| (CUVID, n))
             .collect(),
@@ -175,7 +175,7 @@ fn available_() -> Vec<DecodeContext> {
         let buf265 = buf265.clone();
         let handle = thread::spawn(move || {
             let test = match input.driver {
-                CUVID => nvidia::decode_calls().test,
+                CUVID => nv::decode_calls().test,
                 AMF => amf::decode_calls().test,
                 MFX => mfx::decode_calls().test,
             };

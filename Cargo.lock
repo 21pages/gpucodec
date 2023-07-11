@@ -254,7 +254,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nvidia"
+name = "nv"
 version = "0.1.0"
 dependencies = [
  "bindgen",
@@ -403,7 +403,7 @@ dependencies = [
  "hw_common",
  "log",
  "mfx",
- "nvidia",
+ "nv",
  "render",
  "serde",
  "serde_derive",
