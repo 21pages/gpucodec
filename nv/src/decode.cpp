@@ -264,7 +264,7 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
         std::cerr << "Failed to GetSharedHandle" << std::endl;
         return -1;
       }
-      callback(sharedHandle, SURFACE_FORMAT_BGRA, width, height, obj, 0);
+      callback(sharedHandle, obj);
       decoded = true;
     }
     return decoded ? 0 : -1;

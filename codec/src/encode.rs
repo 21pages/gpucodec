@@ -71,12 +71,12 @@ impl Encoder {
         }
     }
 
-    extern "C" fn callback(data: *const u8, size: c_int, pts: i64, key: i32, obj: *const c_void) {
+    extern "C" fn callback(data: *const u8, size: c_int, key: i32, obj: *const c_void) {
         unsafe {
             let frames = &mut *(obj as *mut Vec<EncodeFrame>);
             frames.push(EncodeFrame {
                 data: from_raw_parts(data, size as usize).to_vec(),
-                pts,
+                pts: 0,
                 key,
             });
         }
@@ -119,7 +119,7 @@ pub struct EncodeFrame {
 
 impl Display for EncodeFrame {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "encode len:{}, pts:{}", self.data.len(), self.pts)
+        write!(f, "encode len:{}, key:{}", self.data.len(), self.key)
     }
 }
 

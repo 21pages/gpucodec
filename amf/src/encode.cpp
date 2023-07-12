@@ -130,7 +130,7 @@ public:
         packet.data = packetDataBuffer_.data();
         std::memcpy(packet.data, pBuffer->GetNative(), packet.size);
         if (callback)
-          callback(packet.data, packet.size, 0, packet.keyframe, obj);
+          callback(packet.data, packet.size, packet.keyframe, obj);
         encoded = true;
       }
       pBuffer = NULL;

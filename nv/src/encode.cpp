@@ -270,12 +270,12 @@ extern "C" int nv_encode(void *encoder, void *texture, EncodeCallback callback,
     pEnc->EncodeFrame(vPacket);
     for (NvPacket &packet : vPacket) {
       int32_t key = (packet.pictureType == NV_ENC_PIC_TYPE_IDR ||
-                         packet.pictureType = NV_ENC_PIC_TYPE_I)
+                     packet.pictureType == NV_ENC_PIC_TYPE_I)
                         ? 1
                         : 0;
       if (packet.data.size() > 0) {
         if (callback)
-          callback(packet.data.data(), packet.data.size(), 0, key, obj);
+          callback(packet.data.data(), packet.data.size(), key, obj);
         encoded = true;
       }
     }

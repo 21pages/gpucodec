@@ -255,9 +255,7 @@ extern "C" int mfx_decode(void *decoder, uint8_t *data, int len,
       }
       if (MFX_ERR_NONE == sts) {
         if (callback)
-          callback(sharedHandle, SURFACE_FORMAT_BGRA,
-                   pmfxOutSurface->Info.CropW, pmfxOutSurface->Info.CropH, obj,
-                   0);
+          callback(sharedHandle, obj);
         decoded = true;
       }
       break;

@@ -261,8 +261,8 @@ extern "C" int mfx_encode(void *encoder, ID3D11Texture2D *tex,
       int key = (p->mfxBS.FrameType & MFX_FRAMETYPE_I) ||
                 (p->mfxBS.FrameType & MFX_FRAMETYPE_IDR);
       if (callback)
-        callback(p->mfxBS.Data + p->mfxBS.DataOffset, p->mfxBS.DataLength, 0,
-                 key, obj);
+        callback(p->mfxBS.Data + p->mfxBS.DataOffset, p->mfxBS.DataLength, key,
+                 obj);
       encoded = true;
     }
   }

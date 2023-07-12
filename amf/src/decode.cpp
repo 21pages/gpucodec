@@ -91,7 +91,7 @@ public:
           return AMF_FAIL;
         }
         if (callback)
-          callback(sharedHandle, 0, 0, 0, obj, 0);
+          callback(sharedHandle, obj);
         decoded = true;
       } break;
       case amf::AMF_MEMORY_OPENCL: {

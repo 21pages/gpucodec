@@ -32,17 +32,13 @@ static int32_t encode_len;
 static void *decode_shared_handle;
 
 extern "C" static void encode_callback(const uint8_t *data, int32_t len,
-                                       int64_t pts, int32_t key,
-                                       const void *obj) {
+                                       int32_t key, const void *obj) {
   encode_data = data;
   encode_len = len;
   std::cerr << "encode len" << len << std::endl;
 }
 
-extern "C" static void decode_callback(void *shared_handle,
-                                       int32_t surfaceFormat, int32_t width,
-                                       int32_t height, const void *obj,
-                                       int32_t key) {
+extern "C" static void decode_callback(void *shared_handle, const void *obj) {
   decode_shared_handle = shared_handle;
 }
 

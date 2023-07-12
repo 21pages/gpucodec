@@ -1,10 +1,6 @@
 use crate::gpu_video_codec_get_bin_file;
 use gvc_common::{
-    inner::DecodeCalls,
-    AdapterDesc,
-    DataFormat::*,
-    DecodeContext, DecodeDriver,
-    SurfaceFormat::{self, *},
+    inner::DecodeCalls, AdapterDesc, DataFormat::*, DecodeContext, DecodeDriver, SurfaceFormat::*,
 };
 use log::{error, trace};
 use std::{
@@ -72,23 +68,10 @@ impl Decoder {
         }
     }
 
-    unsafe extern "C" fn callback(
-        texture: *mut c_void,
-        format: c_int,
-        width: c_int,
-        height: c_int,
-        obj: *const c_void,
-        key: c_int,
-    ) {
+    unsafe extern "C" fn callback(texture: *mut c_void, obj: *const c_void) {
         let frames = &mut *(obj as *mut Vec<DecodeFrame>);
 
-        let frame = DecodeFrame {
-            surface_format: std::mem::transmute(format),
-            width,
-            height,
-            texture,
-            key: key != 0,
-        };
+        let frame = DecodeFrame { texture };
         frames.push(frame);
     }
 }
@@ -104,21 +87,7 @@ impl Drop for Decoder {
 }
 
 pub struct DecodeFrame {
-    pub surface_format: SurfaceFormat,
-    pub width: i32,
-    pub height: i32,
     pub texture: *mut c_void,
-    pub key: bool,
-}
-
-impl std::fmt::Display for DecodeFrame {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "surface_format:{:?}, width:{}, height:{},key:{}",
-            self.surface_format, self.width, self.height, self.key,
-        )
-    }
 }
 
 pub fn available() -> Vec<DecodeContext> {
