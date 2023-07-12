@@ -1,4 +1,5 @@
 use duplication::dxgi;
+use gpu_video_codec::{decode::Decoder, encode::Encoder};
 use hw_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
     FeatureContext, SurfaceFormat::*, API::*, MAX_GOP,
@@ -9,7 +10,6 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
-use texcodec::{decode::Decoder, encode::Encoder};
 
 fn main() {
     unsafe {

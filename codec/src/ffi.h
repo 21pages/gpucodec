@@ -3,6 +3,6 @@
 
 #include <stdint.h>
 
-void native_codec_get_bin_file(int32_t is265, uint8_t **p, int32_t *len);
+void gpu_video_codec_get_bin_file(int32_t is265, uint8_t **p, int32_t *len);
 
 #endif

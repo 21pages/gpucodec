@@ -1,2 +1,2 @@
 [workspace]
-members = ["texcodec", "amf", "nv", "hw_common", "mfx", "duplication", "render"]
+members = ["codec", "amf", "nv", "hw_common", "mfx", "duplication", "render"]

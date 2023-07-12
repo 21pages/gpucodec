@@ -1,4 +1,4 @@
-use crate::native_codec_get_bin_file;
+use crate::gpu_video_codec_get_bin_file;
 use hw_common::{
     inner::DecodeCalls,
     AdapterDesc,
@@ -161,8 +161,8 @@ fn available_() -> Vec<DecodeContext> {
     let mut len_bin_265: c_int = 0;
     let buf265;
     unsafe {
-        native_codec_get_bin_file(0, &mut p_bin_264 as _, &mut len_bin_264 as _);
-        native_codec_get_bin_file(1, &mut p_bin_265 as _, &mut len_bin_265 as _);
+        gpu_video_codec_get_bin_file(0, &mut p_bin_264 as _, &mut len_bin_264 as _);
+        gpu_video_codec_get_bin_file(1, &mut p_bin_265 as _, &mut len_bin_265 as _);
         buf264 = from_raw_parts(p_bin_264, len_bin_264 as _);
         buf265 = from_raw_parts(p_bin_265, len_bin_265 as _);
     }

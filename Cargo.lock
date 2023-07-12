@@ -152,6 +152,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
+name = "gpu_video_codec"
+version = "0.1.0"
+dependencies = [
+ "amf",
+ "bindgen",
+ "cc",
+ "duplication",
+ "env_logger",
+ "hw_common",
+ "log",
+ "mfx",
+ "nv",
+ "render",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -389,25 +408,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be55cf8942feac5c765c2c993422806843c9a9a45d4d5c407ad6dd2ea95eb9b6"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "texcodec"
-version = "0.1.0"
-dependencies = [
- "amf",
- "bindgen",
- "cc",
- "duplication",
- "env_logger",
- "hw_common",
- "log",
- "mfx",
- "nv",
- "render",
- "serde",
- "serde_derive",
- "serde_json",
 ]
 
 [[package]]

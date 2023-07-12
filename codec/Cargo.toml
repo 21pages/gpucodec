@@ -1,5 +1,5 @@
 [package]
-name = "texcodec"
+name = "gpu_video_codec"
 version = "0.1.0"
 edition = "2021"
 
