@@ -258,9 +258,11 @@ extern "C" int mfx_encode(void *encoder, ID3D11Texture2D *tex,
         syncp, 1000); // Synchronize. Wait until encoded frame is ready
     CHECK_STATUS_RETURN(sts, "SyncOperation");
     if (p->mfxBS.DataLength > 0) {
+      int key = (p->mfxBS.FrameType & MFX_FRAMETYPE_I) ||
+                (p->mfxBS.FrameType & MFX_FRAMETYPE_IDR);
       if (callback)
-        callback(p->mfxBS.Data + p->mfxBS.DataOffset, p->mfxBS.DataLength, 0, 0,
-                 obj);
+        callback(p->mfxBS.Data + p->mfxBS.DataOffset, p->mfxBS.DataLength, 0,
+                 key, obj);
       encoded = true;
     }
   }
