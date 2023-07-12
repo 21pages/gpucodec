@@ -31,6 +31,7 @@ impl Decoder {
         };
         unsafe {
             let codec = (calls.new)(
+                ctx.device.unwrap_or(std::ptr::null_mut()),
                 ctx.luid,
                 ctx.api as i32,
                 ctx.data_format as i32,
@@ -116,6 +117,7 @@ fn available_() -> Vec<DecodeContext> {
             .collect(),
     );
     let inputs = natives.drain(..).map(|(driver, n)| DecodeContext {
+        device: None,
         driver,
         data_format: n.dataFormat,
         api: n.api,

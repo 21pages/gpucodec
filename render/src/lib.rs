@@ -31,6 +31,10 @@ impl Render {
         }
     }
 
+    pub unsafe fn device(&mut self) -> *mut c_void {
+        DXGIDevice(self.inner.as_mut())
+    }
+
     pub unsafe fn drop(&mut self) {
         DestroyDXGIRender(self.inner.as_mut());
     }

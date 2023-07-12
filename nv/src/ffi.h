@@ -15,7 +15,7 @@ int nv_encode(void *encoder, void *tex, EncodeCallback callback, void *obj);
 
 int nv_destroy_encoder(void *encoder);
 
-void *nv_new_decoder(int64_t luid, int32_t api, int32_t codecID,
+void *nv_new_decoder(void *device, int64_t luid, int32_t api, int32_t codecID,
                      int32_t outputSurfaceFormat);
 
 int nv_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,

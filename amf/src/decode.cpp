@@ -21,6 +21,7 @@ public:
 
 private:
   // system
+  void *device_;
   int64_t luid_;
   std::unique_ptr<NativeDevice> nativeDevice_ = nullptr;
   // amf
@@ -37,9 +38,9 @@ private:
   std::vector<std::vector<uint8_t>> buffer_;
 
 public:
-  AMFDecoder(int64_t luid, amf::AMF_MEMORY_TYPE memoryTypeOut,
+  AMFDecoder(void *device, int64_t luid, amf::AMF_MEMORY_TYPE memoryTypeOut,
              amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut)
-      : luid_(luid), AMFMemoryType_(memoryTypeOut),
+      : device_(device), luid_(luid), AMFMemoryType_(memoryTypeOut),
         textureFormatOut_(textureFormatOut), codec_(codec) {
     init_result_ = initialize();
   }
@@ -145,7 +146,7 @@ private:
       break;
     case amf::AMF_MEMORY_DX11:
       nativeDevice_ = std::make_unique<NativeDevice>();
-      if (!nativeDevice_->Init(luid_, nullptr, 4)) {
+      if (!nativeDevice_->Init(luid_, (ID3D11Device *)device_, 4)) {
         std::cerr << "Init NativeDevice failed" << std::endl;
         return AMF_FAIL;
       }
@@ -248,7 +249,8 @@ static bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
 
 #include "common.cpp"
 
-extern "C" void *amf_new_decoder(int64_t luid, API api, DataFormat dataFormat,
+extern "C" void *amf_new_decoder(void *device, int64_t luid, API api,
+                                 DataFormat dataFormat,
                                  SurfaceFormat outputSurfaceFormat) {
   try {
     amf_wstring codecStr;
@@ -263,7 +265,8 @@ extern "C" void *amf_new_decoder(int64_t luid, API api, DataFormat dataFormat,
     if (!convert_surface_format(outputSurfaceFormat, surfaceFormat)) {
       return NULL;
     }
-    AMFDecoder *dec = new AMFDecoder(luid, memory, codecStr, surfaceFormat);
+    AMFDecoder *dec =
+        new AMFDecoder(device, luid, memory, codecStr, surfaceFormat);
     if (dec && dec->init_result_ != AMF_OK) {
       dec->destroy();
       delete dec;
@@ -299,8 +302,9 @@ extern "C" int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
       return -1;
     int count = 0;
     for (auto &adapter : adapters.adapters_) {
-      AMFDecoder *p = (AMFDecoder *)amf_new_decoder(
-          LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
+      AMFDecoder *p =
+          (AMFDecoder *)amf_new_decoder(nullptr, LUID(adapter.get()->desc1_),
+                                        api, dataFormat, outputSurfaceFormat);
       if (!p)
         continue;
       if (p->decode(data, length, nullptr, nullptr) == AMF_OK) {

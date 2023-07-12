@@ -560,3 +560,8 @@ extern "C" void DestroyDXGIRender(void *render) {
   if (self->message_thread)
     self->message_thread->join();
 }
+
+extern "C" void *DXGIDevice(void *render) {
+  Render *self = (Render *)render;
+  return self->ctx->device;
+}

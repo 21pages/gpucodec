@@ -100,7 +100,8 @@ static bool dataFormat_to_cuCodecID(DataFormat dataFormat,
   return true;
 }
 
-extern "C" void *nv_new_decoder(int64_t luid, API api, DataFormat dataFormat,
+extern "C" void *nv_new_decoder(void *device, int64_t luid, API api,
+                                DataFormat dataFormat,
                                 SurfaceFormat outputSurfaceFormat) {
   CuvidDecoder *p = NULL;
   try {
@@ -119,7 +120,7 @@ extern "C" void *nv_new_decoder(int64_t luid, API api, DataFormat dataFormat,
 
     CUdevice cuDevice = 0;
     p->nativeDevice = std::make_unique<NativeDevice>();
-    if (!p->nativeDevice->Init(luid, nullptr))
+    if (!p->nativeDevice->Init(luid, (ID3D11Device *)device))
       goto _exit;
     if (!ck(p->cudl->cuD3D11GetDevice(&cuDevice,
                                       p->nativeDevice->adapter_.Get())))
@@ -286,8 +287,9 @@ extern "C" int nv_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
       return -1;
     int count = 0;
     for (auto &adapter : adapters.adapters_) {
-      CuvidDecoder *p = (CuvidDecoder *)nv_new_decoder(
-          LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
+      CuvidDecoder *p =
+          (CuvidDecoder *)nv_new_decoder(nullptr, LUID(adapter.get()->desc1_),
+                                         api, dataFormat, outputSurfaceFormat);
       if (!p)
         continue;
       if (nv_decode(p, data, length, nullptr, nullptr) == 0) {

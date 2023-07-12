@@ -86,13 +86,14 @@ static mfxStatus InitializeMFX(MFXDecoder *p) {
   return MFX_ERR_NONE;
 }
 
-extern "C" void *mfx_new_decoder(int64_t luid, API api, DataFormat codecID,
+extern "C" void *mfx_new_decoder(void *device, int64_t luid, API api,
+                                 DataFormat codecID,
                                  SurfaceFormat outputSurfaceFormat) {
   mfxStatus sts = MFX_ERR_NONE;
 
   MFXDecoder *p = new MFXDecoder();
   p->nativeDevice = std::make_unique<NativeDevice>();
-  if (!p->nativeDevice->Init(luid, nullptr))
+  if (!p->nativeDevice->Init(luid, (ID3D11Device *)device))
     goto _exit;
   p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice->device_.Get(),
                                              p->nativeDevice->context_.Get());
@@ -278,8 +279,9 @@ extern "C" int mfx_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
       return -1;
     int count = 0;
     for (auto &adapter : adapters.adapters_) {
-      MFXDecoder *p = (MFXDecoder *)mfx_new_decoder(
-          LUID(adapter.get()->desc1_), api, dataFormat, outputSurfaceFormat);
+      MFXDecoder *p =
+          (MFXDecoder *)mfx_new_decoder(nullptr, LUID(adapter.get()->desc1_),
+                                        api, dataFormat, outputSurfaceFormat);
       if (!p)
         continue;
       if (mfx_decode(p, data, length, nullptr, nullptr) == 0) {

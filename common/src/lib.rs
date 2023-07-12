@@ -54,6 +54,8 @@ pub struct EncodeContext {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DecodeContext {
+    #[serde(skip)]
+    pub device: Option<*mut c_void>,
     pub driver: DecodeDriver,
     pub luid: i64,
     pub api: API,

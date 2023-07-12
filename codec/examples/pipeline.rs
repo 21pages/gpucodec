@@ -36,6 +36,7 @@ fn main() {
             },
         };
         let de_ctx = DecodeContext {
+            device: Some(render.device()),
             driver: DecodeDriver::AMF,
             api: API_DX11,
             data_format,

@@ -13,8 +13,8 @@ int mfx_encode(void *encoder, void *tex, EncodeCallback callback, void *obj);
 
 int mfx_destroy_encoder(void *encoder);
 
-void *mfx_new_decoder(int64_t luid, int32_t api, int32_t dataFormat,
-                      int32_t outputSurfaceFormat);
+void *mfx_new_decoder(void *device, int64_t luid, int32_t api,
+                      int32_t dataFormat, int32_t outputSurfaceFormat);
 
 int mfx_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
                void *obj);
