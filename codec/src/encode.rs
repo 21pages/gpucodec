@@ -1,4 +1,4 @@
-use hw_common::{
+use gvc_common::{
     inner::EncodeCalls, AdapterDesc, DynamicContext, EncodeContext, EncodeDriver::*, FeatureContext,
 };
 use log::trace;

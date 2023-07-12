@@ -4,7 +4,7 @@
 
 include!(concat!(env!("OUT_DIR"), "/mfx_ffi.rs"));
 
-use hw_common::{
+use gvc_common::{
     inner::{DecodeCalls, EncodeCalls, InnerDecodeContext, InnerEncodeContext},
     DataFormat::*,
     API::*,

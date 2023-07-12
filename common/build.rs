@@ -44,7 +44,7 @@ fn main() {
     for f in vec!["Preproc.cpp"] {
         builder.file(format!("{}/{}", dxgi_path.display(), f));
     }
-    builder.compile("hw_common");
+    builder.compile("gvc_common");
 }
 
 #[derive(Debug)]

@@ -17,7 +17,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen",
  "cc",
- "hw_common",
+ "gvc_common",
  "log",
 ]
 
@@ -160,11 +160,23 @@ dependencies = [
  "cc",
  "duplication",
  "env_logger",
- "hw_common",
+ "gvc_common",
  "log",
  "mfx",
  "nv",
  "render",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
+name = "gvc_common"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "cc",
+ "log",
  "serde",
  "serde_derive",
  "serde_json",
@@ -184,18 +196,6 @@ name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
-
-[[package]]
-name = "hw_common"
-version = "0.1.0"
-dependencies = [
- "bindgen",
- "cc",
- "log",
- "serde",
- "serde_derive",
- "serde_json",
-]
 
 [[package]]
 name = "itoa"
@@ -252,7 +252,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen",
  "cc",
- "hw_common",
+ "gvc_common",
  "log",
 ]
 
@@ -278,7 +278,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen",
  "cc",
- "hw_common",
+ "gvc_common",
  "log",
 ]
 

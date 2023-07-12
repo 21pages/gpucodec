@@ -7,7 +7,7 @@ use std::{
 fn main() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let externals_dir = manifest_dir.parent().unwrap().join("externals");
-    let common_dir = manifest_dir.parent().unwrap().join("hw_common");
+    let common_dir = manifest_dir.parent().unwrap().join("common");
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed={}", common_dir.display());
     println!("cargo:rerun-if-changed={}", externals_dir.display());
@@ -71,9 +71,7 @@ fn main() {
     builder.include(&dxgi_path);
 
     // crate
-    builder.include("../hw_common/src");
-    // #[cfg(windows)]
-    // builder.define("WIN32", None);
+    builder.include("../common/src");
     builder
         .file("src/encode.cpp")
         .file("src/decode.cpp")

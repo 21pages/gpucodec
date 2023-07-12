@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 log = "0.4"
-hw_common = { path = "../hw_common" }
+gvc_common = { path = "../common" }
 
 [build-dependencies]
 cc = "1.0"

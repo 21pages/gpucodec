@@ -1,6 +1,6 @@
 use duplication::dxgi;
 use gpu_video_codec::{decode::Decoder, encode::Encoder};
-use hw_common::{
+use gvc_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
     FeatureContext, SurfaceFormat::*, API::*, MAX_GOP,
 };

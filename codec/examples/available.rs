@@ -1,6 +1,6 @@
 use env_logger::{init_from_env, Env, DEFAULT_FILTER_ENV};
 use gpu_video_codec::{decode, encode};
-use hw_common::{DynamicContext, MAX_GOP};
+use gvc_common::{DynamicContext, MAX_GOP};
 
 fn main() {
     init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "info"));

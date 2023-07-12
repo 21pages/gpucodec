@@ -1,5 +1,5 @@
 use crate::gpu_video_codec_get_bin_file;
-use hw_common::{
+use gvc_common::{
     inner::DecodeCalls,
     AdapterDesc,
     DataFormat::*,
