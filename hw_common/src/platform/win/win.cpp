@@ -11,22 +11,23 @@
 
 #include "win.h"
 
-bool NativeDevice::Init(int64_t luid, ID3D11Device *device) {
+bool NativeDevice::Init(int64_t luid, ID3D11Device *device, int pool_size) {
   if (device) {
-    if (!Init(device))
+    if (!InitFromDevice(device))
       return false;
   } else {
-    if (!Init(luid))
+    if (!InitFromLuid(luid))
       return false;
   }
   if (!SetMultithreadProtected())
     return false;
+  count_ = pool_size;
   texture_.resize(count_);
   std::fill(texture_.begin(), texture_.end(), nullptr);
   return true;
 }
 
-bool NativeDevice::Init(int64_t luid) {
+bool NativeDevice::InitFromLuid(int64_t luid) {
   HRESULT hr = S_OK;
 
   HRB(CreateDXGIFactory1(__uuidof(IDXGIFactory1),
@@ -74,7 +75,7 @@ bool NativeDevice::Init(int64_t luid) {
   return true;
 }
 
-bool NativeDevice::Init(ID3D11Device *device) {
+bool NativeDevice::InitFromDevice(ID3D11Device *device) {
   device_ = device;
   device_->GetImmediateContext(context_.ReleaseAndGetAddressOf());
   ComPtr<IDXGIDevice> dxgiDevice = nullptr;

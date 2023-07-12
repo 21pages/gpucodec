@@ -37,7 +37,7 @@ using Microsoft::WRL::ComPtr;
 
 class NativeDevice {
 public:
-  bool Init(int64_t luid, ID3D11Device *device);
+  bool Init(int64_t luid, ID3D11Device *device, int pool_size = 1);
   bool EnsureTexture(int width, int height);
   bool SetTexture(ID3D11Texture2D *texture);
   HANDLE GetSharedHandle();
@@ -45,8 +45,8 @@ public:
   int next();
 
 private:
-  bool Init(int64_t luid);
-  bool Init(ID3D11Device *device);
+  bool InitFromLuid(int64_t luid);
+  bool InitFromDevice(ID3D11Device *device);
   bool SetMultithreadProtected();
 
 public:
@@ -56,7 +56,7 @@ public:
   ComPtr<IDXGIAdapter1> adapter1_ = nullptr;
   ComPtr<ID3D11Device> device_ = nullptr;
   ComPtr<ID3D11DeviceContext> context_ = nullptr;
-  const int count_ = 8;
+  int count_;
   int index_ = 0;
 
 private:

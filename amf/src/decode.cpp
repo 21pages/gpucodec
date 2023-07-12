@@ -145,7 +145,7 @@ private:
       break;
     case amf::AMF_MEMORY_DX11:
       nativeDevice_ = std::make_unique<NativeDevice>();
-      if (!nativeDevice_->Init(luid_, nullptr)) {
+      if (!nativeDevice_->Init(luid_, nullptr, 4)) {
         std::cerr << "Init NativeDevice failed" << std::endl;
         return AMF_FAIL;
       }
