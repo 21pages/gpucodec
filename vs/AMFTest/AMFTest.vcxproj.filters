@@ -14,17 +14,17 @@
     <Filter Include="source\externals\nvEncDXGIOutputDuplicationSample">
       <UniqueIdentifier>{2bc8fd1a-5082-40fb-a6b5-ac8c3b84d450}</UniqueIdentifier>
     </Filter>
-    <Filter Include="source\hw_common">
-      <UniqueIdentifier>{8a1b8e43-9bdb-4e28-98d9-854c8e8bf107}</UniqueIdentifier>
-    </Filter>
     <Filter Include="source\render">
       <UniqueIdentifier>{6edc9023-4c96-4474-b544-20059b2e32ac}</UniqueIdentifier>
     </Filter>
-    <Filter Include="source\duplication">
-      <UniqueIdentifier>{a65898d7-8992-40d0-9141-7b4f10415e1f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="source\texcodec">
+    <Filter Include="source\codec">
       <UniqueIdentifier>{ccee2176-d5f2-46b3-b138-538ac9bd7d13}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source\common">
+      <UniqueIdentifier>{8a1b8e43-9bdb-4e28-98d9-854c8e8bf107}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="source\capture">
+      <UniqueIdentifier>{a65898d7-8992-40d0-9141-7b4f10415e1f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -49,32 +49,32 @@
     <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\DDAImpl.cpp">
       <Filter>source\externals\nvEncDXGIOutputDuplicationSample</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\hw_common\src\platform\win\win.cpp">
-      <Filter>source\hw_common</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\duplication\src\dxgi.cpp">
-      <Filter>source\render</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\render\src\dxgi_sdl.cpp">
-      <Filter>source\duplication</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\amf\src\encode.cpp">
-      <Filter>source\texcodec</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\amf\src\decode.cpp">
-      <Filter>source\texcodec</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\amf\src\common.cpp">
-      <Filter>source\texcodec</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\texcodec\src\data.c">
-      <Filter>source\texcodec</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\Preproc.cpp">
       <Filter>source\externals\nvEncDXGIOutputDuplicationSample</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\texcodec\src\utils.c">
-      <Filter>source\texcodec</Filter>
+    <ClCompile Include="..\..\common\src\platform\win\win.cpp">
+      <Filter>source\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\capture\src\dxgi.cpp">
+      <Filter>source\capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\render\src\dxgi_sdl.cpp">
+      <Filter>source\render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\codec\src\data.c">
+      <Filter>source\codec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\codec\src\utils.c">
+      <Filter>source\codec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\amf\src\common.cpp">
+      <Filter>source\codec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\amf\src\decode.cpp">
+      <Filter>source\codec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\amf\src\encode.cpp">
+      <Filter>source\codec</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

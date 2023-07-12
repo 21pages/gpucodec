@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;CSO_DIR="../../render/res";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\..\externals\AMF_v1.4.29\amf;..\..\externals\AMF_v1.4.29\amf\public\common;..\..\hw_common\src;..\..\hw_common\src\platform\win;..\..\externals\nvEncDXGIOutputDuplicationSample;..\..\texcodec\src;D:\rustdesk\native_codec\externals\SDL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\externals\AMF_v1.4.29\amf;..\..\externals\AMF_v1.4.29\amf\public\common;..\..\common\src;..\..\common\src\platform\win;..\..\externals\nvEncDXGIOutputDuplicationSample;..\..\codec\src;..\..\externals\SDL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,7 +133,10 @@
     <ClCompile Include="..\..\amf\src\common.cpp" />
     <ClCompile Include="..\..\amf\src\decode.cpp" />
     <ClCompile Include="..\..\amf\src\encode.cpp" />
-    <ClCompile Include="..\..\duplication\src\dxgi.cpp" />
+    <ClCompile Include="..\..\capture\src\dxgi.cpp" />
+    <ClCompile Include="..\..\codec\src\data.c" />
+    <ClCompile Include="..\..\codec\src\utils.c" />
+    <ClCompile Include="..\..\common\src\platform\win\win.cpp" />
     <ClCompile Include="..\..\externals\AMF_v1.4.29\amf\public\common\AMFFactory.cpp" />
     <ClCompile Include="..\..\externals\AMF_v1.4.29\amf\public\common\AMFSTL.cpp" />
     <ClCompile Include="..\..\externals\AMF_v1.4.29\amf\public\common\Thread.cpp" />
@@ -141,10 +144,7 @@
     <ClCompile Include="..\..\externals\AMF_v1.4.29\amf\public\common\Windows\ThreadWindows.cpp" />
     <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\DDAImpl.cpp" />
     <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\Preproc.cpp" />
-    <ClCompile Include="..\..\hw_common\src\platform\win\win.cpp" />
     <ClCompile Include="..\..\render\src\dxgi_sdl.cpp" />
-    <ClCompile Include="..\..\texcodec\src\data.c" />
-    <ClCompile Include="..\..\texcodec\src\utils.c" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

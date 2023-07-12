@@ -80,7 +80,7 @@ static bool SaveTextureToFile(ID3D11Texture2D *texture,
   return true;
 }
 
-extern "C" void *dxgi_new_duplicator() {
+extern "C" void *dxgi_new_capturer() {
   DemoApplication *d = new DemoApplication();
   HRESULT hr = d->Init();
   if (FAILED(hr)) {
@@ -92,8 +92,8 @@ extern "C" void *dxgi_new_duplicator() {
   return d;
 }
 
-extern "C" void *dxgi_device(void *dup) {
-  DemoApplication *d = (DemoApplication *)dup;
+extern "C" void *dxgi_device(void *capturer) {
+  DemoApplication *d = (DemoApplication *)capturer;
   return d->Device();
 }
 
@@ -126,8 +126,8 @@ static void save_bmp(void *texture) {
   }
 }
 
-extern "C" void *dxgi_duplicate(void *dup, int wait_ms) {
-  DemoApplication *d = (DemoApplication *)dup;
+extern "C" void *dxgi_capture(void *capturer, int wait_ms) {
+  DemoApplication *d = (DemoApplication *)capturer;
   void *texture = d->Capture(wait_ms);
 #if 1
   save_bmp(texture);
@@ -135,8 +135,8 @@ extern "C" void *dxgi_duplicate(void *dup, int wait_ms) {
   return texture;
 }
 
-extern "C" void destroy_dxgi_duplicator(void *dup) {
-  DemoApplication *d = (DemoApplication *)dup;
+extern "C" void destroy_dxgi_capturer(void *capturer) {
+  DemoApplication *d = (DemoApplication *)capturer;
   if (d)
     delete d;
 }

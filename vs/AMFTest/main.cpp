@@ -4,10 +4,10 @@
 #include <iostream>
 #include <stdint.h>
 
-extern "C" void *dxgi_new_duplicator();
+extern "C" void *dxgi_new_capturer();
 extern "C" void *dxgi_device(void *self);
-extern "C" void *dxgi_duplicate(void *self, int wait_ms);
-extern "C" void destroy_dxgi_duplicator(void *self);
+extern "C" void *dxgi_capture(void *self, int wait_ms);
+extern "C" void destroy_dxgi_capturer(void *self);
 
 extern "C" void *amf_new_encoder(void *hdl, int64_t luid, API api,
                                  DataFormat dataFormat, int32_t width,
@@ -47,12 +47,12 @@ extern "C" static void decode_callback(void *shared_handle,
 }
 
 int main() {
-  int64_t luid = 64239; // get from texcodec/example/available
+  int64_t luid = 63666; // get from texcodec/example/available
   DataFormat dataFormat = H265;
   int width = 2880;
   int height = 1800;
 
-  void *dup = dxgi_new_duplicator();
+  void *dup = dxgi_new_capturer();
   if (!dup) {
     std::cerr << "create duplicator failed" << std::endl;
     return -1;
@@ -77,7 +77,7 @@ int main() {
   }
 
   while (true) {
-    void *texture = dxgi_duplicate(dup, 100);
+    void *texture = dxgi_capture(dup, 100);
     if (!texture) {
       std::cerr << "texture is NULL" << std::endl;
       continue;

@@ -71,6 +71,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "capture"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "cc",
+ "log",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -118,15 +127,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "duplication"
-version = "0.1.0"
-dependencies = [
- "bindgen",
- "cc",
- "log",
-]
-
-[[package]]
 name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -157,8 +157,8 @@ version = "0.1.0"
 dependencies = [
  "amf",
  "bindgen",
+ "capture",
  "cc",
- "duplication",
  "env_logger",
  "gvc_common",
  "log",

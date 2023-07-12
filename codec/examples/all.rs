@@ -1,4 +1,4 @@
-use duplication::dxgi;
+use capture::dxgi;
 use gpu_video_codec::{decode::Decoder, encode::Encoder};
 use gvc_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
@@ -14,9 +14,9 @@ use std::{
 fn main() {
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
-        let luid = 64352;
+        let luid = 63666;
         let data_format = DataFormat::H265;
-        let mut dup = dxgi::Duplicator::new().unwrap();
+        let mut capturer = dxgi::Capturer::new().unwrap();
         let mut render = Render::new(luid).unwrap();
 
         let en_ctx = EncodeContext {
@@ -27,7 +27,7 @@ fn main() {
                 luid,
             },
             d: DynamicContext {
-                device: Some(dup.device()),
+                device: Some(capturer.device()),
                 width: 2880,
                 height: 1800,
                 kbitrate: 5000,
@@ -52,7 +52,7 @@ fn main() {
         let mut dec_sum = Duration::ZERO;
         loop {
             let start = Instant::now();
-            let texture = dup.duplicate(100);
+            let texture = capturer.capture(100);
             if texture.is_null() {
                 println!("texture is null");
                 continue;
