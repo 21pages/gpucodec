@@ -310,7 +310,19 @@ extern "C" int mfx_test_encode(void *outDescs, int32_t maxDescNum,
   return -1;
 }
 
-extern "C" int mfx_set_bitrate(void *encoder, int32_t kbs) { return -1; }
+// https://github.com/Intel-Media-SDK/MediaSDK/blob/master/doc/mediasdk-man.md#dynamic-bitrate-change
+// https://github.com/Intel-Media-SDK/MediaSDK/blob/master/doc/mediasdk-man.md#mfxinfomfx
+extern "C" int mfx_set_bitrate(void *encoder, int32_t kbs) {
+  MFXEncoder *p = (MFXEncoder *)encoder;
+  mfxVideoParam param = {0};
+  mfxStatus sts = MFX_ERR_NONE;
+  sts = MFXVideoENCODE_GetVideoParam(p->session, &param);
+  CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_GetVideoParam");
+  param.mfx.TargetKbps = kbs;
+  sts = MFXVideoENCODE_Reset(p->session, &param);
+  CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_Reset");
+  return 0;
+}
 
 extern "C" int mfx_set_framerate(void *encoder, int32_t framerate) {
   return -1;
