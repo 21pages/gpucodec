@@ -14,7 +14,7 @@ use std::{
 fn main() {
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
-        let luid = 63666;
+        let luid = 64262;
         let data_format = DataFormat::H265;
         let mut capturer = dxgi::Capturer::new().unwrap();
         let mut render = Render::new(luid).unwrap();
