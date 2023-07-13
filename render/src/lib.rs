@@ -11,8 +11,8 @@ pub struct Render {
 }
 
 impl Render {
-    pub fn new(luid: i64) -> Result<Self, ()> {
-        let inner = unsafe { CreateDXGIRender(luid) };
+    pub fn new(luid: i64, input_shared_handle: bool) -> Result<Self, ()> {
+        let inner = unsafe { CreateDXGIRender(luid, input_shared_handle) };
         if inner.is_null() {
             Err(())
         } else {

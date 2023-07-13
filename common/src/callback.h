@@ -8,6 +8,6 @@
 typedef void (*EncodeCallback)(const uint8_t *data, int32_t len, int32_t key,
                                const void *obj);
 
-typedef void (*DecodeCallback)(void *texture, const void *obj);
+typedef void (*DecodeCallback)(void *opaque, const void *obj);
 
 #endif // CALLBACK_H

@@ -36,6 +36,7 @@ public:
   D3D11FrameAllocator d3d11FrameAllocator;
   std::unique_ptr<RGBToNV12> nv12torgb = NULL;
   mfxFrameAllocResponse mfxResponse;
+  bool outputSharedHandle;
 };
 
 extern "C" int mfx_destroy_decoder(void *decoder) {
@@ -87,13 +88,12 @@ static mfxStatus InitializeMFX(MFXDecoder *p) {
 }
 
 extern "C" void *mfx_new_decoder(void *device, int64_t luid, API api,
-                                 DataFormat codecID,
-                                 SurfaceFormat outputSurfaceFormat) {
+                                 DataFormat codecID, bool outputSharedHandle) {
   mfxStatus sts = MFX_ERR_NONE;
 
   MFXDecoder *p = new MFXDecoder();
   p->nativeDevice = std::make_unique<NativeDevice>();
-  if (!p->nativeDevice->Init(luid, (ID3D11Device *)device))
+  if (!p->nativeDevice->Init(luid, (ID3D11Device *)device, 4))
     goto _exit;
   p->nv12torgb = std::make_unique<RGBToNV12>(p->nativeDevice->device_.Get(),
                                              p->nativeDevice->context_.Get());
@@ -118,6 +118,7 @@ extern "C" void *mfx_new_decoder(void *device, int64_t luid, API api,
 
   // Validate video decode parameters (optional)
   sts = p->mfxDEC->Query(&p->mfxVideoParams, &p->mfxVideoParams);
+  p->outputSharedHandle = outputSharedHandle;
 
   return p;
 
@@ -249,14 +250,21 @@ extern "C" int mfx_decode(void *decoder, uint8_t *data, int len,
       }
       p->nativeDevice->next(); // comment out to remove picture shaking
       HRI(p->nv12torgb->Convert(texture, p->nativeDevice->GetCurrentTexture()));
-      HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
-      if (!sharedHandle) {
-        std::cerr << "Failed to GetSharedHandle" << std::endl;
-        return -1;
+      void *output = nullptr;
+      if (p->outputSharedHandle) {
+        HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
+        if (!sharedHandle) {
+          std::cerr << "Failed to GetSharedHandle" << std::endl;
+          return -1;
+        }
+        output = sharedHandle;
+      } else {
+        output = p->nativeDevice->GetCurrentTexture();
       }
+
       if (MFX_ERR_NONE == sts) {
         if (callback)
-          callback(sharedHandle, obj);
+          callback(output, obj);
         decoded = true;
       }
       break;
@@ -269,9 +277,8 @@ extern "C" int mfx_decode(void *decoder, uint8_t *data, int len,
 
 extern "C" int mfx_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
                                int32_t *outDescNum, API api,
-                               DataFormat dataFormat,
-                               SurfaceFormat outputSurfaceFormat, uint8_t *data,
-                               int32_t length) {
+                               DataFormat dataFormat, bool outputSharedHandle,
+                               uint8_t *data, int32_t length) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -281,7 +288,7 @@ extern "C" int mfx_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
     for (auto &adapter : adapters.adapters_) {
       MFXDecoder *p =
           (MFXDecoder *)mfx_new_decoder(nullptr, LUID(adapter.get()->desc1_),
-                                        api, dataFormat, outputSurfaceFormat);
+                                        api, dataFormat, outputSharedHandle);
       if (!p)
         continue;
       if (mfx_decode(p, data, length, nullptr, nullptr) == 0) {

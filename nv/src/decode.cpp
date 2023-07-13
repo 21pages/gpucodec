@@ -54,6 +54,7 @@ public:
   ComPtr<ID3D11Texture2D> nv12Texture = NULL;
   std::unique_ptr<RGBToNV12> nv12torgb = NULL;
   std::unique_ptr<NativeDevice> nativeDevice = nullptr;
+  bool outputSharedHandle;
 
   CuvidDecoder() { load_driver(&cudl, &cvdl); }
 };
@@ -102,7 +103,7 @@ static bool dataFormat_to_cuCodecID(DataFormat dataFormat,
 
 extern "C" void *nv_new_decoder(void *device, int64_t luid, API api,
                                 DataFormat dataFormat,
-                                SurfaceFormat outputSurfaceFormat) {
+                                bool outputSharedHandle) {
   CuvidDecoder *p = NULL;
   try {
     (void)api;
@@ -153,6 +154,7 @@ extern "C" void *nv_new_decoder(void *device, int64_t luid, API api,
     if (FAILED(p->nv12torgb->Init())) {
       goto _exit;
     }
+    p->outputSharedHandle = outputSharedHandle;
     return p;
   } catch (const std::exception &ex) {
     std::cout << ex.what();
@@ -260,12 +262,19 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
       p->nativeDevice->next();
       HRI(p->nv12torgb->Convert(p->nv12Texture.Get(),
                                 p->nativeDevice->GetCurrentTexture()));
-      HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
-      if (!sharedHandle) {
-        std::cerr << "Failed to GetSharedHandle" << std::endl;
-        return -1;
+      void *opaque = nullptr;
+      if (p->outputSharedHandle) {
+        HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
+        if (!sharedHandle) {
+          std::cerr << "Failed to GetSharedHandle" << std::endl;
+          return -1;
+        }
+        opaque = sharedHandle;
+      } else {
+        opaque = p->nativeDevice->GetCurrentTexture();
       }
-      callback(sharedHandle, obj);
+
+      callback(opaque, obj);
       decoded = true;
     }
     return decoded ? 0 : -1;
@@ -277,9 +286,8 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
 
 extern "C" int nv_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
                               int32_t *outDescNum, API api,
-                              DataFormat dataFormat,
-                              SurfaceFormat outputSurfaceFormat, uint8_t *data,
-                              int32_t length) {
+                              DataFormat dataFormat, bool outputSharedHandle,
+                              uint8_t *data, int32_t length) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -289,7 +297,7 @@ extern "C" int nv_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
     for (auto &adapter : adapters.adapters_) {
       CuvidDecoder *p =
           (CuvidDecoder *)nv_new_decoder(nullptr, LUID(adapter.get()->desc1_),
-                                         api, dataFormat, outputSurfaceFormat);
+                                         api, dataFormat, outputSharedHandle);
       if (!p)
         continue;
       if (nv_decode(p, data, length, nullptr, nullptr) == 0) {

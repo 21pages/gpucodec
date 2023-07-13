@@ -422,7 +422,7 @@ simplerenderer::atomic_packed_32x2::atomic_packed_32x2(void) {}
 
 class Render {
 public:
-  Render(int64_t luid);
+  Render(int64_t luid, bool inputSharedHandle);
   int Init();
   int RenderTexture(ID3D11Texture2D *);
   std::unique_ptr<std::thread> message_thread;
@@ -431,11 +431,13 @@ public:
   std::unique_ptr<dx_device_context> ctx;
   // dx_device_context ctx;
   int64_t luid;
+  bool inputSharedHandle;
 };
 
-Render::Render(int64_t luid) {
+Render::Render(int64_t luid, bool inputSharedHandle) {
   // ctx.reset(new dx_device_context());
   this->luid = luid;
+  this->inputSharedHandle = inputSharedHandle;
   ctx = std::make_unique<dx_device_context>(luid);
 };
 
@@ -534,23 +536,30 @@ int Render::RenderTexture(ID3D11Texture2D *texture) {
   return 0;
 }
 
-extern "C" void *CreateDXGIRender(int64_t luid) {
-  Render *p = new Render(luid);
+extern "C" void *CreateDXGIRender(int64_t luid, bool inputSharedHandle) {
+  Render *p = new Render(luid, inputSharedHandle);
   p->Init();
   return p;
 }
 
-extern "C" int DXGIRenderTexture(void *render, HANDLE shared_handle) {
+extern "C" int DXGIRenderTexture(void *render, HANDLE handle) {
   Render *self = (Render *)render;
   if (!self->running)
     return 0;
-  ComPtr<IDXGIResource> resource = nullptr;
-  ComPtr<ID3D11Texture2D> tex_ = nullptr;
-  MS_THROW(self->ctx->device->OpenSharedResource(
-      shared_handle, __uuidof(ID3D10Texture2D),
-      (void **)resource.ReleaseAndGetAddressOf()));
-  MS_THROW(resource.As(&tex_));
-  self->RenderTexture(tex_.Get());
+  ComPtr<ID3D11Texture2D> texture = nullptr;
+  if (self->inputSharedHandle) {
+    ComPtr<IDXGIResource> resource = nullptr;
+    ComPtr<ID3D11Texture2D> tex_ = nullptr;
+    MS_THROW(self->ctx->device->OpenSharedResource(
+        handle, __uuidof(ID3D11Texture2D),
+        (void **)resource.ReleaseAndGetAddressOf()));
+    MS_THROW(resource.As(&tex_));
+    texture = tex_.Get();
+  } else {
+    texture = (ID3D11Texture2D *)handle;
+  }
+  self->RenderTexture(texture.Get());
+
   return 0;
 }
 

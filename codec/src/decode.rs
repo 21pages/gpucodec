@@ -1,7 +1,5 @@
 use crate::gpu_video_codec_get_bin_file;
-use gvc_common::{
-    inner::DecodeCalls, AdapterDesc, DataFormat::*, DecodeContext, DecodeDriver, SurfaceFormat::*,
-};
+use gvc_common::{inner::DecodeCalls, AdapterDesc, DataFormat::*, DecodeContext, DecodeDriver};
 use log::{error, trace};
 use std::{
     ffi::c_void,
@@ -35,7 +33,7 @@ impl Decoder {
                 ctx.luid,
                 ctx.api as i32,
                 ctx.data_format as i32,
-                ctx.output_surface_format as i32,
+                ctx.output_shared_handle,
             );
             if codec.is_null() {
                 return Err(());
@@ -121,7 +119,7 @@ fn available_() -> Vec<DecodeContext> {
         driver,
         data_format: n.dataFormat,
         api: n.api,
-        output_surface_format: SURFACE_FORMAT_BGRA,
+        output_shared_handle: true,
         luid: 0,
     });
     let outputs = Arc::new(Mutex::new(Vec::<DecodeContext>::new()));
@@ -167,7 +165,7 @@ fn available_() -> Vec<DecodeContext> {
                     &mut desc_count,
                     input.api as _,
                     input.data_format as i32,
-                    input.output_surface_format as i32,
+                    input.output_shared_handle,
                     data.as_ptr() as *mut u8,
                     data.len() as _,
                 )

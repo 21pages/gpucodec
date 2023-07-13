@@ -33,15 +33,18 @@ private:
   amf::AMF_SURFACE_FORMAT textureFormatOut_;
   amf::AMFComponentPtr AMFConverter_ = NULL;
   amf_wstring codec_;
+  bool outputSharedHandle_;
 
   // buffer
   std::vector<std::vector<uint8_t>> buffer_;
 
 public:
   AMFDecoder(void *device, int64_t luid, amf::AMF_MEMORY_TYPE memoryTypeOut,
-             amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut)
+             amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut,
+             bool outputSharedHandle)
       : device_(device), luid_(luid), AMFMemoryType_(memoryTypeOut),
-        textureFormatOut_(textureFormatOut), codec_(codec) {
+        textureFormatOut_(textureFormatOut), codec_(codec),
+        outputSharedHandle_(outputSharedHandle) {
     init_result_ = initialize();
   }
 
@@ -86,13 +89,20 @@ public:
           std::cerr << "Failed to CopyTexture" << std::endl;
           return AMF_FAIL;
         }
-        HANDLE sharedHandle = nativeDevice_->GetSharedHandle();
-        if (!sharedHandle) {
-          std::cerr << "Failed to GetSharedHandle" << std::endl;
-          return AMF_FAIL;
+        void *output = nullptr;
+        if (outputSharedHandle_) {
+          HANDLE sharedHandle = nativeDevice_->GetSharedHandle();
+          if (!sharedHandle) {
+            std::cerr << "Failed to GetSharedHandle" << std::endl;
+            return AMF_FAIL;
+          }
+          output = sharedHandle;
+        } else {
+          output = nativeDevice_->GetCurrentTexture();
         }
+
         if (callback)
-          callback(sharedHandle, obj);
+          callback(output, obj);
         decoded = true;
       } break;
       case amf::AMF_MEMORY_OPENCL: {
@@ -251,7 +261,7 @@ static bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
 
 extern "C" void *amf_new_decoder(void *device, int64_t luid, API api,
                                  DataFormat dataFormat,
-                                 SurfaceFormat outputSurfaceFormat) {
+                                 bool outputSharedHandle) {
   try {
     amf_wstring codecStr;
     amf::AMF_MEMORY_TYPE memory;
@@ -262,11 +272,8 @@ extern "C" void *amf_new_decoder(void *device, int64_t luid, API api,
     if (!convert_codec(dataFormat, codecStr)) {
       return NULL;
     }
-    if (!convert_surface_format(outputSurfaceFormat, surfaceFormat)) {
-      return NULL;
-    }
-    AMFDecoder *dec =
-        new AMFDecoder(device, luid, memory, codecStr, surfaceFormat);
+    AMFDecoder *dec = new AMFDecoder(device, luid, memory, codecStr,
+                                     amf::AMF_SURFACE_BGRA, outputSharedHandle);
     if (dec && dec->init_result_ != AMF_OK) {
       dec->destroy();
       delete dec;
@@ -292,9 +299,8 @@ extern "C" int amf_decode(void *decoder, uint8_t *data, int32_t length,
 
 extern "C" int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
                                int32_t *outDescNum, API api,
-                               DataFormat dataFormat,
-                               SurfaceFormat outputSurfaceFormat, uint8_t *data,
-                               int32_t length) {
+                               DataFormat dataFormat, bool outputSharedHandle,
+                               uint8_t *data, int32_t length) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -304,7 +310,7 @@ extern "C" int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
     for (auto &adapter : adapters.adapters_) {
       AMFDecoder *p =
           (AMFDecoder *)amf_new_decoder(nullptr, LUID(adapter.get()->desc1_),
-                                        api, dataFormat, outputSurfaceFormat);
+                                        api, dataFormat, outputSharedHandle);
       if (!p)
         continue;
       if (p->decode(data, length, nullptr, nullptr) == AMF_OK) {

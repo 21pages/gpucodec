@@ -25,7 +25,7 @@ pub type NewDecoderCall = unsafe extern "C" fn(
     luid: i64,
     api: i32,
     dataFormat: i32,
-    surfaceFormat: i32,
+    outputSharedHandle: bool,
 ) -> *mut c_void;
 
 pub type DecodeCall = unsafe extern "C" fn(
@@ -55,7 +55,7 @@ pub type TestDecodeCall = unsafe extern "C" fn(
     outDescNum: *mut i32,
     api: i32,
     dataFormat: i32,
-    outputSurfaceFormat: i32,
+    outputSharedHandle: bool,
     data: *mut u8,
     length: i32,
 ) -> c_int;

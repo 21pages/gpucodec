@@ -2,7 +2,7 @@ use capture::dxgi;
 use gpu_video_codec::{decode::Decoder, encode::Encoder};
 use gvc_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
-    FeatureContext, SurfaceFormat::*, API::*, MAX_GOP,
+    FeatureContext, API::*, MAX_GOP,
 };
 use render::Render;
 use std::{
@@ -15,9 +15,10 @@ fn main() {
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let luid = 64262;
-        let data_format = DataFormat::H265;
+        let output_shared_handle = false;
+        let data_format = DataFormat::H264;
         let mut capturer = dxgi::Capturer::new().unwrap();
-        let mut render = Render::new(luid).unwrap();
+        let mut render = Render::new(luid, output_shared_handle).unwrap();
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
@@ -36,11 +37,15 @@ fn main() {
             },
         };
         let de_ctx = DecodeContext {
-            device: Some(render.device()),
+            device: if output_shared_handle {
+                None
+            } else {
+                Some(render.device())
+            },
             driver: DecodeDriver::AMF,
             api: API_DX11,
             data_format,
-            output_surface_format: SURFACE_FORMAT_BGRA,
+            output_shared_handle,
             luid,
         };
 
