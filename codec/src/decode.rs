@@ -89,11 +89,7 @@ pub struct DecodeFrame {
     pub texture: *mut c_void,
 }
 
-pub fn available() -> Vec<DecodeContext> {
-    available_()
-}
-
-fn available_() -> Vec<DecodeContext> {
+pub fn available(output_shared_handle: bool) -> Vec<DecodeContext> {
     // to-do: log control
     let mut natives: Vec<_> = vec![];
     natives.append(
@@ -119,7 +115,7 @@ fn available_() -> Vec<DecodeContext> {
         driver,
         data_format: n.dataFormat,
         api: n.api,
-        output_shared_handle: true,
+        output_shared_handle,
         luid: 0,
     });
     let outputs = Arc::new(Mutex::new(Vec::<DecodeContext>::new()));

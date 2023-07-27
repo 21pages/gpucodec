@@ -124,10 +124,6 @@ impl Display for EncodeFrame {
 }
 
 pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
-    available_(d)
-}
-
-fn available_(d: DynamicContext) -> Vec<FeatureContext> {
     let mut natives: Vec<_> = vec![];
     natives.append(
         &mut nv::possible_support_encoders()
