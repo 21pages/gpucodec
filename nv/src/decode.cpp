@@ -12,6 +12,8 @@
 #include "common.h"
 #include "system.h"
 
+#define CONFIG_CPU_CONVERT
+
 static void load_driver(CudaFunctions **pp_cudl, CuvidFunctions **pp_cvdl) {
   if (cuda_load_functions(pp_cudl, NULL) < 0) {
     NVDEC_THROW_ERROR("cuda_load_functions failed", CUDA_ERROR_UNKNOWN);
@@ -50,8 +52,9 @@ public:
   CuvidFunctions *cvdl = NULL;
   NvDecoder *dec = NULL;
   CUcontext cuContext = NULL;
-  CUgraphicsResource cuResource = NULL;
+  CUgraphicsResource resource[2] = {NULL, NULL};
   ComPtr<ID3D11Texture2D> nv12Texture = NULL;
+  ComPtr<ID3D11Texture2D> textures[2] = {NULL, NULL};
   std::unique_ptr<RGBToNV12> nv12torgb = NULL;
   std::unique_ptr<NativeDevice> nativeDevice = nullptr;
   bool outputSharedHandle;
@@ -66,11 +69,12 @@ extern "C" int nv_destroy_decoder(void *decoder) {
       if (p->dec) {
         delete p->dec;
       }
-      if (p->cuResource) {
-        p->cudl->cuCtxPushCurrent(p->cuContext);
-        p->cudl->cuGraphicsUnregisterResource(p->cuResource);
-        p->cudl->cuCtxPopCurrent(NULL);
+      p->cudl->cuCtxPushCurrent(p->cuContext);
+      for (int i = 0; i < 2; i++) {
+        if (p->resource[i])
+          p->cudl->cuGraphicsUnregisterResource(p->resource[i]);
       }
+      p->cudl->cuCtxPopCurrent(NULL);
       if (p->cuContext) {
         p->cudl->cuCtxDestroy(p->cuContext);
       }
@@ -169,6 +173,47 @@ _exit:
   return NULL;
 }
 
+#ifdef CONFIG_CPU_CONVERT
+static bool cpu_r8_r8g8_to_nv12(CuvidDecoder *p, int width, int height) {
+  uint8_t *buffer = new uint8_t[width * height * 3 / 2];
+  memset(buffer, 0, width * height * 3 / 2);
+
+  for (int i = 0; i < 2; i++) {
+    D3D11_TEXTURE2D_DESC desc;
+    p->textures[i]->GetDesc(&desc);
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    desc.BindFlags = 0;
+    ComPtr<ID3D11Texture2D> r8StagingTexture;
+    if (!r8StagingTexture) {
+      HRB(p->nativeDevice->device_->CreateTexture2D(
+          &desc, nullptr, r8StagingTexture.ReleaseAndGetAddressOf()));
+    }
+    p->nativeDevice->context_->CopyResource(r8StagingTexture.Get(),
+                                            p->textures[i].Get());
+    D3D11_MAPPED_SUBRESOURCE resourceDesc = {0};
+    HRB(p->nativeDevice->context_->Map(r8StagingTexture.Get(), 0,
+                                       D3D11_MAP_READ, 0, &resourceDesc));
+    memcpy(buffer + (width * height) * i, resourceDesc.pData,
+           width * height / (1 << i));
+    p->nativeDevice->context_->Unmap(r8StagingTexture.Get(), 0);
+  }
+
+  D3D11_BOX Box;
+  Box.left = 0;
+  Box.right = width;
+  Box.top = 0;
+  Box.bottom = height;
+  Box.front = 0;
+  Box.back = 1;
+
+  p->nativeDevice->context_->UpdateSubresource(
+      p->nv12Texture.Get(), 0, &Box, buffer, width, width * height * 3 / 2);
+
+  delete[] buffer;
+}
+#endif
+
 static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12) {
   NvDecoder *dec = p->dec;
   int width = dec->GetWidth();
@@ -176,24 +221,35 @@ static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12) {
 
   if (!ck(p->cudl->cuCtxPushCurrent(p->cuContext)))
     return false;
-  ck(p->cudl->cuGraphicsMapResources(1, &p->cuResource, 0));
-  CUarray dstArray;
-  ck(p->cudl->cuGraphicsSubResourceGetMappedArray(&dstArray, p->cuResource, 0,
-                                                  0));
 
-  CUDA_MEMCPY2D m = {0};
-  m.srcMemoryType = CU_MEMORYTYPE_DEVICE;
-  m.srcDevice = (CUdeviceptr)dpNv12;
-  m.srcPitch = dec->GetWidth(); // nPitch;
-  m.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-  m.dstArray = dstArray;
-  m.WidthInBytes = dec->GetWidth();
-  m.Height = height;
-  ck(p->cudl->cuMemcpy2D(&m));
+  for (int i = 0; i < 2; i++) {
+    CUarray dstArray;
 
-  ck(p->cudl->cuGraphicsUnmapResources(1, &p->cuResource, 0));
+    ck(p->cudl->cuGraphicsMapResources(1, &p->resource[i], 0));
+    ck(p->cudl->cuGraphicsSubResourceGetMappedArray(&dstArray, p->resource[i],
+                                                    0, 0));
+    CUDA_MEMCPY2D m = {0};
+    m.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+    m.srcDevice = (CUdeviceptr)(CUdeviceptr)(dpNv12 + (width * height) * i);
+    m.srcPitch = dec->GetWidth(); // nPitch;
+    m.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+    m.dstArray = dstArray;
+    m.WidthInBytes = dec->GetWidth();
+    m.Height = height / (1 << i);
+    ck(p->cudl->cuMemcpy2D(&m));
+
+    // todo: release
+    ck(p->cudl->cuGraphicsUnmapResources(1, &p->resource[i], 0));
+  }
+
   if (!ck(p->cudl->cuCtxPopCurrent(NULL)))
     return false;
+
+#ifdef CONFIG_CPU_CONVERT
+  cpu_r8_r8g8_to_nv12(p, width, height);
+#endif
+
+  return true;
 }
 
 static bool create_register_texture(CuvidDecoder *p) {
@@ -216,21 +272,39 @@ static bool create_register_texture(CuvidDecoder *p) {
   desc.Usage = D3D11_USAGE_DEFAULT;
   desc.BindFlags = D3D11_BIND_RENDER_TARGET;
   desc.CPUAccessFlags = 0;
-
   HRB(p->nativeDevice->device_->CreateTexture2D(
       &desc, nullptr, p->nv12Texture.ReleaseAndGetAddressOf()));
+
+  desc.Format = DXGI_FORMAT_R8_UNORM;
+  HRB(p->nativeDevice->device_->CreateTexture2D(
+      &desc, nullptr, p->textures[0].ReleaseAndGetAddressOf()));
+
+  desc.Format = DXGI_FORMAT_R8G8_UNORM;
+  desc.Width = width / 2;
+  desc.Height = height / 2;
+  HRB(p->nativeDevice->device_->CreateTexture2D(
+      &desc, nullptr, p->textures[1].ReleaseAndGetAddressOf()));
+
   if (!ck(p->cudl->cuCtxPushCurrent(p->cuContext)))
     return false;
-  if (!ck(p->cudl->cuGraphicsD3D11RegisterResource(
-          &p->cuResource, p->nv12Texture.Get(),
-          CU_GRAPHICS_REGISTER_FLAGS_NONE)))
-    return false;
-  if (!ck(p->cudl->cuGraphicsResourceSetMapFlags(
-          p->cuResource, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD)))
-    return false;
+  bool ret = true;
+  for (int i = 0; i < 2; i++) {
+    if (!ck(p->cudl->cuGraphicsD3D11RegisterResource(
+            &p->resource[i], p->textures[i].Get(),
+            CU_GRAPHICS_REGISTER_FLAGS_NONE))) {
+      ret = false;
+      break;
+    }
+    if (!ck(p->cudl->cuGraphicsResourceSetMapFlags(
+            p->resource[i], CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD))) {
+      ret = false;
+      break;
+    }
+  }
   if (!ck(p->cudl->cuCtxPopCurrent(NULL)))
     return false;
-  return true;
+
+  return ret;
 }
 
 extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
