@@ -50,8 +50,11 @@ public:
   CuvidFunctions *cvdl = NULL;
   NvDecoder *dec = NULL;
   CUcontext cuContext = NULL;
-  CUgraphicsResource cuResource = NULL;
+  CUgraphicsResource cuResourceR8 = NULL;
+  CUgraphicsResource cuResourceR8G8 = NULL;
   ComPtr<ID3D11Texture2D> nv12Texture = NULL;
+  ComPtr<ID3D11Texture2D> r8Texture = NULL;
+  ComPtr<ID3D11Texture2D> r8g8Texture = NULL;
   std::unique_ptr<RGBToNV12> nv12torgb = NULL;
   std::unique_ptr<NativeDevice> nativeDevice = nullptr;
   bool outputSharedHandle;
@@ -66,9 +69,14 @@ extern "C" int nv_destroy_decoder(void *decoder) {
       if (p->dec) {
         delete p->dec;
       }
-      if (p->cuResource) {
+      if (p->cuResourceR8) {
         p->cudl->cuCtxPushCurrent(p->cuContext);
-        p->cudl->cuGraphicsUnregisterResource(p->cuResource);
+        p->cudl->cuGraphicsUnregisterResource(p->cuResourceR8);
+        p->cudl->cuCtxPopCurrent(NULL);
+      }
+      if (p->cuResourceR8G8) {
+        p->cudl->cuCtxPushCurrent(p->cuContext);
+        p->cudl->cuGraphicsUnregisterResource(p->cuResourceR8G8);
         p->cudl->cuCtxPopCurrent(NULL);
       }
       if (p->cuContext) {
@@ -176,11 +184,11 @@ static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12) {
 
   if (!ck(p->cudl->cuCtxPushCurrent(p->cuContext)))
     return false;
-  ck(p->cudl->cuGraphicsMapResources(1, &p->cuResource, 0));
   CUarray dstArray;
-  ck(p->cudl->cuGraphicsSubResourceGetMappedArray(&dstArray, p->cuResource, 0,
-                                                  0));
 
+  ck(p->cudl->cuGraphicsMapResources(1, &p->cuResourceR8, 0));
+  ck(p->cudl->cuGraphicsSubResourceGetMappedArray(&dstArray, p->cuResourceR8, 0,
+                                                  0));
   CUDA_MEMCPY2D m = {0};
   m.srcMemoryType = CU_MEMORYTYPE_DEVICE;
   m.srcDevice = (CUdeviceptr)dpNv12;
@@ -191,9 +199,103 @@ static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12) {
   m.Height = height;
   ck(p->cudl->cuMemcpy2D(&m));
 
-  ck(p->cudl->cuGraphicsUnmapResources(1, &p->cuResource, 0));
+  ck(p->cudl->cuGraphicsUnmapResources(1, &p->cuResourceR8, 0));
+
+  CUarray dstArrayR8G8;
+  ck(p->cudl->cuGraphicsMapResources(1, &p->cuResourceR8G8, 0));
+  ck(p->cudl->cuGraphicsSubResourceGetMappedArray(&dstArrayR8G8,
+                                                  p->cuResourceR8G8, 0, 0));
+  CUDA_MEMCPY2D m2 = {0};
+  m2.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+  m2.srcDevice = (CUdeviceptr)(dpNv12 + width * height);
+  // m2.srcY = height;
+  m2.srcPitch = dec->GetWidth();
+  m2.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+  m2.dstArray = dstArrayR8G8;
+  // m2.dstHost = dstArrayR8G8;
+  // m2.dstPitch = width / 2;
+  // m2.dstXInBytes = 0;
+  // m2.dstY = 0;
+  m2.WidthInBytes = dec->GetWidth();
+  m2.Height = height / 2;
+  ck(p->cudl->cuMemcpy2D(&m2));
+
+  ck(p->cudl->cuGraphicsUnmapResources(1, &p->cuResourceR8G8, 0));
+
   if (!ck(p->cudl->cuCtxPopCurrent(NULL)))
     return false;
+
+  // p->nativeDevice->context_->CopyResource(p->nv12Texture.Get(),
+  //                                         p->r8Texture.Get());
+
+  // p->nativeDevice->context_->CopySubresourceRegion(
+  //     p->nv12Texture.Get(), 0, 0, 0, 0, p->r8Texture.Get(), 0, nullptr);
+  // p->nativeDevice->context_->CopySubresourceRegion(
+  //     p->nv12Texture.Get(), 1, 0, 0, 0, p->r8g8Texture.Get(), 0, nullptr);
+  // p->nv12torgb->Convert(p->r8Texture.Get(), p->nv12Texture.Get());
+  // p->nv12torgb->Convert(p->r8g8Texture.Get(), p->nv12Texture.Get());
+
+  // p->nativeDevice->context_->UpdateSubresource()
+
+  //
+  uint8_t *buffer = new uint8_t[width * height * 3 / 2];
+  memset(buffer, 0, width * height * 3 / 2);
+
+  D3D11_TEXTURE2D_DESC desc;
+  p->r8Texture->GetDesc(&desc);
+  desc.Usage = D3D11_USAGE_STAGING;
+  desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+  desc.BindFlags = 0;
+  static ComPtr<ID3D11Texture2D> r8StagingTexture;
+  if (!r8StagingTexture) {
+    HRB(p->nativeDevice->device_->CreateTexture2D(
+        &desc, nullptr, r8StagingTexture.ReleaseAndGetAddressOf()));
+  }
+  p->nativeDevice->context_->CopyResource(r8StagingTexture.Get(),
+                                          p->r8Texture.Get());
+  D3D11_MAPPED_SUBRESOURCE r8ResourceDesc = {0};
+  HRB(p->nativeDevice->context_->Map(r8StagingTexture.Get(), 0, D3D11_MAP_READ,
+                                     0, &r8ResourceDesc));
+  memcpy(buffer, r8ResourceDesc.pData, width * height);
+  p->nativeDevice->context_->Unmap(r8StagingTexture.Get(), 0);
+
+  p->r8g8Texture->GetDesc(&desc);
+  desc.Usage = D3D11_USAGE_STAGING;
+  desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+  desc.BindFlags = 0;
+  static ComPtr<ID3D11Texture2D> r8g8StagingTexture;
+  if (!r8g8StagingTexture) {
+    HRB(p->nativeDevice->device_->CreateTexture2D(
+        &desc, nullptr, r8g8StagingTexture.ReleaseAndGetAddressOf()));
+  }
+  p->nativeDevice->context_->CopyResource(r8g8StagingTexture.Get(),
+                                          p->r8g8Texture.Get());
+  D3D11_MAPPED_SUBRESOURCE r8g8ResourceDesc = {0};
+  HRB(p->nativeDevice->context_->Map(r8g8StagingTexture.Get(), 0,
+                                     D3D11_MAP_READ, 0, &r8g8ResourceDesc));
+  memcpy(buffer + width * height, r8g8ResourceDesc.pData, width * height / 2);
+  // for (int i = 0; i < width * height / 2; i++) {
+  //   uint8_t *p = buffer + width * height;
+  //   if (p[i] != 0) {
+  //     printf("%d\n", p[i]);
+  //   }
+  // }
+  p->nativeDevice->context_->Unmap(r8g8StagingTexture.Get(), 0);
+
+  D3D11_BOX Box;
+  Box.left = 0;
+  Box.right = width;
+  Box.top = 0;
+  Box.bottom = height;
+  Box.front = 0;
+  Box.back = 1;
+
+  p->nativeDevice->context_->UpdateSubresource(
+      p->nv12Texture.Get(), 0, &Box, buffer, width, width * height * 3 / 2);
+
+  delete[] buffer;
+
+  return true;
 }
 
 static bool create_register_texture(CuvidDecoder *p) {
@@ -216,20 +318,38 @@ static bool create_register_texture(CuvidDecoder *p) {
   desc.Usage = D3D11_USAGE_DEFAULT;
   desc.BindFlags = D3D11_BIND_RENDER_TARGET;
   desc.CPUAccessFlags = 0;
-
   HRB(p->nativeDevice->device_->CreateTexture2D(
       &desc, nullptr, p->nv12Texture.ReleaseAndGetAddressOf()));
+
+  desc.Format = DXGI_FORMAT_R8_UNORM;
+  HRB(p->nativeDevice->device_->CreateTexture2D(
+      &desc, nullptr, p->r8Texture.ReleaseAndGetAddressOf()));
+
+  desc.Format = DXGI_FORMAT_R8G8_UNORM;
+  desc.Width = width / 2;
+  desc.Height = height / 2;
+  HRB(p->nativeDevice->device_->CreateTexture2D(
+      &desc, nullptr, p->r8g8Texture.ReleaseAndGetAddressOf()));
+
   if (!ck(p->cudl->cuCtxPushCurrent(p->cuContext)))
     return false;
   if (!ck(p->cudl->cuGraphicsD3D11RegisterResource(
-          &p->cuResource, p->nv12Texture.Get(),
+          &p->cuResourceR8, p->r8Texture.Get(),
           CU_GRAPHICS_REGISTER_FLAGS_NONE)))
     return false;
   if (!ck(p->cudl->cuGraphicsResourceSetMapFlags(
-          p->cuResource, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD)))
+          p->cuResourceR8, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD)))
+    return false;
+  if (!ck(p->cudl->cuGraphicsD3D11RegisterResource(
+          &p->cuResourceR8G8, p->r8g8Texture.Get(),
+          CU_GRAPHICS_REGISTER_FLAGS_NONE)))
+    return false;
+  if (!ck(p->cudl->cuGraphicsResourceSetMapFlags(
+          p->cuResourceR8G8, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD)))
     return false;
   if (!ck(p->cudl->cuCtxPopCurrent(NULL)))
     return false;
+
   return true;
 }
 
