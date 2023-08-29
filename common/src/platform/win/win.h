@@ -96,15 +96,4 @@ public:
   std::vector<std::unique_ptr<Adapter>> adapters_;
 };
 
-std::wstring GetCurrentCsoDir();
-
-HRESULT InitVertexShaderFromFile(ID3D11Device *device,
-                                 const WCHAR *wszShaderFile,
-                                 ID3D11VertexShader **ppID3D11VertexShader,
-                                 const BOOL bCreateLayout,
-                                 ID3D11InputLayout **inputLayout);
-HRESULT InitPixelShaderFromFile(ID3D11Device *device,
-                                const WCHAR *wszShaderFile,
-                                ID3D11PixelShader **ppID3D11PixelShader);
-
 #endif

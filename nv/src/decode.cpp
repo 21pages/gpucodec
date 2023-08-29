@@ -1,19 +1,25 @@
 #define FFNV_LOG_FUNC
 #define FFNV_DEBUG_LOG_FUNC
 
+#include <DirectXMath.h>
 #include <Preproc.h>
 #include <Samples/NvCodec/NvDecoder/NvDecoder.h>
 #include <Samples/Utils/NvCodecUtils.h>
 #include <algorithm>
+#include <array>
 #include <directxcolors.h>
 #include <iostream>
 #include <thread>
 
 #include "callback.h"
 #include "common.h"
+#include "p.h"
 #include "system.h"
+#include "v.h"
 
-// #define CONFIG_CPU_CONVERT
+#define NUMVERTICES 6
+
+using namespace DirectX;
 
 static void load_driver(CudaFunctions **pp_cudl, CuvidFunctions **pp_cvdl) {
   if (cuda_load_functions(pp_cudl, NULL) < 0) {
@@ -60,12 +66,18 @@ public:
   ComPtr<ID3D11ShaderResourceView> SRV[2] = {NULL, NULL};
   ComPtr<ID3D11VertexShader> vertexShader = NULL;
   ComPtr<ID3D11PixelShader> pixelShader = NULL;
+  ComPtr<ID3D11SamplerState> samplerLinear = NULL;
   std::unique_ptr<RGBToNV12> nv12torgb = NULL;
   std::unique_ptr<NativeDevice> nativeDevice = nullptr;
   bool outputSharedHandle;
 
   CuvidDecoder() { load_driver(&cudl, &cvdl); }
 };
+
+typedef struct _VERTEX {
+  DirectX::XMFLOAT3 Pos;
+  DirectX::XMFLOAT2 TexCoord;
+} VERTEX;
 
 extern "C" int nv_destroy_decoder(void *decoder) {
   try {
@@ -178,42 +190,6 @@ _exit:
   return NULL;
 }
 
-#ifdef CONFIG_CPU_CONVERT
-static bool cpu_r8g8_to_nv12_uv(CuvidDecoder *p, int width, int height) {
-  uint8_t *buffer = new uint8_t[width * height / 2];
-  memset(buffer, 0, width * height / 2);
-
-  D3D11_TEXTURE2D_DESC desc;
-  p->r8g8texture->GetDesc(&desc);
-  desc.Usage = D3D11_USAGE_STAGING;
-  desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-  desc.BindFlags = 0;
-  ComPtr<ID3D11Texture2D> stagingTexture;
-  HRB(p->nativeDevice->device_->CreateTexture2D(
-      &desc, nullptr, stagingTexture.ReleaseAndGetAddressOf()));
-  p->nativeDevice->context_->CopyResource(stagingTexture.Get(),
-                                          p->r8g8texture.Get());
-  D3D11_MAPPED_SUBRESOURCE resourceDesc = {0};
-  HRB(p->nativeDevice->context_->Map(stagingTexture.Get(), 0, D3D11_MAP_READ, 0,
-                                     &resourceDesc));
-  memcpy(buffer, resourceDesc.pData, width * height / 2);
-  p->nativeDevice->context_->Unmap(stagingTexture.Get(), 0);
-
-  D3D11_BOX Box;
-  Box.left = 0;
-  Box.right = width;
-  Box.top = 0;
-  Box.bottom = height / 2;
-  Box.front = 0;
-  Box.back = 1;
-
-  // p->nativeDevice->context_->UpdateSubresource(
-  //     p->nv12Texture.Get(), 0, &Box, buffer, width, width * height / 2);
-
-  delete[] buffer;
-}
-#endif
-
 static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12) {
   NvDecoder *dec = p->dec;
   int width = dec->GetWidth();
@@ -245,34 +221,55 @@ static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12) {
   if (!ck(p->cudl->cuCtxPopCurrent(NULL)))
     return false;
 
-#ifdef CONFIG_CPU_CONVERT
-  cpu_r8g8_to_nv12_uv(p, width, height);
-#else
-  // create uv shader resource view
-  D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-  srvDesc.Format = DXGI_FORMAT_R8_UNORM;
-  srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-  srvDesc.Texture2D.MipLevels = 1;
-  srvDesc.Texture2D.MostDetailedMip = 0;
-  HRB(p->nativeDevice->device_->CreateShaderResourceView(
-      p->textures[0].Get(), &srvDesc, p->SRV[0].ReleaseAndGetAddressOf()));
+  // set SRV
+  std::array<ID3D11ShaderResourceView *, 2> const textureViews = {
+      p->SRV[0].Get(), p->SRV[1].Get()};
+  p->nativeDevice->context_->PSSetShaderResources(0, textureViews.size(),
+                                                  textureViews.data());
 
-  srvDesc.Format = DXGI_FORMAT_R8G8_UNORM;
-  HRB(p->nativeDevice->device_->CreateShaderResourceView(
-      p->textures[1].Get(), &srvDesc, p->SRV[1].ReleaseAndGetAddressOf()));
+  UINT Stride = sizeof(VERTEX);
+  UINT Offset = 0;
+  FLOAT blendFactor[4] = {0.f, 0.f, 0.f, 0.f};
+  p->nativeDevice->context_->OMSetBlendState(nullptr, blendFactor, 0xffffffff);
 
+  const float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // clear as black
+  p->nativeDevice->context_->ClearRenderTargetView(p->RTV.Get(), clearColor);
   p->nativeDevice->context_->OMSetRenderTargets(1, p->RTV.GetAddressOf(), NULL);
-  p->nativeDevice->context_->ClearRenderTargetView(p->RTV.Get(),
-                                                   DirectX::Colors::Aquamarine);
   p->nativeDevice->context_->VSSetShader(p->vertexShader.Get(), NULL, 0);
   p->nativeDevice->context_->PSSetShader(p->pixelShader.Get(), NULL, 0);
-  ID3D11ShaderResourceView *SRVs[2];
-  SRVs[0] = p->SRV[0].Get();
-  SRVs[1] = p->SRV[1].Get();
-  p->nativeDevice->context_->PSSetShaderResources(0, 2, SRVs);
-  p->nativeDevice->context_->Draw(4, 0);
+  p->nativeDevice->context_->PSSetSamplers(0, 1,
+                                           p->samplerLinear.GetAddressOf());
+  p->nativeDevice->context_->IASetPrimitiveTopology(
+      D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+  // set VertexBuffers
+  VERTEX Vertices[NUMVERTICES] = {
+      {XMFLOAT3(-1.0f, -1.0f, 0), XMFLOAT2(0.0f, 1.0f)},
+      {XMFLOAT3(-1.0f, 1.0f, 0), XMFLOAT2(0.0f, 0.0f)},
+      {XMFLOAT3(1.0f, -1.0f, 0), XMFLOAT2(1.0f, 1.0f)},
+      {XMFLOAT3(1.0f, -1.0f, 0), XMFLOAT2(1.0f, 1.0f)},
+      {XMFLOAT3(-1.0f, 1.0f, 0), XMFLOAT2(0.0f, 0.0f)},
+      {XMFLOAT3(1.0f, 1.0f, 0), XMFLOAT2(1.0f, 0.0f)},
+  };
+  D3D11_BUFFER_DESC BufferDesc;
+  RtlZeroMemory(&BufferDesc, sizeof(BufferDesc));
+  BufferDesc.Usage = D3D11_USAGE_DEFAULT;
+  BufferDesc.ByteWidth = sizeof(VERTEX) * NUMVERTICES;
+  BufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+  BufferDesc.CPUAccessFlags = 0;
+  D3D11_SUBRESOURCE_DATA InitData;
+  RtlZeroMemory(&InitData, sizeof(InitData));
+  InitData.pSysMem = Vertices;
+  ComPtr<ID3D11Buffer> VertexBuffer = nullptr;
+  // Create vertex buffer
+  HRB(p->nativeDevice->device_->CreateBuffer(&BufferDesc, &InitData,
+                                             &VertexBuffer));
+  p->nativeDevice->context_->IASetVertexBuffers(
+      0, 1, VertexBuffer.GetAddressOf(), &Stride, &Offset);
+
+  // draw
+  p->nativeDevice->context_->Draw(NUMVERTICES, 0);
   p->nativeDevice->context_->Flush();
-#endif
 
   return true;
 }
@@ -285,7 +282,7 @@ static bool create_register_texture(CuvidDecoder *p) {
   int width = dec->GetWidth();
   int height = dec->GetHeight();
 
-  // create textures
+  // create SRV
   D3D11_TEXTURE2D_DESC desc;
   ZeroMemory(&desc, sizeof(desc));
   desc.Width = width;
@@ -305,35 +302,35 @@ static bool create_register_texture(CuvidDecoder *p) {
   desc.Format = DXGI_FORMAT_R8G8_UNORM;
   desc.Width = width / 2;
   desc.Height = height / 2;
-  desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
   HRB(p->nativeDevice->device_->CreateTexture2D(
       &desc, nullptr, p->textures[1].ReleaseAndGetAddressOf()));
 
-  // create shader
-  // auto vsFile = GetCurrentCsoDir() + L"v.cso";
-  // auto psFile = GetCurrentCsoDir() + L"p.cso";
-  auto vsFile = L"nv/src/v.cso";
-  auto psFile = L"nv/src/p.cso";
-  HRB(InitVertexShaderFromFile(p->nativeDevice->device_.Get(), vsFile,
-                               p->vertexShader.GetAddressOf(), FALSE, nullptr));
-  HRB(InitPixelShaderFromFile(p->nativeDevice->device_.Get(), psFile,
-                              p->pixelShader.ReleaseAndGetAddressOf()));
+  D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = CD3D11_SHADER_RESOURCE_VIEW_DESC(
+      p->textures[0].Get(), D3D11_SRV_DIMENSION_TEXTURE2D,
+      DXGI_FORMAT_R8_UNORM);
+  HRB(p->nativeDevice->device_->CreateShaderResourceView(
+      p->textures[0].Get(), &srvDesc, p->SRV[0].ReleaseAndGetAddressOf()));
 
-  // create  rtv
-  D3D11_RENDER_TARGET_VIEW_DESC rtDesc;
-  rtDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-  rtDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-  rtDesc.Texture2D.MipSlice = 0;
+  srvDesc = CD3D11_SHADER_RESOURCE_VIEW_DESC(p->textures[1].Get(),
+                                             D3D11_SRV_DIMENSION_TEXTURE2D,
+                                             DXGI_FORMAT_R8G8_UNORM);
+  HRB(p->nativeDevice->device_->CreateShaderResourceView(
+      p->textures[1].Get(), &srvDesc, p->SRV[1].ReleaseAndGetAddressOf()));
 
+  // create RTV
   if (!p->nativeDevice->EnsureTexture(width, height)) {
     std::cerr << "Failed to EnsureTexture" << std::endl;
     return false;
   }
+  D3D11_RENDER_TARGET_VIEW_DESC rtDesc;
+  rtDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  rtDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+  rtDesc.Texture2D.MipSlice = 0;
   ID3D11Texture2D *bgraTexture = p->nativeDevice->GetCurrentTexture();
   HRB(p->nativeDevice->device_->CreateRenderTargetView(
       bgraTexture, &rtDesc, p->RTV.ReleaseAndGetAddressOf()));
 
-  // view port
+  // set ViewPort
   D3D11_VIEWPORT vp;
   vp.Width = (FLOAT)(width);
   vp.Height = (FLOAT)(height);
@@ -341,8 +338,31 @@ static bool create_register_texture(CuvidDecoder *p) {
   vp.MaxDepth = 1.0f;
   vp.TopLeftX = 0;
   vp.TopLeftY = 0;
-
   p->nativeDevice->context_->RSSetViewports(1, &vp);
+
+  // create sample
+  D3D11_SAMPLER_DESC sampleDesc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
+  HRB(p->nativeDevice->device_->CreateSamplerState(
+      &sampleDesc, p->samplerLinear.ReleaseAndGetAddressOf()));
+
+  // create shader
+  p->nativeDevice->device_->CreateVertexShader(
+      g_VS, ARRAYSIZE(g_VS), nullptr, p->vertexShader.ReleaseAndGetAddressOf());
+  p->nativeDevice->device_->CreatePixelShader(
+      g_PS, ARRAYSIZE(g_PS), nullptr, p->pixelShader.ReleaseAndGetAddressOf());
+
+  // set InputLayout
+  constexpr std::array<D3D11_INPUT_ELEMENT_DESC, 2> Layout = {{
+      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
+       D3D11_INPUT_PER_VERTEX_DATA, 0},
+      {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12,
+       D3D11_INPUT_PER_VERTEX_DATA, 0},
+  }};
+  ComPtr<ID3D11InputLayout> inputLayout = NULL;
+  HRB(p->nativeDevice->device_->CreateInputLayout(Layout.data(), Layout.size(),
+                                                  g_VS, ARRAYSIZE(g_VS),
+                                                  inputLayout.GetAddressOf()));
+  p->nativeDevice->context_->IASetInputLayout(inputLayout.Get());
 
   if (!ck(p->cudl->cuCtxPushCurrent(p->cuContext)))
     return false;
