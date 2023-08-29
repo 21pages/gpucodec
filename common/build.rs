@@ -24,7 +24,7 @@ fn main() {
     // system
     #[cfg(windows)]
     {
-        ["d3d11", "dxgi", "D3DCompiler"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
+        ["d3d11", "dxgi"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
     }
 
     builder.include(manifest_dir.join("src"));

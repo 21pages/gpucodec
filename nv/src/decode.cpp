@@ -7,15 +7,14 @@
 #include <Samples/Utils/NvCodecUtils.h>
 #include <algorithm>
 #include <array>
+#include <d3dcompiler.h>
 #include <directxcolors.h>
 #include <iostream>
 #include <thread>
 
 #include "callback.h"
 #include "common.h"
-#include "p.h"
 #include "system.h"
-#include "v.h"
 
 #define NUMVERTICES 6
 
@@ -305,9 +304,10 @@ static bool create_register_texture(CuvidDecoder *p) {
   HRB(p->nativeDevice->device_->CreateTexture2D(
       &desc, nullptr, p->textures[1].ReleaseAndGetAddressOf()));
 
-  D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = CD3D11_SHADER_RESOURCE_VIEW_DESC(
-      p->textures[0].Get(), D3D11_SRV_DIMENSION_TEXTURE2D,
-      DXGI_FORMAT_R8_UNORM);
+  D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+  srvDesc = CD3D11_SHADER_RESOURCE_VIEW_DESC(p->textures[0].Get(),
+                                             D3D11_SRV_DIMENSION_TEXTURE2D,
+                                             DXGI_FORMAT_R8_UNORM);
   HRB(p->nativeDevice->device_->CreateShaderResourceView(
       p->textures[0].Get(), &srvDesc, p->SRV[0].ReleaseAndGetAddressOf()));
 
@@ -346,10 +346,57 @@ static bool create_register_texture(CuvidDecoder *p) {
       &sampleDesc, p->samplerLinear.ReleaseAndGetAddressOf()));
 
   // create shader
+  const char *vertexShaderCode = R"(
+struct VS_INPUT
+{
+    float4 Pos : POSITION;
+    float2 Tex : TEXCOORD;
+};
+
+struct VS_OUTPUT
+{
+    float4 Pos : SV_POSITION;
+    float2 Tex : TEXCOORD;
+};
+VS_OUTPUT VS(VS_INPUT input)
+{
+    return input;
+}
+)";
+  const char *pixleShaderCode = R"(
+Texture2D g_txFrame0 : register(t0);
+Texture2D g_txFrame1 : register(t1);
+SamplerState g_Sam : register(s0);
+
+struct VertexImageOut
+{
+    float4 Pos : SV_POSITION;
+    float2 Tex : TEXCOORD0;
+};
+
+float4 PS(VertexImageOut input) : SV_TARGET{
+  float y = g_txFrame0.Sample(g_Sam, input.Tex).r;
+  float2 uv = g_txFrame1.Sample(g_Sam, input.Tex).rg - float2(0.5f, 0.5f);
+  float u = uv.x;
+  float v = uv.y;
+  float r = y + 1.14f * v;
+  float g = y - 0.394f * u - 0.581f * v;
+  float b = y + 2.03f * u;
+  return float4(r, g, b, 1.0f);
+}
+)";
+  ComPtr<ID3DBlob> vsBlob = NULL;
+  ComPtr<ID3DBlob> psBlob = NULL;
+  HRB(D3DCompile(vertexShaderCode, strlen(vertexShaderCode), NULL, NULL, NULL,
+                 "VS", "vs_4_0", 0, 0, vsBlob.ReleaseAndGetAddressOf(), NULL));
+  HRB(D3DCompile(pixleShaderCode, strlen(pixleShaderCode), NULL, NULL, NULL,
+                 "PS", "ps_4_0", 0, 0, psBlob.ReleaseAndGetAddressOf(), NULL));
   p->nativeDevice->device_->CreateVertexShader(
-      g_VS, ARRAYSIZE(g_VS), nullptr, p->vertexShader.ReleaseAndGetAddressOf());
+      vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr,
+      p->vertexShader.ReleaseAndGetAddressOf());
   p->nativeDevice->device_->CreatePixelShader(
-      g_PS, ARRAYSIZE(g_PS), nullptr, p->pixelShader.ReleaseAndGetAddressOf());
+      psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr,
+      p->pixelShader.ReleaseAndGetAddressOf());
 
   // set InputLayout
   constexpr std::array<D3D11_INPUT_ELEMENT_DESC, 2> Layout = {{
@@ -359,9 +406,9 @@ static bool create_register_texture(CuvidDecoder *p) {
        D3D11_INPUT_PER_VERTEX_DATA, 0},
   }};
   ComPtr<ID3D11InputLayout> inputLayout = NULL;
-  HRB(p->nativeDevice->device_->CreateInputLayout(Layout.data(), Layout.size(),
-                                                  g_VS, ARRAYSIZE(g_VS),
-                                                  inputLayout.GetAddressOf()));
+  HRB(p->nativeDevice->device_->CreateInputLayout(
+      Layout.data(), Layout.size(), vsBlob->GetBufferPointer(),
+      vsBlob->GetBufferSize(), inputLayout.GetAddressOf()));
   p->nativeDevice->context_->IASetInputLayout(inputLayout.Get());
 
   if (!ck(p->cudl->cuCtxPushCurrent(p->cuContext)))
