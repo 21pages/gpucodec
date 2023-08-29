@@ -12,25 +12,26 @@ use std::{
 };
 
 fn main() {
+    let nv_luid = 94714;
+    let intel_luid = 93733;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
-        let luid = 64262;
         let output_shared_handle = false;
         let data_format = DataFormat::H264;
         let mut capturer = dxgi::Capturer::new().unwrap();
-        let mut render = Render::new(luid, output_shared_handle).unwrap();
+        let mut render = Render::new(nv_luid, output_shared_handle).unwrap();
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
-                driver: EncodeDriver::AMF,
+                driver: EncodeDriver::MFX,
                 api: API_DX11,
                 data_format,
-                luid,
+                luid: intel_luid,
             },
             d: DynamicContext {
                 device: Some(capturer.device()),
-                width: 2880,
-                height: 1800,
+                width: 1920,
+                height: 1080,
                 kbitrate: 5000,
                 framerate: 30,
                 gop: MAX_GOP as _,
@@ -42,11 +43,11 @@ fn main() {
             } else {
                 Some(render.device())
             },
-            driver: DecodeDriver::AMF,
+            driver: DecodeDriver::CUVID,
             api: API_DX11,
             data_format,
             output_shared_handle,
-            luid,
+            luid: intel_luid,
         };
 
         let mut enc = Encoder::new(en_ctx).unwrap();
