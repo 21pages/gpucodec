@@ -9,6 +9,15 @@
 
 using Microsoft::WRL::ComPtr;
 
+#define IF_FAILED_RETURN(X)                                                    \
+  if (FAILED(hr = (X))) {                                                      \
+    return hr;                                                                 \
+  }
+
+#define IF_FAILED_THROW(X)                                                     \
+  if (FAILED(hr = (X))) {                                                      \
+    throw hr;                                                                  \
+  }
 #define SAFE_RELEASE(p)                                                        \
   {                                                                            \
     if ((p)) {                                                                 \
@@ -86,5 +95,8 @@ public:
   ComPtr<IDXGIFactory1> factory1_ = nullptr;
   std::vector<std::unique_ptr<Adapter>> adapters_;
 };
+
+bool createBgraBmpFile(ID3D11Device *device, ID3D11DeviceContext *deviceContext,
+                       ID3D11Texture2D *texture, LPCWSTR wszBmpFile);
 
 #endif

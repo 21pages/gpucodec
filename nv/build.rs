@@ -24,8 +24,19 @@ fn main() {
     // system
     #[cfg(target_os = "windows")]
     [
-        "kernel32", "user32", "gdi32", "winspool", "shell32", "ole32", "oleaut32", "uuid",
-        "comdlg32", "advapi32", "d3d11", "dxgi",
+        "kernel32",
+        "user32",
+        "gdi32",
+        "winspool",
+        "shell32",
+        "ole32",
+        "oleaut32",
+        "uuid",
+        "comdlg32",
+        "advapi32",
+        "d3d11",
+        "dxgi",
+        "D3DCompiler",
     ]
     .map(|lib| println!("cargo:rustc-link-lib={}", lib));
     #[cfg(target_os = "linux")]
