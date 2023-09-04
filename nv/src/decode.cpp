@@ -58,7 +58,7 @@ public:
   CuvidFunctions *cvdl = NULL;
   NvDecoder *dec = NULL;
   CUcontext cuContext = NULL;
-  CUgraphicsResource cuResource[2] = {NULL, NULL}; // nv12, r8g8
+  CUgraphicsResource cuResource[2] = {NULL, NULL}; // r8, r8g8
   ComPtr<ID3D11Texture2D> nv12Texture = NULL;
   ComPtr<ID3D11Texture2D> textures[2] = {NULL, NULL};
   ComPtr<ID3D11RenderTargetView> RTV = NULL;
@@ -70,6 +70,8 @@ public:
   std::unique_ptr<RGBToNV12> nv12torgb = NULL;
   std::unique_ptr<NativeDevice> nativeDevice = nullptr;
   bool outputSharedHandle;
+  bool prepare_tried = false;
+  bool prepare_ok = false;
 
   CuvidDecoder() { load_driver(&cudl, &cvdl); }
 };
@@ -86,14 +88,16 @@ extern "C" int nv_destroy_decoder(void *decoder) {
       if (p->dec) {
         delete p->dec;
       }
-      p->cudl->cuCtxPushCurrent(p->cuContext);
-      for (int i = 0; i < 2; i++) {
-        if (p->cuResource[i])
-          p->cudl->cuGraphicsUnregisterResource(p->cuResource[i]);
-      }
-      p->cudl->cuCtxPopCurrent(NULL);
-      if (p->cuContext) {
-        p->cudl->cuCtxDestroy(p->cuContext);
+      if (p->cudl && p->cuContext) {
+        p->cudl->cuCtxPushCurrent(p->cuContext);
+        for (int i = 0; i < 2; i++) {
+          if (p->cuResource[i])
+            p->cudl->cuGraphicsUnregisterResource(p->cuResource[i]);
+        }
+        p->cudl->cuCtxPopCurrent(NULL);
+        if (p->cuContext) {
+          p->cudl->cuCtxDestroy(p->cuContext);
+        }
       }
       free_driver(&p->cudl, &p->cvdl);
     }
@@ -142,7 +146,7 @@ extern "C" void *nv_new_decoder(void *device, int64_t luid, API api,
 
     CUdevice cuDevice = 0;
     p->nativeDevice = std::make_unique<NativeDevice>();
-    if (!p->nativeDevice->Init(luid, (ID3D11Device *)device, 1))
+    if (!p->nativeDevice->Init(luid, (ID3D11Device *)device))
       goto _exit;
     if (!ck(p->cudl->cuD3D11GetDevice(&cuDevice,
                                       p->nativeDevice->adapter_.Get())))
@@ -190,7 +194,7 @@ _exit:
   return NULL;
 }
 
-static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12) {
+static bool copy_cuda_frame(CuvidDecoder *p, unsigned char *dpNv12) {
   NvDecoder *dec = p->dec;
   int width = dec->GetWidth();
   int height = dec->GetHeight();
@@ -220,7 +224,9 @@ static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12) {
 
   if (!ck(p->cudl->cuCtxPopCurrent(NULL)))
     return false;
+}
 
+static bool draw(CuvidDecoder *p) {
   // set SRV
   std::array<ID3D11ShaderResourceView *, 2> const textureViews = {
       p->SRV[0].Get(), p->SRV[1].Get()};
@@ -274,15 +280,11 @@ static bool CopyDeviceFrame(CuvidDecoder *p, unsigned char *dpNv12) {
   return true;
 }
 
-static bool create_register_texture(CuvidDecoder *p) {
-
-  if (p->vertexShader)
-    return true;
+static bool create_srv(CuvidDecoder *p) {
   NvDecoder *dec = p->dec;
   int width = dec->GetWidth();
   int height = dec->GetHeight();
 
-  // create SRV
   D3D11_TEXTURE2D_DESC desc;
   ZeroMemory(&desc, sizeof(desc));
   desc.Width = width;
@@ -318,7 +320,16 @@ static bool create_register_texture(CuvidDecoder *p) {
   HRB(p->nativeDevice->device_->CreateShaderResourceView(
       p->textures[1].Get(), &srvDesc, p->SRV[1].ReleaseAndGetAddressOf()));
 
-  // create RTV
+  return true;
+}
+
+static bool create_rtv(CuvidDecoder *p) {
+  NvDecoder *dec = p->dec;
+  int width = dec->GetWidth();
+  int height = dec->GetHeight();
+
+  D3D11_TEXTURE2D_DESC desc;
+  ZeroMemory(&desc, sizeof(desc));
   desc.Width = width;
   desc.Height = height;
   desc.MipLevels = 1;
@@ -339,7 +350,14 @@ static bool create_register_texture(CuvidDecoder *p) {
   HRB(p->nativeDevice->device_->CreateRenderTargetView(
       p->bgraTexture.Get(), &rtDesc, p->RTV.ReleaseAndGetAddressOf()));
 
-  // set ViewPort
+  return true;
+}
+
+static bool set_view_port(CuvidDecoder *p) {
+  NvDecoder *dec = p->dec;
+  int width = dec->GetWidth();
+  int height = dec->GetHeight();
+
   D3D11_VIEWPORT vp;
   vp.Width = (FLOAT)(width);
   vp.Height = (FLOAT)(height);
@@ -349,12 +367,18 @@ static bool create_register_texture(CuvidDecoder *p) {
   vp.TopLeftY = 0;
   p->nativeDevice->context_->RSSetViewports(1, &vp);
 
-  // create sample
+  return true;
+}
+
+static bool create_sample(CuvidDecoder *p) {
   D3D11_SAMPLER_DESC sampleDesc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
   HRB(p->nativeDevice->device_->CreateSamplerState(
       &sampleDesc, p->samplerLinear.ReleaseAndGetAddressOf()));
 
-  // create shader
+  return true;
+}
+
+static bool create_shader(CuvidDecoder *p) {
   const char *vertexShaderCode = R"(
 struct VS_INPUT
 {
@@ -420,6 +444,10 @@ float4 PS(VertexImageOut input) : SV_TARGET{
       vsBlob->GetBufferSize(), inputLayout.GetAddressOf()));
   p->nativeDevice->context_->IASetInputLayout(inputLayout.Get());
 
+  return true;
+}
+
+static bool register_texture(CuvidDecoder *p) {
   if (!ck(p->cudl->cuCtxPushCurrent(p->cuContext)))
     return false;
   bool ret = true;
@@ -442,6 +470,29 @@ float4 PS(VertexImageOut input) : SV_TARGET{
   return ret;
 }
 
+static bool prepare(CuvidDecoder *p) {
+  if (p->prepare_tried) {
+    return p->prepare_ok;
+  }
+  p->prepare_tried = true;
+
+  if (!create_srv(p))
+    return false;
+  if (!create_rtv(p))
+    return false;
+  if (!set_view_port(p))
+    return false;
+  if (!create_sample(p))
+    return false;
+  if (!create_shader(p))
+    return false;
+  if (!register_texture(p))
+    return false;
+
+  p->prepare_ok = true;
+  return true;
+}
+
 extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
                          DecodeCallback callback, void *obj) {
   try {
@@ -458,11 +509,13 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
     for (int i = 0; i < nFrameReturned; i++) {
       uint8_t *pFrame = dec->GetFrame();
       if (!p->vertexShader) {
-        if (!create_register_texture(p)) { // TODO: failed on available
+        if (!prepare(p)) {
           return -1;
         }
       }
-      if (!CopyDeviceFrame(p, pFrame))
+      if (!copy_cuda_frame(p, pFrame))
+        return -1;
+      if (!draw(p))
         return -1;
       if (!p->nativeDevice->EnsureTexture(width, height)) {
         std::cerr << "Failed to EnsureTexture" << std::endl;
