@@ -199,9 +199,10 @@ extern "C" void *nv_new_decoder(void *device, int64_t luid, API api,
     }
     bool bUseDeviceFrame = true;
     bool bLowLatency = true;
-    p->dec =
-        new NvDecoder(p->cudl, p->cvdl, p->cuContext, bUseDeviceFrame,
-                      cudaCodecID, bLowLatency, false, &cropRect, &resizeDim);
+    bool bDeviceFramePitched = false; // width=pitch
+    p->dec = new NvDecoder(p->cudl, p->cvdl, p->cuContext, bUseDeviceFrame,
+                           cudaCodecID, bLowLatency, bDeviceFramePitched,
+                           &cropRect, &resizeDim);
     /* Set operating point for AV1 SVC. It has no impact for other profiles or
      * codecs PFNVIDOPPOINTCALLBACK Callback from video parser will pick
      * operating point set to NvDecoder  */
@@ -230,6 +231,7 @@ static bool copy_cuda_frame(CuvidDecoder *p, unsigned char *dpNv12) {
   NvDecoder *dec = p->dec;
   int width = dec->GetWidth();
   int height = dec->GetHeight();
+  int chromaHeight = dec->GetChromaHeight();
 
   CUVIDAutoCtxPopper ctxPoper(p->cudl, p->cuContext);
 
@@ -246,7 +248,7 @@ static bool copy_cuda_frame(CuvidDecoder *p, unsigned char *dpNv12) {
     m.dstMemoryType = CU_MEMORYTYPE_ARRAY;
     m.dstArray = dstArray;
     m.WidthInBytes = width;
-    m.Height = height / (1 << i);
+    m.Height = i == 0 ? height : chromaHeight;
     if (!ck(p->cudl->cuMemcpy2D(&m)))
       return false;
   }
@@ -310,6 +312,9 @@ static bool create_srv(CuvidDecoder *p) {
   NvDecoder *dec = p->dec;
   int width = dec->GetWidth();
   int height = dec->GetHeight();
+  int chromaHeight = dec->GetChromaHeight();
+  printf("width: %d, height %d, chromaHeight:%d\n", width, height,
+         chromaHeight);
 
   D3D11_TEXTURE2D_DESC desc;
   ZeroMemory(&desc, sizeof(desc));
@@ -329,7 +334,7 @@ static bool create_srv(CuvidDecoder *p) {
 
   desc.Format = DXGI_FORMAT_R8G8_UNORM;
   desc.Width = width / 2;
-  desc.Height = height / 2;
+  desc.Height = chromaHeight;
   HRB(p->nativeDevice->device_->CreateTexture2D(
       &desc, nullptr, p->textures[1].ReleaseAndGetAddressOf()));
 
@@ -519,6 +524,7 @@ static bool prepare(CuvidDecoder *p) {
   return true;
 }
 
+// ref: HandlePictureDisplay
 extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
                          DecodeCallback callback, void *obj) {
   try {
