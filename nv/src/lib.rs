@@ -49,20 +49,19 @@ pub fn possible_support_encoders() -> Vec<InnerEncodeContext> {
 }
 
 pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
-    vec![]
-    // if unsafe { nv_encode_driver_support() } != 0 {
-    //     return vec![];
-    // }
-    // let devices = vec![API_DX11];
-    // let dataFormats = vec![H264, H265];
-    // let mut v = vec![];
-    // for device in devices.iter() {
-    //     for dataFormat in dataFormats.iter() {
-    //         v.push(InnerDecodeContext {
-    //             api: device.clone(),
-    //             dataFormat: dataFormat.clone(),
-    //         });
-    //     }
-    // }
-    // v
+    if unsafe { nv_encode_driver_support() } != 0 {
+        return vec![];
+    }
+    let devices = vec![API_DX11];
+    let dataFormats = vec![H264, H265];
+    let mut v = vec![];
+    for device in devices.iter() {
+        for dataFormat in dataFormats.iter() {
+            v.push(InnerDecodeContext {
+                api: device.clone(),
+                dataFormat: dataFormat.clone(),
+            });
+        }
+    }
+    v
 }
