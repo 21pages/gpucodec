@@ -66,6 +66,7 @@ public:
   ComPtr<ID3D11VertexShader> vertexShader = NULL;
   ComPtr<ID3D11PixelShader> pixelShader = NULL;
   ComPtr<ID3D11SamplerState> samplerLinear = NULL;
+  ComPtr<ID3D11Texture2D> bgraTexture = NULL;
   std::unique_ptr<RGBToNV12> nv12torgb = NULL;
   std::unique_ptr<NativeDevice> nativeDevice = nullptr;
   bool outputSharedHandle;
@@ -141,7 +142,7 @@ extern "C" void *nv_new_decoder(void *device, int64_t luid, API api,
 
     CUdevice cuDevice = 0;
     p->nativeDevice = std::make_unique<NativeDevice>();
-    if (!p->nativeDevice->Init(luid, (ID3D11Device *)device))
+    if (!p->nativeDevice->Init(luid, (ID3D11Device *)device, 1))
       goto _exit;
     if (!ck(p->cudl->cuD3D11GetDevice(&cuDevice,
                                       p->nativeDevice->adapter_.Get())))
@@ -318,17 +319,25 @@ static bool create_register_texture(CuvidDecoder *p) {
       p->textures[1].Get(), &srvDesc, p->SRV[1].ReleaseAndGetAddressOf()));
 
   // create RTV
-  if (!p->nativeDevice->EnsureTexture(width, height)) {
-    std::cerr << "Failed to EnsureTexture" << std::endl;
-    return false;
-  }
+  desc.Width = width;
+  desc.Height = height;
+  desc.MipLevels = 1;
+  desc.ArraySize = 1;
+  desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  desc.SampleDesc.Count = 1;
+  desc.SampleDesc.Quality = 0;
+  desc.MiscFlags = 0;
+  desc.Usage = D3D11_USAGE_DEFAULT;
+  desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+  desc.CPUAccessFlags = 0;
+  HRB(p->nativeDevice->device_->CreateTexture2D(
+      &desc, nullptr, p->bgraTexture.ReleaseAndGetAddressOf()));
   D3D11_RENDER_TARGET_VIEW_DESC rtDesc;
   rtDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
   rtDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
   rtDesc.Texture2D.MipSlice = 0;
-  ID3D11Texture2D *bgraTexture = p->nativeDevice->GetCurrentTexture();
   HRB(p->nativeDevice->device_->CreateRenderTargetView(
-      bgraTexture, &rtDesc, p->RTV.ReleaseAndGetAddressOf()));
+      p->bgraTexture.Get(), &rtDesc, p->RTV.ReleaseAndGetAddressOf()));
 
   // set ViewPort
   D3D11_VIEWPORT vp;
@@ -459,9 +468,19 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
         std::cerr << "Failed to EnsureTexture" << std::endl;
         return -1;
       }
-      // p->nativeDevice->next();
-      // HRI(p->nv12torgb->Convert(p->nv12Texture.Get(),
-      //                           p->nativeDevice->GetCurrentTexture()));
+      p->nativeDevice->next();
+      HRI(p->nv12torgb->Convert(p->bgraTexture.Get(),
+                                p->nativeDevice->GetCurrentTexture()));
+      // p->nativeDevice->context_->CopyResource(
+      //     p->nativeDevice->GetCurrentTexture(), p->bgraTexture.Get());
+
+      // static int saved = 0;
+      // saved += 1;
+      // if (saved == 8)
+      //   createBgraBmpFile(p->nativeDevice->device_.Get(),
+      //                     p->nativeDevice->context_.Get(),
+      //                     p->bgraTexture.Get(), L"nv.bmp");
+
       void *opaque = nullptr;
       if (p->outputSharedHandle) {
         HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
@@ -474,7 +493,8 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
         opaque = p->nativeDevice->GetCurrentTexture();
       }
 
-      callback(opaque, obj);
+      if (callback)
+        callback(opaque, obj);
       decoded = true;
     }
     return decoded ? 0 : -1;
