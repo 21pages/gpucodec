@@ -20,6 +20,40 @@
 
 using namespace DirectX;
 
+class CUVIDAutoUnmapper {
+  CudaFunctions *cudl_ = NULL;
+  CUgraphicsResource *pCuResource_ = NULL;
+
+public:
+  CUVIDAutoUnmapper(CudaFunctions *cudl, CUgraphicsResource *pCuResource)
+      : cudl_(cudl), pCuResource_(pCuResource) {
+    if (!ck(cudl->cuGraphicsMapResources(1, pCuResource, 0))) {
+      NVDEC_THROW_ERROR("cuGraphicsMapResources failed", CUDA_ERROR_UNKNOWN);
+    }
+  }
+  ~CUVIDAutoUnmapper() {
+    if (!ck(cudl_->cuGraphicsUnmapResources(1, pCuResource_, 0))) {
+      NVDEC_THROW_ERROR("cuGraphicsUnmapResources failed", CUDA_ERROR_UNKNOWN);
+    }
+  }
+};
+
+class CUVIDAutoCtxPopper {
+  CudaFunctions *cudl_ = NULL;
+
+public:
+  CUVIDAutoCtxPopper(CudaFunctions *cudl, CUcontext cuContext) : cudl_(cudl) {
+    if (!ck(cudl->cuCtxPushCurrent(cuContext))) {
+      NVDEC_THROW_ERROR("cuCtxPopCurrent failed", CUDA_ERROR_UNKNOWN);
+    }
+  }
+  ~CUVIDAutoCtxPopper() {
+    if (!ck(cudl_->cuCtxPopCurrent(NULL))) {
+      NVDEC_THROW_ERROR("cuCtxPopCurrent failed", CUDA_ERROR_UNKNOWN);
+    }
+  }
+};
+
 static void load_driver(CudaFunctions **pp_cudl, CuvidFunctions **pp_cvdl) {
   if (cuda_load_functions(pp_cudl, NULL) < 0) {
     NVDEC_THROW_ERROR("cuda_load_functions failed", CUDA_ERROR_UNKNOWN);
@@ -95,9 +129,7 @@ extern "C" int nv_destroy_decoder(void *decoder) {
             p->cudl->cuGraphicsUnregisterResource(p->cuResource[i]);
         }
         p->cudl->cuCtxPopCurrent(NULL);
-        if (p->cuContext) {
-          p->cudl->cuCtxDestroy(p->cuContext);
-        }
+        p->cudl->cuCtxDestroy(p->cuContext);
       }
       free_driver(&p->cudl, &p->cvdl);
     }
@@ -199,15 +231,14 @@ static bool copy_cuda_frame(CuvidDecoder *p, unsigned char *dpNv12) {
   int width = dec->GetWidth();
   int height = dec->GetHeight();
 
-  if (!ck(p->cudl->cuCtxPushCurrent(p->cuContext)))
-    return false;
+  CUVIDAutoCtxPopper ctxPoper(p->cudl, p->cuContext);
 
   for (int i = 0; i < 2; i++) {
     CUarray dstArray;
-
-    ck(p->cudl->cuGraphicsMapResources(1, &p->cuResource[i], 0));
-    ck(p->cudl->cuGraphicsSubResourceGetMappedArray(&dstArray, p->cuResource[i],
-                                                    0, 0));
+    CUVIDAutoUnmapper unmapper(p->cudl, &p->cuResource[i]);
+    if (!ck(p->cudl->cuGraphicsSubResourceGetMappedArray(
+            &dstArray, p->cuResource[i], 0, 0)))
+      return false;
     CUDA_MEMCPY2D m = {0};
     m.srcMemoryType = CU_MEMORYTYPE_DEVICE;
     m.srcDevice = (CUdeviceptr)(dpNv12 + (width * height) * i);
@@ -216,14 +247,9 @@ static bool copy_cuda_frame(CuvidDecoder *p, unsigned char *dpNv12) {
     m.dstArray = dstArray;
     m.WidthInBytes = width;
     m.Height = height / (1 << i);
-    ck(p->cudl->cuMemcpy2D(&m));
-
-    // todo: release
-    ck(p->cudl->cuGraphicsUnmapResources(1, &p->cuResource[i], 0));
+    if (!ck(p->cudl->cuMemcpy2D(&m)))
+      return false;
   }
-
-  if (!ck(p->cudl->cuCtxPopCurrent(NULL)))
-    return false;
 }
 
 static bool draw(CuvidDecoder *p) {
