@@ -428,7 +428,7 @@ VS_OUTPUT VS(VS_INPUT input)
     return input;
 }
 )";
-  const char *pixleShaderCode = R"(
+  const char *pixleShaderCode601 = R"(
 Texture2D g_txFrame0 : register(t0);
 Texture2D g_txFrame1 : register(t1);
 SamplerState g_Sam : register(s0);
@@ -438,7 +438,6 @@ struct PS_INPUT
     float4 Pos : SV_POSITION;
     float2 Tex : TEXCOORD0;
 };
-// 601
 float4 PS(PS_INPUT input) : SV_TARGET{
   float y = g_txFrame0.Sample(g_Sam, input.Tex).r;
   y = 1.164383561643836 * (y - 0.0625);
@@ -451,12 +450,35 @@ float4 PS(PS_INPUT input) : SV_TARGET{
   return float4(r, g, b, 1.0f);
 }
 )";
+  const char *pixleShaderCode709 = R"(
+Texture2D g_txFrame0 : register(t0);
+Texture2D g_txFrame1 : register(t1);
+SamplerState g_Sam : register(s0);
+
+struct PS_INPUT
+{
+    float4 Pos : SV_POSITION;
+    float2 Tex : TEXCOORD0;
+};
+float4 PS(PS_INPUT input) : SV_TARGET{
+  float y = g_txFrame0.Sample(g_Sam, input.Tex).r;
+  y = 1.164383561643836 * (y - 0.0625);
+  float2 uv = g_txFrame1.Sample(g_Sam, input.Tex).rg - float2(0.5f, 0.5f);
+  float u = uv.x;
+  float v = uv.y;
+  float r = saturate(y + 1.792741071428571 * v);
+  float g = saturate(y - 0.532909328559444 * v - 0.21324861427373 * u);
+  float b = saturate(y + 2.112401785714286 * u);
+  return float4(r, g, b, 1.0f);
+}
+)";
   ComPtr<ID3DBlob> vsBlob = NULL;
   ComPtr<ID3DBlob> psBlob = NULL;
   HRB(D3DCompile(vertexShaderCode, strlen(vertexShaderCode), NULL, NULL, NULL,
                  "VS", "vs_4_0", 0, 0, vsBlob.ReleaseAndGetAddressOf(), NULL));
-  HRB(D3DCompile(pixleShaderCode, strlen(pixleShaderCode), NULL, NULL, NULL,
-                 "PS", "ps_4_0", 0, 0, psBlob.ReleaseAndGetAddressOf(), NULL));
+  HRB(D3DCompile(pixleShaderCode601, strlen(pixleShaderCode601), NULL, NULL,
+                 NULL, "PS", "ps_4_0", 0, 0, psBlob.ReleaseAndGetAddressOf(),
+                 NULL));
   p->nativeDevice->device_->CreateVertexShader(
       vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr,
       p->vertexShader.ReleaseAndGetAddressOf());
