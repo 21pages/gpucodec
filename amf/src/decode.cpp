@@ -223,7 +223,7 @@ private:
           AMFContext_, AMFVideoConverter, &AMFConverter_);
       AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateComponent");
       int width = surface->GetPlaneAt(0)->GetWidth();
-      int height = surface->GetPlaneAt(0)->GetWidth();
+      int height = surface->GetPlaneAt(0)->GetHeight();
       res = AMFConverter_->SetProperty(AMF_VIDEO_CONVERTER_MEMORY_TYPE,
                                        AMFMemoryType_);
       res = AMFConverter_->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_FORMAT,
