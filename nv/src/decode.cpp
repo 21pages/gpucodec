@@ -432,13 +432,13 @@ Texture2D g_txFrame0 : register(t0);
 Texture2D g_txFrame1 : register(t1);
 SamplerState g_Sam : register(s0);
 
-struct VertexImageOut
+struct PS_INPUT
 {
     float4 Pos : SV_POSITION;
     float2 Tex : TEXCOORD0;
 };
 
-float4 PS(VertexImageOut input) : SV_TARGET{
+float4 PS(PS_INPUT input) : SV_TARGET{
   float y = g_txFrame0.Sample(g_Sam, input.Tex).r;
   float2 uv = g_txFrame1.Sample(g_Sam, input.Tex).rg - float2(0.5f, 0.5f);
   float u = uv.x;
