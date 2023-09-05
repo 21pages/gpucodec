@@ -172,7 +172,7 @@ extern "C" void *nv_new_encoder(void *handle, int64_t luid, API api,
     e->pEnc->CreateDefaultEncoderParams(
         &initializeParams, NV_ENC_CODEC_H264_GUID,
         NV_ENC_PRESET_P3_GUID /*NV_ENC_PRESET_LOW_LATENCY_HP_GUID*/,
-        NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY);
+        NV_ENC_TUNING_INFO_LOW_LATENCY);
 
     // no delay
     initializeParams.encodeConfig->frameIntervalP = 1;

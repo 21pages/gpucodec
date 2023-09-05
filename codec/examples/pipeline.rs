@@ -12,21 +12,20 @@ use std::{
 };
 
 fn main() {
-    let nv_luid = 94714;
-    let intel_luid = 93733;
+    let luid = 93457;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;
         let data_format = DataFormat::H264;
         let mut capturer = dxgi::Capturer::new().unwrap();
-        let mut render = Render::new(nv_luid, output_shared_handle).unwrap();
+        let mut render = Render::new(luid, output_shared_handle).unwrap();
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
-                driver: EncodeDriver::MFX,
+                driver: EncodeDriver::NVENC,
                 api: API_DX11,
                 data_format,
-                luid: intel_luid,
+                luid,
             },
             d: DynamicContext {
                 device: Some(capturer.device()),
@@ -47,7 +46,7 @@ fn main() {
             api: API_DX11,
             data_format,
             output_shared_handle,
-            luid: intel_luid,
+            luid,
         };
 
         let mut enc = Encoder::new(en_ctx).unwrap();
