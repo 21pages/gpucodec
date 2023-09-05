@@ -255,52 +255,6 @@ static bool copy_cuda_frame(CuvidDecoder *p, unsigned char *dpNv12) {
 }
 
 static bool draw(CuvidDecoder *p) {
-  // set SRV
-  std::array<ID3D11ShaderResourceView *, 2> const textureViews = {
-      p->SRV[0].Get(), p->SRV[1].Get()};
-  p->nativeDevice->context_->PSSetShaderResources(0, textureViews.size(),
-                                                  textureViews.data());
-
-  UINT Stride = sizeof(VERTEX);
-  UINT Offset = 0;
-  FLOAT blendFactor[4] = {0.f, 0.f, 0.f, 0.f};
-  p->nativeDevice->context_->OMSetBlendState(nullptr, blendFactor, 0xffffffff);
-
-  const float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // clear as black
-  p->nativeDevice->context_->ClearRenderTargetView(p->RTV.Get(), clearColor);
-  p->nativeDevice->context_->OMSetRenderTargets(1, p->RTV.GetAddressOf(), NULL);
-  p->nativeDevice->context_->VSSetShader(p->vertexShader.Get(), NULL, 0);
-  p->nativeDevice->context_->PSSetShader(p->pixelShader.Get(), NULL, 0);
-  p->nativeDevice->context_->PSSetSamplers(0, 1,
-                                           p->samplerLinear.GetAddressOf());
-  p->nativeDevice->context_->IASetPrimitiveTopology(
-      D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-  // set VertexBuffers
-  VERTEX Vertices[NUMVERTICES] = {
-      {XMFLOAT3(-1.0f, -1.0f, 0), XMFLOAT2(0.0f, 1.0f)},
-      {XMFLOAT3(-1.0f, 1.0f, 0), XMFLOAT2(0.0f, 0.0f)},
-      {XMFLOAT3(1.0f, -1.0f, 0), XMFLOAT2(1.0f, 1.0f)},
-      {XMFLOAT3(1.0f, -1.0f, 0), XMFLOAT2(1.0f, 1.0f)},
-      {XMFLOAT3(-1.0f, 1.0f, 0), XMFLOAT2(0.0f, 0.0f)},
-      {XMFLOAT3(1.0f, 1.0f, 0), XMFLOAT2(1.0f, 0.0f)},
-  };
-  D3D11_BUFFER_DESC BufferDesc;
-  RtlZeroMemory(&BufferDesc, sizeof(BufferDesc));
-  BufferDesc.Usage = D3D11_USAGE_DEFAULT;
-  BufferDesc.ByteWidth = sizeof(VERTEX) * NUMVERTICES;
-  BufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-  BufferDesc.CPUAccessFlags = 0;
-  D3D11_SUBRESOURCE_DATA InitData;
-  RtlZeroMemory(&InitData, sizeof(InitData));
-  InitData.pSysMem = Vertices;
-  ComPtr<ID3D11Buffer> VertexBuffer = nullptr;
-  // Create vertex buffer
-  HRB(p->nativeDevice->device_->CreateBuffer(&BufferDesc, &InitData,
-                                             &VertexBuffer));
-  p->nativeDevice->context_->IASetVertexBuffers(
-      0, 1, VertexBuffer.GetAddressOf(), &Stride, &Offset);
-
   // draw
   p->nativeDevice->context_->Draw(NUMVERTICES, 0);
   p->nativeDevice->context_->Flush();
@@ -308,7 +262,7 @@ static bool draw(CuvidDecoder *p) {
   return true;
 }
 
-static bool create_srv(CuvidDecoder *p) {
+static bool set_srv(CuvidDecoder *p) {
   NvDecoder *dec = p->dec;
   int width = dec->GetWidth();
   int height = dec->GetHeight();
@@ -351,10 +305,15 @@ static bool create_srv(CuvidDecoder *p) {
   HRB(p->nativeDevice->device_->CreateShaderResourceView(
       p->textures[1].Get(), &srvDesc, p->SRV[1].ReleaseAndGetAddressOf()));
 
+  // set SRV
+  std::array<ID3D11ShaderResourceView *, 2> const textureViews = {
+      p->SRV[0].Get(), p->SRV[1].Get()};
+  p->nativeDevice->context_->PSSetShaderResources(0, textureViews.size(),
+                                                  textureViews.data());
   return true;
 }
 
-static bool create_rtv(CuvidDecoder *p) {
+static bool set_rtv(CuvidDecoder *p) {
   NvDecoder *dec = p->dec;
   int width = dec->GetWidth();
   int height = dec->GetHeight();
@@ -381,6 +340,10 @@ static bool create_rtv(CuvidDecoder *p) {
   HRB(p->nativeDevice->device_->CreateRenderTargetView(
       p->bgraTexture.Get(), &rtDesc, p->RTV.ReleaseAndGetAddressOf()));
 
+  const float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // clear as black
+  p->nativeDevice->context_->ClearRenderTargetView(p->RTV.Get(), clearColor);
+  p->nativeDevice->context_->OMSetRenderTargets(1, p->RTV.GetAddressOf(), NULL);
+
   return true;
 }
 
@@ -401,15 +364,16 @@ static bool set_view_port(CuvidDecoder *p) {
   return true;
 }
 
-static bool create_sample(CuvidDecoder *p) {
+static bool set_sample(CuvidDecoder *p) {
   D3D11_SAMPLER_DESC sampleDesc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
   HRB(p->nativeDevice->device_->CreateSamplerState(
       &sampleDesc, p->samplerLinear.ReleaseAndGetAddressOf()));
-
+  p->nativeDevice->context_->PSSetSamplers(0, 1,
+                                           p->samplerLinear.GetAddressOf());
   return true;
 }
 
-static bool create_shader(CuvidDecoder *p) {
+static bool set_shader(CuvidDecoder *p) {
   // https://gist.github.com/RomiTT/9c05d36fe339b899793a3252297a5624
   const char *vertexShaderCode = R"(
 struct VS_INPUT
@@ -499,12 +463,52 @@ float4 PS(PS_INPUT input) : SV_TARGET{
       vsBlob->GetBufferSize(), inputLayout.GetAddressOf()));
   p->nativeDevice->context_->IASetInputLayout(inputLayout.Get());
 
+  p->nativeDevice->context_->VSSetShader(p->vertexShader.Get(), NULL, 0);
+  p->nativeDevice->context_->PSSetShader(p->pixelShader.Get(), NULL, 0);
+
+  return true;
+}
+
+static bool set_vertex_buffer(CuvidDecoder *p) {
+  UINT Stride = sizeof(VERTEX);
+  UINT Offset = 0;
+  FLOAT blendFactor[4] = {0.f, 0.f, 0.f, 0.f};
+  p->nativeDevice->context_->OMSetBlendState(nullptr, blendFactor, 0xffffffff);
+
+  p->nativeDevice->context_->IASetPrimitiveTopology(
+      D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+  // set VertexBuffers
+  VERTEX Vertices[NUMVERTICES] = {
+      {XMFLOAT3(-1.0f, -1.0f, 0), XMFLOAT2(0.0f, 1.0f)},
+      {XMFLOAT3(-1.0f, 1.0f, 0), XMFLOAT2(0.0f, 0.0f)},
+      {XMFLOAT3(1.0f, -1.0f, 0), XMFLOAT2(1.0f, 1.0f)},
+      {XMFLOAT3(1.0f, -1.0f, 0), XMFLOAT2(1.0f, 1.0f)},
+      {XMFLOAT3(-1.0f, 1.0f, 0), XMFLOAT2(0.0f, 0.0f)},
+      {XMFLOAT3(1.0f, 1.0f, 0), XMFLOAT2(1.0f, 0.0f)},
+  };
+  D3D11_BUFFER_DESC BufferDesc;
+  RtlZeroMemory(&BufferDesc, sizeof(BufferDesc));
+  BufferDesc.Usage = D3D11_USAGE_DEFAULT;
+  BufferDesc.ByteWidth = sizeof(VERTEX) * NUMVERTICES;
+  BufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+  BufferDesc.CPUAccessFlags = 0;
+  D3D11_SUBRESOURCE_DATA InitData;
+  RtlZeroMemory(&InitData, sizeof(InitData));
+  InitData.pSysMem = Vertices;
+  ComPtr<ID3D11Buffer> VertexBuffer = nullptr;
+  // Create vertex buffer
+  HRB(p->nativeDevice->device_->CreateBuffer(&BufferDesc, &InitData,
+                                             &VertexBuffer));
+  p->nativeDevice->context_->IASetVertexBuffers(
+      0, 1, VertexBuffer.GetAddressOf(), &Stride, &Offset);
+
   return true;
 }
 
 static bool register_texture(CuvidDecoder *p) {
-  if (!ck(p->cudl->cuCtxPushCurrent(p->cuContext)))
-    return false;
+  CUVIDAutoCtxPopper ctxPoper(p->cudl, p->cuContext);
+
   bool ret = true;
   for (int i = 0; i < 2; i++) {
     if (!ck(p->cudl->cuGraphicsD3D11RegisterResource(
@@ -519,8 +523,6 @@ static bool register_texture(CuvidDecoder *p) {
       break;
     }
   }
-  if (!ck(p->cudl->cuCtxPopCurrent(NULL)))
-    return false;
 
   return ret;
 }
@@ -531,15 +533,17 @@ static bool prepare(CuvidDecoder *p) {
   }
   p->prepare_tried = true;
 
-  if (!create_srv(p))
+  if (!set_srv(p))
     return false;
-  if (!create_rtv(p))
+  if (!set_rtv(p))
     return false;
   if (!set_view_port(p))
     return false;
-  if (!create_sample(p))
+  if (!set_sample(p))
     return false;
-  if (!create_shader(p))
+  if (!set_shader(p))
+    return false;
+  if (!set_vertex_buffer(p))
     return false;
   if (!register_texture(p))
     return false;
