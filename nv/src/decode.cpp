@@ -587,13 +587,6 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
       // p->nativeDevice->context_->CopyResource(
       //     p->nativeDevice->GetCurrentTexture(), p->bgraTexture.Get());
 
-      // static int saved = 0;
-      // saved += 1;
-      // if (saved == 8)
-      //   createBgraBmpFile(p->nativeDevice->device_.Get(),
-      //                     p->nativeDevice->context_.Get(),
-      //                     p->bgraTexture.Get(), L"nv.bmp");
-
       void *opaque = nullptr;
       if (p->outputSharedHandle) {
         HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
