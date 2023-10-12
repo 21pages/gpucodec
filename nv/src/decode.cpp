@@ -20,6 +20,29 @@
 
 using namespace DirectX;
 
+#include <chrono>
+#include <fstream>
+#include <iostream>
+#include <unordered_map>
+
+static std::unordered_map<std::string, std::chrono::steady_clock::time_point>
+    lastEntryTimes;
+
+static void flog(std::string tag, std::string s) {
+  std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+  auto it = lastEntryTimes.find(tag);
+
+  if (it == lastEntryTimes.end() ||
+      now - it->second >= std::chrono::seconds(1)) {
+    std::ofstream myfile;
+    myfile.open("D:/tmp/log.txt", std::ios_base::app);
+    myfile << tag << s << "\n";
+    myfile.close();
+
+    lastEntryTimes[tag] = now;
+  }
+}
+
 class CUVIDAutoUnmapper {
   CudaFunctions *cudl_ = NULL;
   CUgraphicsResource *pCuResource_ = NULL;
@@ -533,35 +556,66 @@ static bool prepare(CuvidDecoder *p) {
   }
   p->prepare_tried = true;
 
-  if (!set_srv(p))
+  if (!set_srv(p)) {
+    flog("nv_decode set_srv failed !!!!!!!!!!!!!!!!!", "");
     return false;
-  if (!set_rtv(p))
+  }
+  if (!set_rtv(p)) {
+    flog("nv_decode set_rtv failed !!!!!!!!!!!!!!!!!", "");
     return false;
-  if (!set_view_port(p))
+  }
+  if (!set_view_port(p)) {
+    flog("nv_decode set_view_port failed !!!!!!!!!!!!!!!!!", "");
     return false;
-  if (!set_sample(p))
+  }
+  if (!set_sample(p)) {
+    flog("nv_decode set_sample failed !!!!!!!!!!!!!!!!!", "");
     return false;
-  if (!set_shader(p))
+  }
+  if (!set_shader(p)) {
+    flog("nv_decode set_shader failed !!!!!!!!!!!!!!!!!", "");
     return false;
-  if (!set_vertex_buffer(p))
+  }
+  if (!set_vertex_buffer(p)) {
+    flog("nv_decode set_vertex_buffer failed !!!!!!!!!!!!!!!!!", "");
     return false;
-  if (!register_texture(p))
+  }
+  if (!register_texture(p)) {
+    flog("nv_decode set_vertex_buffer failed !!!!!!!!!!!!!!!!!", "");
     return false;
+  }
 
   p->prepare_ok = true;
+  flog("nv_decode prepare ok", "");
   return true;
 }
 
+static int bmpIndex = 0;
+
+static std::string get_bmp_filename(const std::string &tag) {
+  std::stringstream ss;
+  ss << bmpIndex;
+  std::string numberString = ss.str();
+  std::string combinedString = "D:/tmp/bmp/" + tag + numberString + ".bmp";
+  return combinedString;
+}
+
 // ref: HandlePictureDisplay
+static std::chrono::steady_clock::time_point last_bmp_timestamp =
+    std::chrono::steady_clock::now();
 extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
                          DecodeCallback callback, void *obj) {
   try {
     CuvidDecoder *p = (CuvidDecoder *)decoder;
     NvDecoder *dec = p->dec;
-
+    flog("nv_decode paras:", "len:" + std::to_string(len));
     int nFrameReturned = dec->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
-    if (!nFrameReturned)
+    flog("nv_decode nFrameReturned:", std::to_string(nFrameReturned));
+    if (!nFrameReturned) {
+      flog("nv_decode nFrameReturned is 0 !!!!!!!!!!!!!!!!!",
+           std::to_string(nFrameReturned));
       return -1;
+    }
     cudaVideoSurfaceFormat format = dec->GetOutputFormat();
     int width = dec->GetWidth();
     int height = dec->GetHeight();
@@ -570,20 +624,40 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
       uint8_t *pFrame = dec->GetFrame();
       if (!p->vertexShader) {
         if (!prepare(p)) {
+          flog("nv_decode prepare failed !!!!!!!!!!!!!!!!!", "");
           return -1;
         }
       }
-      if (!copy_cuda_frame(p, pFrame))
+      if (!copy_cuda_frame(p, pFrame)) {
+        flog("nv_decode copy_cuda_frame failed !!!!!!!!!!!!!!!!!", "");
         return -1;
-      if (!draw(p))
+      }
+      if (!draw(p)) {
+        flog("nv_decode draw failed !!!!!!!!!!!!!!!!!", "");
         return -1;
+      }
       if (!p->nativeDevice->EnsureTexture(width, height)) {
         std::cerr << "Failed to EnsureTexture" << std::endl;
+        flog("nv_decode EnsureTexture failed !!!!!!!!!!!!!!!!!", "");
         return -1;
       }
       p->nativeDevice->next();
+      std::chrono::steady_clock::time_point now =
+          std::chrono::steady_clock::now();
+      if (now - last_bmp_timestamp >= std::chrono::seconds(1)) {
+        createBgraBmpFile(p->nativeDevice->device_.Get(),
+                          p->nativeDevice->context_.Get(), p->bgraTexture.Get(),
+                          get_bmp_filename("decode_"));
+      }
       HRI(p->nv12torgb->Convert(p->bgraTexture.Get(),
                                 p->nativeDevice->GetCurrentTexture()));
+      if (now - last_bmp_timestamp >= std::chrono::seconds(1)) {
+        createBgraBmpFile(p->nativeDevice->device_.Get(),
+                          p->nativeDevice->context_.Get(), p->bgraTexture.Get(),
+                          get_bmp_filename("convert_"));
+        last_bmp_timestamp = now;
+        bmpIndex += 1;
+      }
       // p->nativeDevice->context_->CopyResource(
       //     p->nativeDevice->GetCurrentTexture(), p->bgraTexture.Get());
 
@@ -592,6 +666,7 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
         HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
         if (!sharedHandle) {
           std::cerr << "Failed to GetSharedHandle" << std::endl;
+          flog("nv_decode GetSharedHandle failed !!!!!!!!!!!!!!!!!", "");
           return -1;
         }
         opaque = sharedHandle;
@@ -603,9 +678,12 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
         callback(opaque, obj);
       decoded = true;
     }
+    flog("nv_decode decode result:",
+         decoded ? "success" : "failed!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     return decoded ? 0 : -1;
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
+    flog("nv_decode decode exception!!!!!!!!!!!!!!!!!!!!!!!!!!!!:", e.what());
   }
   return -1;
 }

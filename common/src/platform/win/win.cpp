@@ -298,8 +298,19 @@ static HRESULT CreateBmpFile(LPCWSTR wszBmpFile, BYTE *pData,
   return hr;
 }
 
+static LPCWSTR ConvertToLPCWSTR(const std::string &str) {
+  std::wstring wstr(str.begin(), str.end());
+
+  int bufferSize = static_cast<int>((wstr.size() + 1) * sizeof(wchar_t));
+  LPWSTR buffer = new wchar_t[bufferSize];
+  wcscpy_s(buffer, bufferSize, wstr.c_str());
+
+  return buffer;
+};
+
 bool createBgraBmpFile(ID3D11Device *device, ID3D11DeviceContext *deviceContext,
-                       ID3D11Texture2D *texture, LPCWSTR wszBmpFile) {
+                       ID3D11Texture2D *texture,
+                       const std::string &strBmpFile) {
   D3D11_TEXTURE2D_DESC desc = {};
   HRESULT hr;
   texture->GetDesc(&desc);
@@ -338,7 +349,7 @@ bool createBgraBmpFile(ID3D11Device *device, ID3D11DeviceContext *deviceContext,
       }
     }
   }
-
+  LPCWSTR wszBmpFile = ConvertToLPCWSTR(strBmpFile);
   hr =
       CreateBmpFile(wszBmpFile, pDataRgb, uiImageSize, desc.Width, desc.Height);
   delete[] pDataRgb;
