@@ -181,11 +181,12 @@ pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
                     input.d.gop,
                 )
             } {
-                if desc_count as usize <= descs.len() {}
-                for i in 0..desc_count as usize {
-                    let mut input = input.clone();
-                    input.f.luid = descs[i].luid;
-                    outputs.lock().unwrap().push(input);
+                if desc_count as usize <= descs.len() {
+                    for i in 0..desc_count as usize {
+                        let mut input = input.clone();
+                        input.f.luid = descs[i].luid;
+                        outputs.lock().unwrap().push(input);
+                    }
                 }
             }
         });
