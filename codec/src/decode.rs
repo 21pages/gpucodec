@@ -58,7 +58,7 @@ impl Decoder {
                 self.frames as *mut _ as *mut c_void,
             );
 
-            if ret < 0 {
+            if ret != 0 {
                 error!("Error decode: {}", ret);
                 Err(ret)
             } else {

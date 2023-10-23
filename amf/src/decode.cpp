@@ -290,7 +290,7 @@ extern "C" int amf_decode(void *decoder, uint8_t *data, int32_t length,
                           DecodeCallback callback, void *obj) {
   try {
     AMFDecoder *dec = (AMFDecoder *)decoder;
-    return dec->decode(data, length, callback, obj);
+    return -dec->decode(data, length, callback, obj);
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
   }
