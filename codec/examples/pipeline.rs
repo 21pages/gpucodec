@@ -1,9 +1,9 @@
 use capture::dxgi;
-use gpu_codec::{decode::Decoder, encode::Encoder};
 use gpu_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
     FeatureContext, API::*, MAX_GOP,
 };
+use gpucodec::{decode::Decoder, encode::Encoder};
 use render::Render;
 use std::{
     io::Write,
