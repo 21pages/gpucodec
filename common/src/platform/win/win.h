@@ -96,7 +96,4 @@ public:
   std::vector<std::unique_ptr<Adapter>> adapters_;
 };
 
-bool createBgraBmpFile(ID3D11Device *device, ID3D11DeviceContext *deviceContext,
-                       ID3D11Texture2D *texture, LPCWSTR wszBmpFile);
-
 #endif

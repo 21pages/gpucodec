@@ -12,7 +12,7 @@ use std::{
 };
 
 fn main() {
-    let luid = 64442;
+    let luid = 64068;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;
@@ -29,8 +29,8 @@ fn main() {
             },
             d: DynamicContext {
                 device: Some(capturer.device()),
-                width: 1920,
-                height: 1080,
+                width: 2880,
+                height: 1800,
                 kbitrate: 5000,
                 framerate: 30,
                 gop: MAX_GOP as _,
