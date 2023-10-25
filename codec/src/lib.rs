@@ -6,6 +6,6 @@ include!(concat!(env!("OUT_DIR"), "/codec_ffi.rs"));
 
 pub mod decode;
 pub mod encode;
-pub use gvc_common;
+pub use gpu_common;
 
 pub(crate) const MAX_ADATER_NUM_ONE_VENDER: usize = 4;

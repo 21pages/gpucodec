@@ -1,4 +1,4 @@
-use gvc_common::{
+use gpu_common::{
     inner::EncodeCalls, AdapterDesc, DynamicContext, EncodeContext, EncodeDriver::*, FeatureContext,
 };
 use log::trace;

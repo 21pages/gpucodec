@@ -17,7 +17,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen",
  "cc",
- "gvc_common",
+ "gpu_common",
  "log",
 ]
 
@@ -152,7 +152,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
-name = "gpu_video_codec"
+name = "gpu_codec"
 version = "0.1.0"
 dependencies = [
  "amf",
@@ -160,7 +160,7 @@ dependencies = [
  "capture",
  "cc",
  "env_logger",
- "gvc_common",
+ "gpu_common",
  "log",
  "mfx",
  "nv",
@@ -171,7 +171,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gvc_common"
+name = "gpu_common"
 version = "0.1.0"
 dependencies = [
  "bindgen",
@@ -252,7 +252,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen",
  "cc",
- "gvc_common",
+ "gpu_common",
  "log",
 ]
 
@@ -278,7 +278,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen",
  "cc",
- "gvc_common",
+ "gpu_common",
  "log",
 ]
 

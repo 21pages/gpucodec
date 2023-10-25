@@ -4,7 +4,7 @@
 
 include!(concat!(env!("OUT_DIR"), "/mfx_ffi.rs"));
 
-use gvc_common::{
+use gpu_common::{
     inner::{DecodeCalls, EncodeCalls, InnerDecodeContext, InnerEncodeContext},
     DataFormat::*,
     API::*,

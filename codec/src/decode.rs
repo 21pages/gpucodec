@@ -1,5 +1,5 @@
 use crate::gpu_video_codec_get_bin_file;
-use gvc_common::{inner::DecodeCalls, AdapterDesc, DataFormat::*, DecodeContext, DecodeDriver};
+use gpu_common::{inner::DecodeCalls, AdapterDesc, DataFormat::*, DecodeContext, DecodeDriver};
 use log::{error, trace};
 use std::{
     ffi::c_void,

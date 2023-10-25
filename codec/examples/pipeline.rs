@@ -1,6 +1,6 @@
 use capture::dxgi;
-use gpu_video_codec::{decode::Decoder, encode::Encoder};
-use gvc_common::{
+use gpu_codec::{decode::Decoder, encode::Encoder};
+use gpu_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
     FeatureContext, API::*, MAX_GOP,
 };
@@ -12,7 +12,7 @@ use std::{
 };
 
 fn main() {
-    let luid = 93457;
+    let luid = 64442;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;
@@ -22,7 +22,7 @@ fn main() {
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
-                driver: EncodeDriver::NVENC,
+                driver: EncodeDriver::AMF,
                 api: API_DX11,
                 data_format,
                 luid,
@@ -42,7 +42,7 @@ fn main() {
             } else {
                 Some(render.device())
             },
-            driver: DecodeDriver::CUVID,
+            driver: DecodeDriver::AMF,
             api: API_DX11,
             data_format,
             output_shared_handle,
