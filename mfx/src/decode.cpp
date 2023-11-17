@@ -75,7 +75,7 @@ static mfxStatus InitializeMFX(MFXDecoder *p) {
                              p->nativeDevice->device_.Get());
   MSDK_CHECK_STATUS(sts, "SetHandle");
 
-  allocParams.bUseSingleTexture = true;
+  allocParams.bUseSingleTexture = false;
   allocParams.pDevice = p->nativeDevice->device_.Get();
   allocParams.uncompressedResourceMiscFlags = 0;
   sts = p->d3d11FrameAllocator.Init(&allocParams);
