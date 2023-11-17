@@ -75,7 +75,7 @@ static mfxStatus InitializeMFX(MFXDecoder *p) {
                              p->nativeDevice->device_.Get());
   MSDK_CHECK_STATUS(sts, "SetHandle");
 
-  allocParams.bUseSingleTexture = false;
+  allocParams.bUseSingleTexture = false; // important
   allocParams.pDevice = p->nativeDevice->device_.Get();
   allocParams.uncompressedResourceMiscFlags = 0;
   sts = p->d3d11FrameAllocator.Init(&allocParams);
@@ -115,6 +115,14 @@ extern "C" void *mfx_new_decoder(void *device, int64_t luid, API api,
   }
 
   p->mfxVideoParams.IOPattern = MFX_IOPATTERN_OUT_VIDEO_MEMORY;
+  // AsyncDepth: sSpecifies how many asynchronous operations an
+  // application performs before the application explicitly synchronizes the
+  // result. If zero, the value is not specified
+  p->mfxVideoParams.AsyncDepth = 1; // Not important.
+  // DecodedOrder: For AVC and HEVC, used to instruct the decoder
+  // to return output frames in the decoded order. Must be zero for all other
+  // decoders.
+  p->mfxVideoParams.mfx.DecodedOrder = true; // Not important.
 
   // Validate video decode parameters (optional)
   sts = p->mfxDEC->Query(&p->mfxVideoParams, &p->mfxVideoParams);
