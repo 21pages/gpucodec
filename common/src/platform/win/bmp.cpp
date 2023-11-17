@@ -162,11 +162,11 @@ static bool createBgraBmpFile(ID3D11Device *device, ID3D11Texture2D *texture,
   deviceContext->Unmap(bgraStagingTexture.Get(), 0);
 }
 
-void SaveBgraBmps(ID3D11Device *device, void *texture) {
+void SaveBgraBmps(ID3D11Device *device, void *texture, int cycle) {
   if (!texture)
     return;
   static int index = 0;
-  if (index++ % 1000 == 0) {
+  if (index++ % cycle == 0) {
     auto now = std::chrono::system_clock::now();
     auto time_t_now = std::chrono::system_clock::to_time_t(now);
 
@@ -175,7 +175,8 @@ void SaveBgraBmps(ID3D11Device *device, void *texture) {
 
     char buffer[80];
     std::strftime(buffer, 80, "%H_%M_%S", &local_tm);
-    std::string filename = std::string("texture_bmp") + "/" + buffer + ".bmp";
+    std::string filename = std::string("bmps") + "/" + std::to_string(index) +
+                           "_" + buffer + ".bmp";
     createBgraBmpFile(device, (ID3D11Texture2D *)texture, filename);
   }
 }
