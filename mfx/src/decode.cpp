@@ -216,7 +216,7 @@ extern "C" int mfx_decode(void *decoder, uint8_t *data, int len,
 
   do {
     if (loop_counter++ > 100) {
-      printf("mfx decode loop two many times\n");
+      std::cerr << "mfx decode loop two many times" << std::endl;
       break;
     }
 
@@ -227,8 +227,11 @@ extern "C" int mfx_decode(void *decoder, uint8_t *data, int len,
       nIndex = GetFreeSurfaceIndex(
           p->pmfxSurfaces.data(),
           p->pmfxSurfaces.size()); // Find free frame surface
-      if (nIndex >= p->pmfxSurfaces.size())
+      if (nIndex >= p->pmfxSurfaces.size()) {
+        std::cerr << "GetFreeSurfaceIndex failed, nIndex=" << nIndex
+                  << std::endl;
         return -1;
+      }
     }
     // Decode a frame asychronously (returns immediately)
     //  - If input bitstream contains multiple frames DecodeFrameAsync will
@@ -279,6 +282,10 @@ extern "C" int mfx_decode(void *decoder, uint8_t *data, int len,
     }
 
   } while (MFX_ERR_NONE <= sts || MFX_ERR_MORE_SURFACE == sts);
+
+  if (!decoded) {
+    std::cerr << "decoded failed, sts=" << sts << std::endl;
+  }
 
   return decoded ? 0 : -1;
 }

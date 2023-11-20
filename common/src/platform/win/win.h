@@ -52,11 +52,15 @@ public:
   HANDLE GetSharedHandle();
   ID3D11Texture2D *GetCurrentTexture();
   int next();
+  void BeginQuery();
+  void EndQuery();
+  bool Query();
 
 private:
   bool InitFromLuid(int64_t luid);
   bool InitFromDevice(ID3D11Device *device);
   bool SetMultithreadProtected();
+  bool InitQuery();
 
 public:
   // Direct3D 11
@@ -65,6 +69,7 @@ public:
   ComPtr<IDXGIAdapter1> adapter1_ = nullptr;
   ComPtr<ID3D11Device> device_ = nullptr;
   ComPtr<ID3D11DeviceContext> context_ = nullptr;
+  ComPtr<ID3D11Query> query_ = nullptr;
   int count_;
   int index_ = 0;
 

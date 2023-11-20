@@ -93,7 +93,6 @@ public:
   NvDecoder *dec = NULL;
   CUcontext cuContext = NULL;
   CUgraphicsResource cuResource[2] = {NULL, NULL}; // r8, r8g8
-  ComPtr<ID3D11Texture2D> nv12Texture = NULL;
   ComPtr<ID3D11Texture2D> textures[2] = {NULL, NULL};
   ComPtr<ID3D11RenderTargetView> RTV = NULL;
   ComPtr<ID3D11ShaderResourceView> SRV[2] = {NULL, NULL};
@@ -178,7 +177,7 @@ extern "C" void *nv_new_decoder(void *device, int64_t luid, API api,
 
     CUdevice cuDevice = 0;
     p->nativeDevice = std::make_unique<NativeDevice>();
-    if (!p->nativeDevice->Init(luid, (ID3D11Device *)device))
+    if (!p->nativeDevice->Init(luid, (ID3D11Device *)device, 4))
       goto _exit;
     if (!ck(p->cudl->cuD3D11GetDevice(&cuDevice,
                                       p->nativeDevice->adapter_.Get())))
@@ -573,19 +572,30 @@ extern "C" int nv_decode(void *decoder, uint8_t *data, int len,
           return -1;
         }
       }
-      if (!copy_cuda_frame(p, pFrame))
+      p->nativeDevice->BeginQuery();
+      if (!copy_cuda_frame(p, pFrame)) {
+        p->nativeDevice->EndQuery();
         return -1;
-      if (!draw(p))
+      }
+      if (!draw(p)) {
+        p->nativeDevice->EndQuery();
         return -1;
+      }
       if (!p->nativeDevice->EnsureTexture(width, height)) {
         std::cerr << "Failed to EnsureTexture" << std::endl;
+        p->nativeDevice->EndQuery();
         return -1;
       }
       p->nativeDevice->next();
-      HRI(p->nv12torgb->Convert(p->bgraTexture.Get(),
-                                p->nativeDevice->GetCurrentTexture()));
-      // p->nativeDevice->context_->CopyResource(
-      //     p->nativeDevice->GetCurrentTexture(), p->bgraTexture.Get());
+      // HRI(p->nv12torgb->Convert(p->bgraTexture.Get(),
+      //                           p->nativeDevice->GetCurrentTexture()));
+      p->nativeDevice->context_->CopyResource(
+          p->nativeDevice->GetCurrentTexture(), p->bgraTexture.Get());
+
+      p->nativeDevice->EndQuery();
+      if (!p->nativeDevice->Query()) {
+        std::cerr << "Query failed" << std::endl;
+      }
 
       void *opaque = nullptr;
       if (p->outputSharedHandle) {

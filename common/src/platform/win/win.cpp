@@ -22,6 +22,8 @@ bool NativeDevice::Init(int64_t luid, ID3D11Device *device, int pool_size) {
   }
   if (!SetMultithreadProtected())
     return false;
+  if (!InitQuery())
+    return false;
   count_ = pool_size;
   texture_.resize(count_);
   std::fill(texture_.begin(), texture_.end(), nullptr);
@@ -101,6 +103,15 @@ bool NativeDevice::SetMultithreadProtected() {
   return true;
 }
 
+bool NativeDevice::InitQuery() {
+  D3D11_QUERY_DESC queryDesc;
+  ZeroMemory(&queryDesc, sizeof(queryDesc));
+  queryDesc.Query = D3D11_QUERY_EVENT;
+  queryDesc.MiscFlags = 0;
+  HRB(device_->CreateQuery(&queryDesc, query_.ReleaseAndGetAddressOf()));
+  return true;
+}
+
 bool NativeDevice::EnsureTexture(int width, int height) {
   D3D11_TEXTURE2D_DESC desc;
   ZeroMemory(&desc, sizeof(desc));
@@ -155,6 +166,29 @@ int NativeDevice::next() {
   index_++;
   index_ = index_ % count_;
   return index_;
+}
+
+void NativeDevice::BeginQuery() { context_->Begin(query_.Get()); }
+
+void NativeDevice::EndQuery() { context_->End(query_.Get()); }
+
+bool NativeDevice::Query() {
+  BOOL bResult = FALSE;
+  int attempts = 0;
+  while (!bResult) {
+    HRESULT hr = context_->GetData(query_.Get(), &bResult, sizeof(BOOL), 0);
+    if (SUCCEEDED(hr)) {
+      if (bResult) {
+        break;
+      }
+    }
+    attempts++;
+    if (attempts > 100)
+      Sleep(1);
+    if (attempts > 10000)
+      break;
+  }
+  return bResult == TRUE;
 }
 
 bool Adapter::Init(IDXGIAdapter1 *adapter1) {
