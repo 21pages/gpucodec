@@ -59,6 +59,7 @@ public:
   int32_t height_;
   NV_ENC_BUFFER_FORMAT format_;
   CUcontext cuContext_ = nullptr;
+  void *handle_ = nullptr;
 
   NvencEncoder(int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format)
       : width_(width), height_(height), format_(format) {
@@ -68,7 +69,7 @@ public:
 
 #ifdef CONFIG_NV_OPTIMUS_FOR_DEV
 int copy_texture(NvencEncoder *e, void *src, void *dst) {
-  ComPtr<ID3D11Device> src_device = (ID3D11Device *)e->handle;
+  ComPtr<ID3D11Device> src_device = (ID3D11Device *)e->handle_;
   ComPtr<ID3D11DeviceContext> src_deviceContext;
   src_device->GetImmediateContext(src_deviceContext.ReleaseAndGetAddressOf());
   ComPtr<ID3D11Texture2D> src_tex = (ID3D11Texture2D *)src;
@@ -100,9 +101,9 @@ int copy_texture(NvencEncoder *e, void *src, void *dst) {
   Box.bottom = desc.Height;
   Box.front = 0;
   Box.back = 1;
-  e->nativeDevice->context_->UpdateSubresource(dst_tex.Get(), 0, &Box,
-                                               buffer.get(), desc.Width * 4,
-                                               desc.Width * desc.Height * 4);
+  e->native_->context_->UpdateSubresource(dst_tex.Get(), 0, &Box, buffer.get(),
+                                          desc.Width * 4,
+                                          desc.Width * desc.Height * 4);
 
   return 0;
 }
@@ -175,7 +176,7 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
     if (API_DX11 == api) {
       e->native_ = std::make_unique<NativeDevice>();
 #ifdef CONFIG_NV_OPTIMUS_FOR_DEV
-      if (!e->nativeDevice->Init(luid, nullptr))
+      if (!e->native_->Init(luid, nullptr))
         goto _exit;
 #else
       if (!e->native_->Init(luid, (ID3D11Device *)handle))
@@ -235,6 +236,7 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
     initializeParams.encodeConfig->gopLength = gop;
 
     e->pEnc_->CreateEncoder(&initializeParams);
+    e->handle_ = handle;
 
     return e;
   } catch (const std::exception &ex) {
