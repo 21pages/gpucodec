@@ -15,6 +15,7 @@
 
 #define AMF_FACILITY L"AMFDecoder"
 
+namespace {
 class AMFDecoder {
 public:
   AMF_RESULT init_result_ = AMF_FAIL;
@@ -242,7 +243,7 @@ private:
   }
 };
 
-static bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
+bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
   switch (lhs) {
   case H264:
     rhs = AMFVideoDecoderUVD_H264_AVC;
@@ -257,11 +258,14 @@ static bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
   return true;
 }
 
+} // namespace
+
 #include "common.cpp"
 
-extern "C" void *amf_new_decoder(void *device, int64_t luid, API api,
-                                 DataFormat dataFormat,
-                                 bool outputSharedHandle) {
+extern "C" {
+
+void *amf_new_decoder(void *device, int64_t luid, API api,
+                      DataFormat dataFormat, bool outputSharedHandle) {
   try {
     amf_wstring codecStr;
     amf::AMF_MEMORY_TYPE memory;
@@ -286,8 +290,8 @@ extern "C" void *amf_new_decoder(void *device, int64_t luid, API api,
   return NULL;
 }
 
-extern "C" int amf_decode(void *decoder, uint8_t *data, int32_t length,
-                          DecodeCallback callback, void *obj) {
+int amf_decode(void *decoder, uint8_t *data, int32_t length,
+               DecodeCallback callback, void *obj) {
   try {
     AMFDecoder *dec = (AMFDecoder *)decoder;
     return -dec->decode(data, length, callback, obj);
@@ -297,10 +301,9 @@ extern "C" int amf_decode(void *decoder, uint8_t *data, int32_t length,
   return -1;
 }
 
-extern "C" int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
-                               int32_t *outDescNum, API api,
-                               DataFormat dataFormat, bool outputSharedHandle,
-                               uint8_t *data, int32_t length) {
+int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
+                    int32_t *outDescNum, API api, DataFormat dataFormat,
+                    bool outputSharedHandle, uint8_t *data, int32_t length) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -329,7 +332,7 @@ extern "C" int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
   return -1;
 }
 
-extern "C" int amf_destroy_decoder(void *decoder) {
+int amf_destroy_decoder(void *decoder) {
   try {
     AMFDecoder *dec = (AMFDecoder *)decoder;
     if (dec) {
@@ -340,3 +343,4 @@ extern "C" int amf_destroy_decoder(void *decoder) {
   }
   return -1;
 }
+} // extern "C"

@@ -22,18 +22,18 @@
     }                                                                          \
   }
 
-struct MFXEncoder {
-  std::unique_ptr<NativeDevice> nativeDevice = nullptr;
-  MFXVideoSession session;
-  MFXVideoENCODE *mfxENC = NULL;
-  std::vector<mfxFrameSurface1> pEncSurfaces;
-  std::vector<mfxU8> bstData;
-  mfxBitstream mfxBS;
-  int width = 0;
-  int height = 0;
-};
+namespace {
 
-static mfxStatus InitSession(MFXVideoSession &session) {
+mfxStatus MFX_CDECL simple_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL *handle) {
+  mfxHDLPair *pair = (mfxHDLPair *)handle;
+  pair->first = mid;
+  pair->second = (mfxHDL)(UINT)0;
+  return MFX_ERR_NONE;
+}
+
+mfxFrameAllocator alloc{{}, NULL, NULL, NULL, NULL, simple_getHDL, NULL};
+
+mfxStatus InitSession(MFXVideoSession &session) {
   mfxInitParam mfxparams{};
   mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
   mfxparams.Implementation = impl;
@@ -43,28 +43,32 @@ static mfxStatus InitSession(MFXVideoSession &session) {
 
   return session.InitEx(mfxparams);
 }
+class MFXEncoder {
+public:
+  std::unique_ptr<NativeDevice> native_ = nullptr;
+  MFXVideoSession session_;
+  MFXVideoENCODE *mfxENC_ = nullptr;
+  std::vector<mfxFrameSurface1> pEncSurfaces_;
+  std::vector<mfxU8> bstData_;
+  mfxBitstream mfxBS_;
+  int width_ = 0;
+  int height_ = 0;
 
-extern "C" int mfx_driver_support() {
-  MFXVideoSession session;
-  return InitSession(session) == MFX_ERR_NONE ? 0 : -1;
-}
+  mfxStatus InitMFX() {
+    mfxStatus sts = MFX_ERR_NONE;
 
-extern "C" int mfx_destroy_encoder(void *encoder) {
-  MFXEncoder *p = (MFXEncoder *)encoder;
-  if (p) {
-    if (p->mfxENC) {
-      //  - It is recommended to close Media SDK components first, before
-      //  releasing allocated surfaces, since
-      //    some surfaces may still be locked by internal Media SDK resources.
-      p->mfxENC->Close();
-      delete p->mfxENC;
-    }
-    // session closed automatically on destruction
+    sts = InitSession(session_);
+    MSDK_CHECK_STATUS(sts, "InitSession");
+    sts = session_.SetHandle(MFX_HANDLE_D3D11_DEVICE, native_->device_.Get());
+    MSDK_CHECK_STATUS(sts, "SetHandle");
+    sts = session_.SetFrameAllocator(&alloc);
+    MSDK_CHECK_STATUS(sts, "SetFrameAllocator");
+
+    return MFX_ERR_NONE;
   }
-  return 0;
-}
+};
 
-static bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId) {
+bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId) {
   switch (dataFormat) {
   case H264:
     CodecId = MFX_CODEC_AVC;
@@ -75,34 +79,33 @@ static bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId) {
   }
   return false;
 }
+} // namespace
 
-static mfxStatus MFX_CDECL simple_getHDL(mfxHDL pthis, mfxMemId mid,
-                                         mfxHDL *handle) {
-  mfxHDLPair *pair = (mfxHDLPair *)handle;
-  pair->first = mid;
-  pair->second = (mfxHDL)(UINT)0;
-  return MFX_ERR_NONE;
+extern "C" {
+
+int mfx_driver_support() {
+  MFXVideoSession session;
+  return InitSession(session) == MFX_ERR_NONE ? 0 : -1;
 }
 
-static mfxFrameAllocator alloc{{}, NULL, NULL, NULL, NULL, simple_getHDL, NULL};
-
-static mfxStatus InitMFX(MFXEncoder *p) {
-  mfxStatus sts = MFX_ERR_NONE;
-
-  sts = InitSession(p->session);
-  MSDK_CHECK_STATUS(sts, "InitSession");
-  sts = p->session.SetHandle(MFX_HANDLE_D3D11_DEVICE,
-                             p->nativeDevice->device_.Get());
-  MSDK_CHECK_STATUS(sts, "SetHandle");
-  sts = p->session.SetFrameAllocator(&alloc);
-  MSDK_CHECK_STATUS(sts, "SetFrameAllocator");
-
-  return MFX_ERR_NONE;
+int mfx_destroy_encoder(void *encoder) {
+  MFXEncoder *p = (MFXEncoder *)encoder;
+  if (p) {
+    if (p->mfxENC_) {
+      //  - It is recommended to close Media SDK components first, before
+      //  releasing allocated surfaces, since
+      //    some surfaces may still be locked by internal Media SDK resources.
+      p->mfxENC_->Close();
+      delete p->mfxENC_;
+    }
+    // session closed automatically on destruction
+  }
+  return 0;
 }
 
-extern "C" void *mfx_new_encoder(void *handle, int64_t luid, API api,
-                                 DataFormat dataFormat, int32_t w, int32_t h,
-                                 int32_t kbs, int32_t framerate, int32_t gop) {
+void *mfx_new_encoder(void *handle, int64_t luid, API api,
+                      DataFormat dataFormat, int32_t w, int32_t h, int32_t kbs,
+                      int32_t framerate, int32_t gop) {
   mfxStatus sts = MFX_ERR_NONE;
   mfxVersion ver = {{0, 1}};
   mfxVideoParam mfxEncParams;
@@ -152,18 +155,18 @@ extern "C" void *mfx_new_encoder(void *handle, int64_t luid, API api,
   if (!p)
     goto _exit;
 
-  p->width = w;
-  p->height = h;
-  p->nativeDevice = std::make_unique<NativeDevice>();
-  if (!p->nativeDevice->Init(luid, (ID3D11Device *)handle))
+  p->width_ = w;
+  p->height_ = h;
+  p->native_ = std::make_unique<NativeDevice>();
+  if (!p->native_->Init(luid, (ID3D11Device *)handle))
     goto _exit;
 
-  sts = InitMFX(p);
+  sts = p->InitMFX();
   CHECK_STATUS_GOTO(sts, "InitMFX");
 
   // Create Media SDK encoder
-  p->mfxENC = new MFXVideoENCODE(p->session);
-  if (!p->mfxENC) {
+  p->mfxENC_ = new MFXVideoENCODE(p->session_);
+  if (!p->mfxENC_) {
     goto _exit;
   }
 
@@ -173,37 +176,37 @@ extern "C" void *mfx_new_encoder(void *handle, int64_t luid, API api,
   // parameters are not supported,
   //   instead the encoder will select suitable parameters closest matching the
   //   requested configuration
-  sts = p->mfxENC->Query(&mfxEncParams, &mfxEncParams);
+  sts = p->mfxENC_->Query(&mfxEncParams, &mfxEncParams);
   MSDK_IGNORE_MFX_STS(sts, MFX_WRN_INCOMPATIBLE_VIDEO_PARAM);
   CHECK_STATUS_GOTO(sts, "Query");
 
-  sts = p->mfxENC->QueryIOSurf(&mfxEncParams, &EncRequest);
+  sts = p->mfxENC_->QueryIOSurf(&mfxEncParams, &EncRequest);
   CHECK_STATUS_GOTO(sts, "QueryIOSurf");
 
   nEncSurfNum = EncRequest.NumFrameSuggested;
 
   // Allocate surface headers (mfxFrameSurface1) for encoder
-  p->pEncSurfaces.resize(nEncSurfNum);
+  p->pEncSurfaces_.resize(nEncSurfNum);
   for (int i = 0; i < nEncSurfNum; i++) {
-    memset(&p->pEncSurfaces[i], 0, sizeof(mfxFrameSurface1));
-    p->pEncSurfaces[i].Info = mfxEncParams.mfx.FrameInfo;
+    memset(&p->pEncSurfaces_[i], 0, sizeof(mfxFrameSurface1));
+    p->pEncSurfaces_[i].Info = mfxEncParams.mfx.FrameInfo;
   }
 
   // Initialize the Media SDK encoder
-  sts = p->mfxENC->Init(&mfxEncParams);
+  sts = p->mfxENC_->Init(&mfxEncParams);
   MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
   CHECK_STATUS_GOTO(sts, "Init");
 
   // Retrieve video parameters selected by encoder.
   // - BufferSizeInKB parameter is required to set bit stream buffer size
-  sts = p->mfxENC->GetVideoParam(&par);
+  sts = p->mfxENC_->GetVideoParam(&par);
   CHECK_STATUS_GOTO(sts, "GetVideoParam");
 
   // Prepare Media SDK bit stream buffer
-  memset(&p->mfxBS, 0, sizeof(p->mfxBS));
-  p->mfxBS.MaxLength = par.mfx.BufferSizeInKB * 1024;
-  p->bstData.resize(p->mfxBS.MaxLength);
-  p->mfxBS.Data = p->bstData.data();
+  memset(&p->mfxBS_, 0, sizeof(p->mfxBS_));
+  p->mfxBS_.MaxLength = par.mfx.BufferSizeInKB * 1024;
+  p->bstData_.resize(p->mfxBS_.MaxLength);
+  p->mfxBS_.Data = p->bstData_.data();
 
   return p;
 _exit:
@@ -214,30 +217,30 @@ _exit:
   return NULL;
 }
 
-extern "C" int mfx_encode(void *encoder, ID3D11Texture2D *tex,
-                          EncodeCallback callback, void *obj) {
+int mfx_encode(void *encoder, ID3D11Texture2D *tex, EncodeCallback callback,
+               void *obj) {
   mfxStatus sts = MFX_ERR_NONE;
   bool encoded = false;
   MFXEncoder *p = (MFXEncoder *)encoder;
   int nEncSurfIdx = 0;
   mfxSyncPoint syncp;
 
-  p->mfxBS.DataLength = 0;
-  p->mfxBS.DataOffset = 0;
+  p->mfxBS_.DataLength = 0;
+  p->mfxBS_.DataOffset = 0;
 
   nEncSurfIdx =
-      GetFreeSurfaceIndex(p->pEncSurfaces.data(),
-                          p->pEncSurfaces.size()); // Find free frame surface
-  if (nEncSurfIdx >= p->pEncSurfaces.size()) {
+      GetFreeSurfaceIndex(p->pEncSurfaces_.data(),
+                          p->pEncSurfaces_.size()); // Find free frame surface
+  if (nEncSurfIdx >= p->pEncSurfaces_.size()) {
     return -1;
   }
 
-  p->pEncSurfaces[nEncSurfIdx].Data.MemId = tex;
+  p->pEncSurfaces_[nEncSurfIdx].Data.MemId = tex;
 
   for (;;) {
     // Encode a frame asychronously (returns immediately)
-    sts = p->mfxENC->EncodeFrameAsync(NULL, &p->pEncSurfaces[nEncSurfIdx],
-                                      &p->mfxBS, &syncp);
+    sts = p->mfxENC_->EncodeFrameAsync(NULL, &p->pEncSurfaces_[nEncSurfIdx],
+                                       &p->mfxBS_, &syncp);
 
     if (MFX_ERR_NONE < sts &&
         !syncp) { // Repeat the call if warning and no output
@@ -254,15 +257,15 @@ extern "C" int mfx_encode(void *encoder, ID3D11Texture2D *tex,
   }
 
   if (MFX_ERR_NONE == sts) {
-    sts = p->session.SyncOperation(
+    sts = p->session_.SyncOperation(
         syncp, 1000); // Synchronize. Wait until encoded frame is ready
     CHECK_STATUS_RETURN(sts, "SyncOperation");
-    if (p->mfxBS.DataLength > 0) {
-      int key = (p->mfxBS.FrameType & MFX_FRAMETYPE_I) ||
-                (p->mfxBS.FrameType & MFX_FRAMETYPE_IDR);
+    if (p->mfxBS_.DataLength > 0) {
+      int key = (p->mfxBS_.FrameType & MFX_FRAMETYPE_I) ||
+                (p->mfxBS_.FrameType & MFX_FRAMETYPE_IDR);
       if (callback)
-        callback(p->mfxBS.Data + p->mfxBS.DataOffset, p->mfxBS.DataLength, key,
-                 obj);
+        callback(p->mfxBS_.Data + p->mfxBS_.DataOffset, p->mfxBS_.DataLength,
+                 key, obj);
       encoded = true;
     }
   }
@@ -274,11 +277,10 @@ extern "C" int mfx_encode(void *encoder, ID3D11Texture2D *tex,
   return encoded ? 0 : -1;
 }
 
-extern "C" int mfx_test_encode(void *outDescs, int32_t maxDescNum,
-                               int32_t *outDescNum, API api,
-                               DataFormat dataFormat, int32_t width,
-                               int32_t height, int32_t kbs, int32_t framerate,
-                               int32_t gop) {
+int mfx_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
+                    API api, DataFormat dataFormat, int32_t width,
+                    int32_t height, int32_t kbs, int32_t framerate,
+                    int32_t gop) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -291,11 +293,11 @@ extern "C" int mfx_test_encode(void *outDescs, int32_t maxDescNum,
           api, dataFormat, width, height, kbs, framerate, gop);
       if (!e)
         continue;
-      if (!e->nativeDevice->EnsureTexture(e->width, e->height))
+      if (!e->native_->EnsureTexture(e->width_, e->height_))
         continue;
-      e->nativeDevice->next();
-      if (mfx_encode(e, e->nativeDevice->GetCurrentTexture(), nullptr,
-                     nullptr) == 0) {
+      e->native_->next();
+      if (mfx_encode(e, e->native_->GetCurrentTexture(), nullptr, nullptr) ==
+          0) {
         AdapterDesc *desc = descs + count;
         desc->luid = LUID(adapter.get()->desc1_);
         count += 1;
@@ -314,18 +316,17 @@ extern "C" int mfx_test_encode(void *outDescs, int32_t maxDescNum,
 
 // https://github.com/Intel-Media-SDK/MediaSDK/blob/master/doc/mediasdk-man.md#dynamic-bitrate-change
 // https://github.com/Intel-Media-SDK/MediaSDK/blob/master/doc/mediasdk-man.md#mfxinfomfx
-extern "C" int mfx_set_bitrate(void *encoder, int32_t kbs) {
+int mfx_set_bitrate(void *encoder, int32_t kbs) {
   MFXEncoder *p = (MFXEncoder *)encoder;
   mfxVideoParam param = {0};
   mfxStatus sts = MFX_ERR_NONE;
-  sts = MFXVideoENCODE_GetVideoParam(p->session, &param);
+  sts = MFXVideoENCODE_GetVideoParam(p->session_, &param);
   CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_GetVideoParam");
   param.mfx.TargetKbps = kbs;
-  sts = MFXVideoENCODE_Reset(p->session, &param);
+  sts = MFXVideoENCODE_Reset(p->session_, &param);
   CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_Reset");
   return 0;
 }
 
-extern "C" int mfx_set_framerate(void *encoder, int32_t framerate) {
-  return -1;
+int mfx_set_framerate(void *encoder, int32_t framerate) { return -1; }
 }

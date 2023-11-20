@@ -19,6 +19,8 @@
 #define AMF_FACILITY L"AMFEncoder"
 #define MILLISEC_TIME 10000
 
+namespace {
+
 /** Encoder output packet */
 struct encoder_packet {
   uint8_t *data; /**< Packet data */
@@ -355,7 +357,7 @@ private:
   }
 };
 
-static bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
+bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
   switch (lhs) {
   case H264:
     rhs = AMFVideoEncoderVCE_AVC;
@@ -370,12 +372,14 @@ static bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
   return true;
 }
 
+} // namespace
 #include "common.cpp"
 
-extern "C" void *amf_new_encoder(void *handle, int64_t luid, API api,
-                                 DataFormat dataFormat, int32_t width,
-                                 int32_t height, int32_t kbs, int32_t framerate,
-                                 int32_t gop) {
+extern "C" {
+
+void *amf_new_encoder(void *handle, int64_t luid, API api,
+                      DataFormat dataFormat, int32_t width, int32_t height,
+                      int32_t kbs, int32_t framerate, int32_t gop) {
   try {
     if (width % 2 != 0 || height % 2 != 0) {
       return NULL;
@@ -402,8 +406,7 @@ extern "C" void *amf_new_encoder(void *handle, int64_t luid, API api,
   return NULL;
 }
 
-extern "C" int amf_encode(void *encoder, void *tex, EncodeCallback callback,
-                          void *obj) {
+int amf_encode(void *encoder, void *tex, EncodeCallback callback, void *obj) {
   try {
     AMFEncoder *enc = (AMFEncoder *)encoder;
     return -enc->encode(tex, callback, obj);
@@ -413,7 +416,7 @@ extern "C" int amf_encode(void *encoder, void *tex, EncodeCallback callback,
   return -1;
 }
 
-extern "C" int amf_destroy_encoder(void *encoder) {
+int amf_destroy_encoder(void *encoder) {
   try {
     AMFEncoder *enc = (AMFEncoder *)encoder;
     return enc->destroy();
@@ -423,7 +426,7 @@ extern "C" int amf_destroy_encoder(void *encoder) {
   return -1;
 }
 
-extern "C" int amf_driver_support() {
+int amf_driver_support() {
   try {
     AMFFactoryHelper factory;
     AMF_RESULT res = factory.Init();
@@ -436,11 +439,10 @@ extern "C" int amf_driver_support() {
   return -1;
 }
 
-extern "C" int amf_test_encode(void *outDescs, int32_t maxDescNum,
-                               int32_t *outDescNum, API api,
-                               DataFormat dataFormat, int32_t width,
-                               int32_t height, int32_t kbs, int32_t framerate,
-                               int32_t gop) {
+int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
+                    API api, DataFormat dataFormat, int32_t width,
+                    int32_t height, int32_t kbs, int32_t framerate,
+                    int32_t gop) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -470,7 +472,7 @@ extern "C" int amf_test_encode(void *outDescs, int32_t maxDescNum,
   return -1;
 }
 
-extern "C" int amf_set_bitrate(void *encoder, int32_t kbs) {
+int amf_set_bitrate(void *encoder, int32_t kbs) {
   try {
     AMFEncoder *enc = (AMFEncoder *)encoder;
     AMF_RESULT res = AMF_FAIL;
@@ -491,7 +493,7 @@ extern "C" int amf_set_bitrate(void *encoder, int32_t kbs) {
   return -1;
 }
 
-extern "C" int amf_set_framerate(void *encoder, int32_t framerate) {
+int amf_set_framerate(void *encoder, int32_t framerate) {
   try {
     AMFEncoder *enc = (AMFEncoder *)encoder;
     AMF_RESULT res = AMF_FAIL;
@@ -511,3 +513,4 @@ extern "C" int amf_set_framerate(void *encoder, int32_t framerate) {
   }
   return -1;
 }
+} // extern "C"
