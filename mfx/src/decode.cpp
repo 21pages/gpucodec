@@ -260,7 +260,18 @@ extern "C" int mfx_decode(void *decoder, uint8_t *data, int len,
         return -1;
       }
       p->nativeDevice->next(); // comment out to remove picture shaking
-      HRI(p->nv12torgb->Convert(texture, p->nativeDevice->GetCurrentTexture()));
+      p->nativeDevice->BeginQuery();
+      if (FAILED(p->nv12torgb->Convert(texture,
+                                       p->nativeDevice->GetCurrentTexture()))) {
+        std::cerr << "Failed to convert to bgra" << std::endl;
+        p->nativeDevice->EndQuery();
+        return -1;
+      }
+      p->nativeDevice->context_->Flush();
+      p->nativeDevice->EndQuery();
+      if (!p->nativeDevice->Query()) {
+        std::cerr << "Failed to query" << std::endl;
+      }
       void *output = nullptr;
       if (p->outputSharedHandle) {
         HANDLE sharedHandle = p->nativeDevice->GetSharedHandle();
