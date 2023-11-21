@@ -114,6 +114,29 @@ int copy_texture(NvencEncoder *e, void *src, void *dst) {
 }
 #endif
 
+int set_qp(NV_ENC_CONFIG *encodeConfig, int32_t q_min, int32_t q_max) {
+  bool q_valid =
+      q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 && q_min <= q_max;
+  if (!q_valid) {
+    LOG_WARN("invalid qp range: [" + std::to_string(q_min) + ", " +
+             std::to_string(q_max) + "]");
+    return -1;
+  }
+  if (!encodeConfig) {
+    LOG_ERROR("encodeConfig is null");
+    return -1;
+  }
+  encodeConfig->rcParams.enableMinQP = 1;
+  encodeConfig->rcParams.enableMaxQP = 1;
+  encodeConfig->rcParams.minQP.qpIntra = q_min;
+  encodeConfig->rcParams.minQP.qpInterB = q_min;
+  encodeConfig->rcParams.minQP.qpInterP = q_min;
+  encodeConfig->rcParams.maxQP.qpIntra = q_max;
+  encodeConfig->rcParams.maxQP.qpInterB = q_max;
+  encodeConfig->rcParams.maxQP.qpInterP = q_max;
+  return 0;
+}
+
 } // namespace
 
 extern "C" {
@@ -257,18 +280,7 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
     initializeParams.encodeConfig->rcParams.rateControlMode =
         NV_ENC_PARAMS_RC_CBR;
     // qp
-    bool q_valid = q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 &&
-                   q_min <= q_max;
-    if (q_valid) {
-      initializeParams.encodeConfig->rcParams.enableMinQP = 1;
-      initializeParams.encodeConfig->rcParams.enableMaxQP = 1;
-      initializeParams.encodeConfig->rcParams.minQP.qpIntra = q_min;
-      initializeParams.encodeConfig->rcParams.minQP.qpInterB = q_min;
-      initializeParams.encodeConfig->rcParams.minQP.qpInterP = q_min;
-      initializeParams.encodeConfig->rcParams.maxQP.qpIntra = q_max;
-      initializeParams.encodeConfig->rcParams.maxQP.qpInterB = q_max;
-      initializeParams.encodeConfig->rcParams.maxQP.qpInterP = q_max;
-    }
+    set_qp(initializeParams.encodeConfig, q_min, q_max);
 
     e->pEnc_->CreateEncoder(&initializeParams);
     e->handle_ = handle;
@@ -324,6 +336,8 @@ int nv_encode(void *encoder, void *texture, EncodeCallback callback,
   }
   return -1;
 }
+
+// ref: Reconfigure API
 
 #define RECONFIGURE_HEAD                                                       \
   NvencEncoder *enc = (NvencEncoder *)e;                                       \
@@ -386,6 +400,20 @@ int nv_set_bitrate(void *e, int32_t kbs) {
   } catch (const std::exception &e) {
     LOG_ERROR("set bitrate to " + std::to_string(kbs) +
               "k failed: " + e.what());
+  }
+  return -1;
+}
+
+int nv_set_qp(void *e, int32_t q_min, int32_t q_max) {
+  try {
+    RECONFIGURE_HEAD
+    if (set_qp(params.reInitEncodeParams.encodeConfig, q_min, q_max) != 0) {
+      return -1;
+    }
+    RECONFIGURE_TAIL
+  } catch (const std::exception &e) {
+    LOG_ERROR("set qp to [" + std::to_string(q_min) + ", " +
+              std::to_string(q_max) + "] failed: " + e.what());
   }
   return -1;
 }

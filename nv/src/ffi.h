@@ -36,6 +36,8 @@ int nv_test_decode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
 
 int nv_set_bitrate(void *encoder, int32_t kbs);
 
+int nv_set_qp(void *encoder, int32_t q_min, int32_t q_max);
+
 int nv_set_framerate(void *encoder, int32_t framerate);
 
 #endif // AMF_FFI_H

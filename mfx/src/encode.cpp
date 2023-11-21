@@ -56,6 +56,27 @@ mfxStatus InitSession(MFXVideoSession &session) {
 
   return session.InitEx(mfxparams);
 }
+
+int set_qp(mfxExtCodingOption2 *codingOption2, int32_t q_min, int32_t q_max) {
+  bool q_valid =
+      q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 && q_min <= q_max;
+  if (!q_valid) {
+    LOG_WARN("invalid qp range: [" + std::to_string(q_min) + ", " +
+             std::to_string(q_max) + "]");
+    return -1;
+  }
+  if (!codingOption2) {
+    LOG_ERROR("codingOption2 is null");
+    return -1;
+  }
+  codingOption2->MinQPI = q_min;
+  codingOption2->MinQPB = q_min;
+  codingOption2->MinQPP = q_min;
+  codingOption2->MaxQPI = q_max;
+  codingOption2->MaxQPB = q_max;
+  codingOption2->MaxQPP = q_max;
+  return 0;
+}
 class MFXEncoder {
 public:
   std::unique_ptr<NativeDevice> native_ = nullptr;
@@ -170,12 +191,7 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
       q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 && q_min <= q_max;
   if (q_valid) {
     codingOption2 = mfxEncParams.AddExtBuffer<mfxExtCodingOption2>();
-    codingOption2->MinQPI = q_min;
-    codingOption2->MinQPB = q_min;
-    codingOption2->MinQPP = q_min;
-    codingOption2->MaxQPI = q_max;
-    codingOption2->MaxQPB = q_max;
-    codingOption2->MaxQPP = q_max;
+    set_qp(codingOption2, q_min, q_max);
   }
 
   MFXEncoder *p = new MFXEncoder();
@@ -353,6 +369,27 @@ int mfx_set_bitrate(void *encoder, int32_t kbs) {
   sts = MFXVideoENCODE_Reset(p->session_, &param);
   CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_Reset");
   return 0;
+}
+
+int mfx_set_qp(void *encoder, int32_t q_min, int32_t q_max) {
+  MFXEncoder *p = (MFXEncoder *)encoder;
+  MfxVideoParamsWrapper param;
+  mfxStatus sts = MFX_ERR_NONE;
+  sts = MFXVideoENCODE_GetVideoParam(p->session_, &param);
+  CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_GetVideoParam");
+  mfxExtCodingOption2 *codingOption2 =
+      param.GetExtBuffer<mfxExtCodingOption2>();
+  if (codingOption2 != nullptr) {
+    if (set_qp(codingOption2, q_min, q_max) != 0) {
+      return -1;
+    }
+    sts = MFXVideoENCODE_Reset(p->session_, &param);
+    CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_Reset");
+    return 0;
+  } else {
+    LOG_ERROR("codingOption2 is null");
+    return -1;
+  }
 }
 
 int mfx_set_framerate(void *encoder, int32_t framerate) { return -1; }

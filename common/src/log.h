@@ -17,7 +17,7 @@ void trace(const std::string &message);
 
 #define LOG_ERROR(message)                                                     \
   gol::error(std::string("[") + LOG_MODULE + "] " + message)
-#define LOG_WARNING(message)                                                   \
+#define LOG_WARN(message)                                                      \
   gol::warn(std::string("[") + LOG_MODULE + "] " + message)
 #define LOG_INFO(message)                                                      \
   gol::info(std::string("[") + LOG_MODULE + "] " + message)

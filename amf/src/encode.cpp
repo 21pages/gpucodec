@@ -78,7 +78,6 @@ private:
   int32_t gop_;
   int32_t q_min_;
   int32_t q_max_;
-  bool q_valid_;
 
   // Buffers
   std::vector<uint8_t> packetDataBuffer_;
@@ -98,8 +97,6 @@ public:
     gop_ = gop;
     q_min_ = q_min;
     q_max_ = q_max;
-    q_valid_ = q_min_ >= 0 && q_min <= 51 && q_max_ >= 0 && q_max <= 51 &&
-               q_min_ <= q_max_;
     init_result_ = initialize();
   }
 
@@ -186,6 +183,52 @@ public:
     if (!native)
       return AMF_FAIL;
     return encode(native, nullptr, nullptr);
+  }
+
+  AMF_RESULT set_qp(int32_t q_min, int32_t q_max) {
+    bool q_valid = q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 &&
+                   q_min <= q_max;
+    if (!q_valid) {
+      LOG_WARN("invalid qp range: [" + std::to_string(q_min) + ", " +
+               std::to_string(q_max) + "]");
+      return AMF_FAIL;
+    }
+    AMF_RESULT res = AMF_FAIL;
+    switch (dataFormat_) {
+    case H264:
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_MIN_QP, q_min_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_MIN_QP failed, val = " +
+                           std::to_string(q_min_));
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_MAX_QP, q_max_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_MAX_QP failed, val = " +
+                           std::to_string(q_max_));
+      break;
+    case H265:
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_GOP_SIZE failed");
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MIN_QP_I, q_min_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MIN_QP_I failed");
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MAX_QP_I, q_max_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MAX_QP_I failed");
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MIN_QP_P, q_min_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MIN_QP_P failed");
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MAX_QP_P, q_max_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MAX_QP_P failed");
+      break;
+    }
+
+    return res;
   }
 
 private:
@@ -291,17 +334,7 @@ private:
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_IDR_PERIOD, gop_);
       AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_IDR_PERIOD failed");
 
-      if (q_valid_) {
-        res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_MIN_QP, q_min_);
-        AMF_CHECK_RETURN(res,
-                         "SetProperty AMF_VIDEO_ENCODER_MIN_QP failed, val = " +
-                             std::to_string(q_min_));
-
-        res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_MAX_QP, q_max_);
-        AMF_CHECK_RETURN(res,
-                         "SetProperty AMF_VIDEO_ENCODER_MAX_QP failed, val = " +
-                             std::to_string(q_max_));
-      }
+      set_qp(q_min_, q_max_);
 
     } else if (codecStr == amf_wstring(AMFVideoEncoder_HEVC)) {
       // ------------- Encoder params usage---------------
@@ -358,26 +391,7 @@ private:
 
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_GOP_SIZE,
                                      gop_); // todo
-      if (q_valid_) {
-        AMF_CHECK_RETURN(res,
-                         "SetProperty AMF_VIDEO_ENCODER_HEVC_GOP_SIZE failed");
-
-        res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MIN_QP_I, q_min_);
-        AMF_CHECK_RETURN(res,
-                         "SetProperty AMF_VIDEO_ENCODER_HEVC_MIN_QP_I failed");
-
-        res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MAX_QP_I, q_max_);
-        AMF_CHECK_RETURN(res,
-                         "SetProperty AMF_VIDEO_ENCODER_HEVC_MAX_QP_I failed");
-
-        res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MIN_QP_P, q_min_);
-        AMF_CHECK_RETURN(res,
-                         "SetProperty AMF_VIDEO_ENCODER_HEVC_MIN_QP_P failed");
-
-        res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MAX_QP_P, q_max_);
-        AMF_CHECK_RETURN(res,
-                         "SetProperty AMF_VIDEO_ENCODER_HEVC_MAX_QP_P failed");
-      }
+      set_qp(q_min_, q_max_);
 
     } else {
       return AMF_FAIL;
@@ -558,6 +572,18 @@ int amf_set_framerate(void *encoder, int32_t framerate) {
   } catch (const std::exception &e) {
     LOG_ERROR("set framerate to " + std::to_string(framerate) +
               " failed: " + e.what());
+  }
+  return -1;
+}
+
+int amf_set_qp(void *encoder, int32_t q_min, int32_t q_max) {
+  try {
+    AMFEncoder *enc = (AMFEncoder *)encoder;
+    AMF_RESULT res = enc->set_qp(q_min, q_max);
+    return res == AMF_OK ? 0 : -1;
+  } catch (const std::exception &e) {
+    LOG_ERROR("set qp to [" + std::to_string(q_min) + ", " +
+              std::to_string(q_max) + "] failed: " + e.what());
   }
   return -1;
 }

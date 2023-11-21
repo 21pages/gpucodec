@@ -93,6 +93,15 @@ impl Encoder {
         }
     }
 
+    pub fn set_qp(&mut self, q_min: i32, q_max: i32) -> Result<(), i32> {
+        unsafe {
+            match (self.calls.set_qp)(&mut *self.codec, q_min, q_max) {
+                0 => Ok(()),
+                err => Err(err),
+            }
+        }
+    }
+
     pub fn set_framerate(&mut self, framerate: i32) -> Result<(), i32> {
         unsafe {
             match (self.calls.set_framerate)(&mut *self.codec, framerate) {
