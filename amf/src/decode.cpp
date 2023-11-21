@@ -13,7 +13,16 @@
 #include "common.h"
 #include "system.h"
 
+#define LOG_MODULE "AMF DECODE"
+#include "log.h"
+
 #define AMF_FACILITY L"AMFDecoder"
+
+#define AMF_CHECK_RETURN(res, msg)                                             \
+  if (res != AMF_OK) {                                                         \
+    LOG_ERROR(msg + ", result code: " + std::to_string(int(res)));             \
+    return res;                                                                \
+  }
 
 namespace {
 class AMFDecoder {
@@ -57,9 +66,9 @@ public:
 
     res = AMFContext_->CreateBufferFromHostNative(iData, iDataSize,
                                                   &iDataWrapBuffer, NULL);
-    AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateBufferFromHostNative");
+    AMF_CHECK_RETURN(res, "CreateBufferFromHostNative failed");
     res = AMFDecoder_->SubmitInput(iDataWrapBuffer);
-    AMF_RETURN_IF_FAILED(res, L"SubmitInput failed");
+    AMF_CHECK_RETURN(res, "SubmitInput failed");
     amf::AMFDataPtr oData = NULL;
     do {
       res = AMFDecoder_->QueryOutput(&oData);
@@ -87,14 +96,14 @@ public:
       case amf::AMF_MEMORY_DX11: {
         nativeDevice_->next();
         if (!nativeDevice_->SetTexture((ID3D11Texture2D *)native)) {
-          std::cerr << "Failed to CopyTexture" << std::endl;
+          LOG_ERROR("SetTexture failed");
           return AMF_FAIL;
         }
         void *output = nullptr;
         if (outputSharedHandle_) {
           HANDLE sharedHandle = nativeDevice_->GetSharedHandle();
           if (!sharedHandle) {
-            std::cerr << "Failed to GetSharedHandle" << std::endl;
+            LOG_ERROR("GetSharedHandle failed");
             return AMF_FAIL;
           }
           output = sharedHandle;
@@ -139,45 +148,42 @@ private:
     AMF_RESULT res;
 
     res = AMFFactory_.Init();
-    if (res != AMF_OK) {
-      std::cerr << "AMF init failed, error code = " << res << "\n";
-      return res;
-    }
+    AMF_CHECK_RETURN(res, "AMFFactory Init failed");
     amf::AMFSetCustomTracer(AMFFactory_.GetTrace());
     amf::AMFTraceEnableWriter(AMF_TRACE_WRITER_CONSOLE, true);
     amf::AMFTraceSetWriterLevel(AMF_TRACE_WRITER_CONSOLE, AMF_TRACE_WARNING);
 
     res = AMFFactory_.GetFactory()->CreateContext(&AMFContext_);
-    AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateContext");
+    AMF_CHECK_RETURN(res, "CreateContext failed");
 
     switch (AMFMemoryType_) {
     case amf::AMF_MEMORY_DX9:
       res = AMFContext_->InitDX9(NULL); // can be DX9 or DX9Ex device
-      AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitDX9");
+      AMF_CHECK_RETURN(res, "InitDX9 failed");
       break;
     case amf::AMF_MEMORY_DX11:
       nativeDevice_ = std::make_unique<NativeDevice>();
       if (!nativeDevice_->Init(luid_, (ID3D11Device *)device_, 4)) {
-        std::cerr << "Init NativeDevice failed" << std::endl;
+        LOG_ERROR("Init NativeDevice failed");
         return AMF_FAIL;
       }
       res = AMFContext_->InitDX11(
           nativeDevice_->device_.Get()); // can be DX11 device
-      AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitDX11");
+      AMF_CHECK_RETURN(res, "InitDX11 failed");
       break;
     case amf::AMF_MEMORY_DX12: {
       amf::AMFContext2Ptr context2(AMFContext_);
       if (context2 == nullptr) {
-        AMFTraceError(AMF_FACILITY, L"amf::AMFContext2 is missing");
+        LOG_ERROR("amf::AMFContext2 is null");
         return AMF_FAIL;
       }
       res = context2->InitDX12(NULL); // can be DX11 device
-      AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitDX12");
+      AMF_CHECK_RETURN(res, "InitDX12 failed");
     } break;
     case amf::AMF_MEMORY_VULKAN:
       res = amf::AMFContext1Ptr(AMFContext_)
                 ->InitVulkan(NULL); // can be Vulkan device
-      AMF_RETURN_IF_FAILED(res, L"AMF Failed to InitVulkan");
+      AMF_CHECK_RETURN(res, "InitVulkan failed");
       break;
     default:
       break;
@@ -185,13 +191,13 @@ private:
 
     res = AMFFactory_.GetFactory()->CreateComponent(AMFContext_, codec_.c_str(),
                                                     &AMFDecoder_);
-    AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateComponent");
+    AMF_CHECK_RETURN(res, "CreateComponent failed");
 
     res = setParameters();
-    AMF_RETURN_IF_FAILED(res, L"AMF Failed to setParameters");
+    AMF_CHECK_RETURN(res, "setParameters failed");
 
     res = AMFDecoder_->Init(decodeFormatOut_, 0, 0);
-    AMF_RETURN_IF_FAILED(res, L"AMF Failed to Init decoder");
+    AMF_CHECK_RETURN(res, "Init decoder failed");
 
     return AMF_OK;
   }
@@ -208,8 +214,7 @@ private:
     res =
         AMFDecoder_->SetProperty(AMF_VIDEO_DECODER_REORDER_MODE,
                                  amf_int64(AMF_VIDEO_DECODER_MODE_LOW_LATENCY));
-    AMF_RETURN_IF_FAILED(res, L"SetProperty AMF_VIDEO_DECODER_REORDER_MODE to "
-                              L"AMF_VIDEO_DECODER_MODE_LOW_LATENCY failed");
+    AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_DECODER_REORDER_MODE failed");
     return AMF_OK;
   }
 
@@ -222,23 +227,28 @@ private:
     if (!AMFConverter_) {
       res = AMFFactory_.GetFactory()->CreateComponent(
           AMFContext_, AMFVideoConverter, &AMFConverter_);
-      AMF_RETURN_IF_FAILED(res, L"AMF Failed to CreateComponent");
+      AMF_CHECK_RETURN(res, "Convert CreateComponent failed");
       int width = surface->GetPlaneAt(0)->GetWidth();
       int height = surface->GetPlaneAt(0)->GetHeight();
       res = AMFConverter_->SetProperty(AMF_VIDEO_CONVERTER_MEMORY_TYPE,
                                        AMFMemoryType_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_CONVERTER_MEMORY_TYPE failed");
       res = AMFConverter_->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_FORMAT,
                                        textureFormatOut_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_CONVERTER_OUTPUT_FORMAT failed");
       res = AMFConverter_->SetProperty(AMF_VIDEO_CONVERTER_OUTPUT_SIZE,
                                        ::AMFConstructSize(width, height));
-      AMF_RETURN_IF_FAILED(res, L"AMF Failed to SetProperty");
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_CONVERTER_OUTPUT_SIZE failed");
       res = AMFConverter_->Init(decodeFormatOut_, width, height);
-      AMF_RETURN_IF_FAILED(res, L"AMF Failed to Init converter");
+      AMF_CHECK_RETURN(res, "Init converter failed");
     }
     res = AMFConverter_->SubmitInput(surface);
-    AMF_RETURN_IF_FAILED(res, L"Convert SubmitInput failed");
+    AMF_CHECK_RETURN(res, "Convert SubmitInput failed");
     res = AMFConverter_->QueryOutput(&convertData);
-    AMF_RETURN_IF_FAILED(res, L"Convert QueryOutput failed");
+    AMF_CHECK_RETURN(res, "Convert QueryOutput failed");
     return AMF_OK;
   }
 };
@@ -252,7 +262,7 @@ bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
     rhs = AMFVideoDecoderHW_H265_HEVC;
     break;
   default:
-    std::cerr << "unsupported codec: " << lhs << "\n";
+    LOG_ERROR("unsupported codec: " + std::to_string(lhs));
     return false;
   }
   return true;
@@ -285,7 +295,7 @@ void *amf_new_decoder(void *device, int64_t luid, API api,
     }
     return dec;
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("new failed: " + e.what());
   }
   return NULL;
 }
@@ -296,7 +306,7 @@ int amf_decode(void *decoder, uint8_t *data, int32_t length,
     AMFDecoder *dec = (AMFDecoder *)decoder;
     return -dec->decode(data, length, callback, obj);
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("decode failed: " + e.what());
   }
   return -1;
 }
@@ -327,7 +337,7 @@ int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
     *outDescNum = count;
     return 0;
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("test failed: " + e.what());
   }
   return -1;
 }
@@ -339,7 +349,7 @@ int amf_destroy_decoder(void *decoder) {
       return dec->destroy();
     }
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("destroy failed: " + e.what());
   }
   return -1;
 }

@@ -22,6 +22,9 @@ using Microsoft::WRL::ComPtr;
 #include "common.h"
 #include "system.h"
 
+#define LOG_MODULE "NVENC"
+#include "log.h"
+
 simplelogger::Logger *logger =
     simplelogger::LoggerFactory::CreateConsoleLogger();
 
@@ -141,7 +144,7 @@ int nv_destroy_encoder(void *encoder) {
     }
     return 0;
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("destroy failed: " + e.what());
   }
   return -1;
 }
@@ -166,10 +169,11 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
 
     e = new NvencEncoder(width, height, surfaceFormat);
     if (!e) {
-      std::cout << "failed to new NvencEncoder" << std::endl;
+      LOG_TRACE("new NvencEncoder failed");
       goto _exit;
     }
     if (!ck(e->cuda_dl_->cuInit(0))) {
+      LOG_TRACE("cuInit failed");
       goto _exit;
     }
 
@@ -190,20 +194,23 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
       goto _exit;
     }
     if (gpu >= nGpu) {
-      std::cout << "GPU ordinal out of range. Should be within [" << 0 << ", "
-                << nGpu - 1 << "]" << std::endl;
+      LOG_TRACE("gpu out of range," + std::to_string(gpu) +
+                ">=" + std::to_string(nGpu));
       goto _exit;
     }
     CUdevice cuDevice = 0;
     if (!ck(e->cuda_dl_->cuDeviceGet(&cuDevice, gpu))) {
+      LOG_TRACE("cuDeviceGet failed");
       goto _exit;
     }
-    char szDeviceName[80];
-    if (!ck(e->cuda_dl_->cuDeviceGetName(szDeviceName, sizeof(szDeviceName),
-                                         cuDevice))) {
-      goto _exit;
-    }
+    // char szDeviceName[80];
+    // if (!ck(e->cuda_dl_->cuDeviceGetName(szDeviceName, sizeof(szDeviceName),
+    //                                      cuDevice))) {
+    //   LOG_TRACE("cuDeviceGetName failed");
+    //   goto _exit;
+    // }
     if (!ck(e->cuda_dl_->cuCtxCreate(&e->cuContext_, 0, cuDevice))) {
+      LOG_TRACE("cuCtxCreate failed");
       goto _exit;
     }
 
@@ -240,7 +247,7 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
 
     return e;
   } catch (const std::exception &ex) {
-    std::cout << ex.what();
+    LOG_ERROR("new failed: " + ex.what());
     goto _exit;
   }
 
@@ -285,7 +292,7 @@ int nv_encode(void *encoder, void *texture, EncodeCallback callback,
     }
     return encoded ? 0 : -1;
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("encode failed: " + e.what());
   }
   return -1;
 }
@@ -337,7 +344,7 @@ int nv_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
     return 0;
 
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("test failed: " + e.what());
   }
   return -1;
 }
@@ -349,19 +356,20 @@ int nv_set_bitrate(void *e, int32_t kbs) {
         kbs * 1000;
     RECONFIGURE_TAIL
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("set bitrate to " + std::to_string(kbs) +
+              "k failed: " + e.what());
   }
   return -1;
 }
 
-int nv_set_framerate(void *e, int32_t kbs) {
+int nv_set_framerate(void *e, int32_t framerate) {
   try {
     RECONFIGURE_HEAD
-    params.reInitEncodeParams.frameRateNum = kbs * 1000;
+    params.reInitEncodeParams.frameRateNum = framerate;
     params.reInitEncodeParams.frameRateDen = 1;
     RECONFIGURE_TAIL
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("set framerate failed: " + e.what());
   }
   return -1;
 }

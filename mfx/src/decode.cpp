@@ -9,10 +9,14 @@
 #include "common.h"
 #include "system.h"
 
+#define LOG_MODULE "MFX DECODE"
+#include "log.h"
+
 #define CHECK_STATUS_GOTO(X, MSG)                                              \
   {                                                                            \
     if ((X) < MFX_ERR_NONE) {                                                  \
       MSDK_PRINT_RET_MSG(X, MSG);                                              \
+      LOG_ERROR(MSG + "failed, sts=" + std::to_string((int)X));                \
       goto _exit;                                                              \
     }                                                                          \
   }
@@ -20,6 +24,16 @@
   {                                                                            \
     if ((X) < MFX_ERR_NONE) {                                                  \
       MSDK_PRINT_RET_MSG(X, MSG);                                              \
+      LOG_ERROR(MSG + "failed, sts=" + std::to_string((int)X));                \
+      return X;                                                                \
+    }                                                                          \
+  }
+
+#define LOG_MSDK_CHECK_STATUS(X, MSG)                                          \
+  {                                                                            \
+    if ((X) < MFX_ERR_NONE) {                                                  \
+      MSDK_PRINT_RET_MSG(X, MSG);                                              \
+      LOG_ERROR(MSG + "failed, sts=" + std::to_string((int)X));                \
       return X;                                                                \
     }                                                                          \
   }
@@ -46,19 +60,19 @@ public:
     D3D11AllocatorParams allocParams;
 
     sts = session_.Init(impl, &ver);
-    MSDK_CHECK_STATUS(sts, "session Init");
+    LOG_MSDK_CHECK_STATUS(sts, "session Init");
 
     sts = session_.SetHandle(MFX_HANDLE_D3D11_DEVICE, native_->device_.Get());
-    MSDK_CHECK_STATUS(sts, "SetHandle");
+    LOG_MSDK_CHECK_STATUS(sts, "SetHandle");
 
     allocParams.bUseSingleTexture = false; // important
     allocParams.pDevice = native_->device_.Get();
     allocParams.uncompressedResourceMiscFlags = 0;
     sts = d3d11FrameAllocator_.Init(&allocParams);
-    MSDK_CHECK_STATUS(sts, "init D3D11FrameAllocator");
+    LOG_MSDK_CHECK_STATUS(sts, "init D3D11FrameAllocator");
 
     sts = session_.SetFrameAllocator(&d3d11FrameAllocator_);
-    MSDK_CHECK_STATUS(sts, "SetFrameAllocator");
+    LOG_MSDK_CHECK_STATUS(sts, "SetFrameAllocator");
 
     return MFX_ERR_NONE;
   }

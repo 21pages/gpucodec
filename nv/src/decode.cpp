@@ -16,6 +16,9 @@
 #include "common.h"
 #include "system.h"
 
+#define LOG_MODULE "CUVID"
+#include "log.h"
+
 #define NUMVERTICES 6
 
 using namespace DirectX;
@@ -475,7 +478,7 @@ int nv_destroy_decoder(void *decoder) {
     }
     return 0;
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("destroy failed: " + e.what());
   }
   return -1;
 }
@@ -535,7 +538,7 @@ void *nv_new_decoder(void *device, int64_t luid, API api, DataFormat dataFormat,
     p->outputSharedHandle_ = outputSharedHandle;
     return p;
   } catch (const std::exception &ex) {
-    std::cout << ex.what();
+    LOG_ERROR("destroy failed: " + ex.what());
     goto _exit;
   }
 
@@ -578,7 +581,7 @@ int nv_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
         return -1;
       }
       if (!p->native_->EnsureTexture(width, height)) {
-        std::cerr << "Failed to EnsureTexture" << std::endl;
+        LOG_ERROR("EnsureTexture failed");
         p->native_->EndQuery();
         return -1;
       }
@@ -590,14 +593,14 @@ int nv_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
 
       p->native_->EndQuery();
       if (!p->native_->Query()) {
-        std::cerr << "Query failed" << std::endl;
+        LOG_ERROR("Query failed");
       }
 
       void *opaque = nullptr;
       if (p->outputSharedHandle_) {
         HANDLE sharedHandle = p->native_->GetSharedHandle();
         if (!sharedHandle) {
-          std::cerr << "Failed to GetSharedHandle" << std::endl;
+          LOG_ERROR("GetSharedHandle failed");
           return -1;
         }
         opaque = sharedHandle;
@@ -611,7 +614,7 @@ int nv_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
     }
     return decoded ? 0 : -1;
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("decode failed" + e.what());
   }
   return -1;
 }
@@ -642,7 +645,7 @@ int nv_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
     *outDescNum = count;
     return 0;
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("test failed" + e.what());
   }
   return -1;
 }

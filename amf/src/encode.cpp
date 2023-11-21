@@ -16,10 +16,19 @@
 #include "common.h"
 #include "system.h"
 
+#define LOG_MODULE "AMF ENCODE"
+#include "log.h"
+
 #define AMF_FACILITY L"AMFEncoder"
 #define MILLISEC_TIME 10000
 
 namespace {
+
+#define AMF_CHECK_RETURN(res, msg)                                             \
+  if (res != AMF_OK) {                                                         \
+    LOG_ERROR(msg + ", result code: " + std::to_string(int(res)));             \
+    return res;                                                                \
+  }
 
 /** Encoder output packet */
 struct encoder_packet {
@@ -98,7 +107,7 @@ public:
       // AMF will not copy the surface during the CreateSurfaceFromDX11Native
       // call
       res = AMFContext_->CreateSurfaceFromDX11Native(tex, &surface, NULL);
-      AMF_RETURN_IF_FAILED(res, L"CreateSurfaceFromDX11Native() failed");
+      AMF_CHECK_RETURN(res, "CreateSurfaceFromDX11Native failed");
       {
         amf::AMFDataPtr data1;
         surface->Duplicate(surface->GetMemoryType(), &data1);
@@ -109,7 +118,7 @@ public:
       break;
     }
     res = AMFEncoder_->SubmitInput(surface);
-    AMF_RETURN_IF_FAILED(res, L"SubmitInput() failed");
+    AMF_CHECK_RETURN(res, "SubmitInput failed");
 
     amf::AMFDataPtr data = NULL;
     do {
@@ -162,7 +171,7 @@ public:
     res = AMFContext_->AllocSurface(AMFMemoryType_, AMFSurfaceFormat_,
                                     resolution_.first, resolution_.second,
                                     &surface);
-    AMF_RETURN_IF_FAILED(res, L"AllocSurface() failed");
+    AMF_CHECK_RETURN(res, "AllocSurface failed");
     if (surface->GetPlanesCount() < 1)
       return AMF_FAIL;
     void *native = surface->GetPlaneAt(0)->GetNative();
@@ -186,37 +195,37 @@ private:
 
     // AMFContext_
     res = AMFFactory_.GetFactory()->CreateContext(&AMFContext_);
-    AMF_RETURN_IF_FAILED(res, L"CreateContext() failed");
+    AMF_CHECK_RETURN(res, "CreateContext failed");
 
     switch (AMFMemoryType_) {
     case amf::AMF_MEMORY_DX11:
       res = AMFContext_->InitDX11(handle_); // can be DX11 device
-      AMF_RETURN_IF_FAILED(res, L"InitDX11(m_hdl) failed");
+      AMF_CHECK_RETURN(res, "InitDX11 failed");
       break;
     case amf::AMF_MEMORY_VULKAN:
       res = amf::AMFContext1Ptr(AMFContext_)->InitVulkan(handle_);
-      AMF_RETURN_IF_FAILED(res, L"InitVulkan(NULL) failed");
+      AMF_CHECK_RETURN(res, "InitVulkan failed");
       break;
     case amf::AMF_MEMORY_OPENCL:
       res = AMFContext_->InitOpenCL(NULL);
-      AMF_RETURN_IF_FAILED(res, L"InitOpenCL(NULL) failed");
+      AMF_CHECK_RETURN(res, "InitOpenCL failed");
       break;
     default:
-      AMFTraceInfo(AMF_FACILITY, L"no init operation\n");
-      break;
+      LOG_ERROR("unsupported amf memory type");
+      return AMF_FAIL;
     }
 
     // component: encoder
     res = AMFFactory_.GetFactory()->CreateComponent(AMFContext_, codec_.c_str(),
                                                     &AMFEncoder_);
-    AMF_RETURN_IF_FAILED(res, L"CreateComponent(%s) failed", codec_.c_str());
+    AMF_CHECK_RETURN(res, "CreateComponent failed");
 
     res = SetParams(codec_);
-    AMF_RETURN_IF_FAILED(res, L"Could not set params in encoder.");
+    AMF_CHECK_RETURN(res, "Could not set params in encoder.");
 
     res = AMFEncoder_->Init(AMFSurfaceFormat_, resolution_.first,
                             resolution_.second);
-    AMF_RETURN_IF_FAILED(res, L"encoder->Init() failed");
+    AMF_CHECK_RETURN(res, "encoder->Init() failed");
 
     return AMF_OK;
   }
@@ -228,113 +237,98 @@ private:
       res = AMFEncoder_->SetProperty(
           AMF_VIDEO_ENCODER_USAGE,
           AMF_VIDEO_ENCODER_USAGE_LOW_LATENCY_HIGH_QUALITY);
-      AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_USAGE, "
-                                L"AMF_VIDEO_ENCODER_USAGE_LOW_LATENCY) failed");
+      AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_USAGE failed");
 
       // ------------- Encoder params static---------------
       res = AMFEncoder_->SetProperty(
           AMF_VIDEO_ENCODER_FRAMESIZE,
           ::AMFConstructSize(resolution_.first, resolution_.second));
-      AMF_RETURN_IF_FAILED(
-          res, L"SetProperty(AMF_VIDEO_ENCODER_FRAMESIZE, %dx%d) failed",
-          resolution_.first, resolution_.second);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_FRAMESIZE failed, (" +
+                           std::to_string(resolution_.first) + "," +
+                           std::to_string(resolution_.second) + ")");
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_LOWLATENCY_MODE, true);
-      AMF_RETURN_IF_FAILED(res, L"encoder->SetProperty(AMF_VIDEO_ENCODER_"
-                                L"LOWLATENCY_MODE, true) failed");
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_LOWLATENCY_MODE failed");
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_QUALITY_PRESET,
                                      AMF_VIDEO_ENCODER_QUALITY_PRESET_BALANCED);
-      AMF_RETURN_IF_FAILED(res,
-                           L"SetProperty(AMF_VIDEO_ENCODER_QUALITY_PRESET, "
-                           L"AMF_VIDEO_ENCODER_QUALITY_PRESET_SPEED) failed");
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_QUALITY_PRESET failed");
       res =
           AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_COLOR_BIT_DEPTH, eDepth_);
-      AMF_RETURN_IF_FAILED(
-          res, L"SetProperty(AMF_VIDEO_ENCODER_COLOR_BIT_DEPTH, %d) failed",
-          eDepth_);
-      // res = m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD,
-      // AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR); AMF_RETURN_IF_FAILED(res,
-      // L"SetProperty(AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD, %d) failed",
+      AMF_CHECK_RETURN(res,
+                       "SetProperty(AMF_VIDEO_ENCODER_COLOR_BIT_DEPTH  failed");
+      // res =
+      // m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD,
+      // AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR);
+      // AMF_CHECK_RETURN(res,
+      // L"SetProperty(AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD,
+      // %d) failed",
       // AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR);
 
       // ------------- Encoder params dynamic ---------------
       AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_B_PIC_PATTERN, 0);
-      // do not check error for AMF_VIDEO_ENCODER_B_PIC_PATTERN - can be not
-      // supported - check Capability Manager sample
+      // do not check error for AMF_VIDEO_ENCODER_B_PIC_PATTERN
+      // - can be not supported - check Capability Manager
+      // sample
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_QUERY_TIMEOUT,
                                      query_timeout_); // ms
-      AMF_RETURN_IF_FAILED(
-          res,
-          L"encoder->SetProperty(AMF_VIDEO_ENCODER_QUERY_TIMEOUT, %d) failed",
-          query_timeout_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_QUERY_TIMEOUT failed");
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_TARGET_BITRATE,
                                      bitRateIn_);
-      AMF_RETURN_IF_FAILED(res,
-                           L"SetProperty(AMF_VIDEO_ENCODER_TARGET_BITRATE, "
-                           L"%" LPRId64 L") failed",
-                           bitRateIn_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_TARGET_BITRATE failed");
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_FRAMERATE,
                                      ::AMFConstructRate(frameRate_, 1));
-      AMF_RETURN_IF_FAILED(
-          res, L"SetProperty(AMF_VIDEO_ENCODER_FRAMERATE, %d) failed",
-          frameRate_);
+      AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_FRAMERATE failed");
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_IDR_PERIOD, gop_);
-      AMF_RETURN_IF_FAILED(
-          res, L"SetProperty(AMF_VIDEO_ENCODER_IDR_PERIOD, %d) failed", gop_);
+      AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_IDR_PERIOD failed");
     } else if (codecStr == amf_wstring(AMFVideoEncoder_HEVC)) {
       // ------------- Encoder params usage---------------
       res = AMFEncoder_->SetProperty(
           AMF_VIDEO_ENCODER_HEVC_USAGE,
           AMF_VIDEO_ENCODER_HEVC_USAGE_LOW_LATENCY_HIGH_QUALITY);
-      AMF_RETURN_IF_FAILED(res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_USAGE, "
-                                L"AMF_VIDEO_ENCODER_HEVC_USAGE_TRANSCODING)");
+      AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_HEVC_USAGE failed");
 
       // ------------- Encoder params static---------------
       res = AMFEncoder_->SetProperty(
           AMF_VIDEO_ENCODER_HEVC_FRAMESIZE,
           ::AMFConstructSize(resolution_.first, resolution_.second));
-      AMF_RETURN_IF_FAILED(
-          res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMESIZE, %dx%d) failed",
-          resolution_.first, resolution_.second);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_FRAMESIZE failed");
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_LOWLATENCY_MODE,
                                      true);
-      AMF_RETURN_IF_FAILED(res, L"encoder->SetProperty(AMF_VIDEO_ENCODER_"
-                                L"LOWLATENCY_MODE, true) failed");
+      AMF_CHECK_RETURN(res,
+                       "SetProperty(AMF_VIDEO_ENCODER_LOWLATENCY_MODE failed");
       res =
           AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET,
                                    AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET_SPEED);
-      AMF_RETURN_IF_FAILED(res,
-                           L"SetProperty(AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET,"
-                           L" AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET_SPEED)");
+      AMF_CHECK_RETURN(
+          res, "SetProperty AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET failed");
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_COLOR_BIT_DEPTH,
                                      eDepth_);
-      AMF_RETURN_IF_FAILED(
-          res,
-          L"SetProperty(AMF_VIDEO_ENCODER_HEVC_COLOR_BIT_DEPTH, %d) failed",
-          eDepth_);
+      AMF_CHECK_RETURN(
+          res, "SetProperty AMF_VIDEO_ENCODER_HEVC_COLOR_BIT_DEPTH failed");
 
       // ------------- Encoder params dynamic ---------------
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_QUERY_TIMEOUT,
                                      query_timeout_); // ms
-      AMF_RETURN_IF_FAILED(res,
-                           L"encoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_QUERY_"
-                           L"TIMEOUT, %d) failed",
-                           query_timeout_);
+      AMF_CHECK_RETURN(
+          res, "SetProperty(AMF_VIDEO_ENCODER_HEVC_QUERY_TIMEOUT failed",
+          query_timeout_);
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE,
                                      bitRateIn_);
-      AMF_RETURN_IF_FAILED(res,
-                           L"SetProperty(AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE,"
-                           L" %" LPRId64 L") failed",
-                           bitRateIn_);
+      AMF_CHECK_RETURN(
+          res, "SetProperty AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE failed");
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMERATE,
                                      ::AMFConstructRate(frameRate_, 1));
-      AMF_RETURN_IF_FAILED(
-          res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMERATE, %d) failed",
-          frameRate_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_FRAMERATE failed");
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_GOP_SIZE,
                                      gop_); // todo
-      AMF_RETURN_IF_FAILED(
-          res, L"SetProperty(AMF_VIDEO_ENCODER_HEVC_GOP_SIZE, %d) failed",
-          gop_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_GOP_SIZE failed");
     } else {
       return AMF_FAIL;
     }
@@ -366,7 +360,7 @@ bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
     rhs = AMFVideoEncoder_HEVC;
     break;
   default:
-    std::cerr << "unsupported codec: " << lhs << "\n";
+    LOG_ERROR("unsupported codec: " + std::to_string((int)lhs));
     return false;
   }
   return true;
@@ -401,7 +395,7 @@ void *amf_new_encoder(void *handle, int64_t luid, API api,
     }
     return enc;
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("new failed: " + e.what());
   }
   return NULL;
 }
@@ -411,7 +405,7 @@ int amf_encode(void *encoder, void *tex, EncodeCallback callback, void *obj) {
     AMFEncoder *enc = (AMFEncoder *)encoder;
     return -enc->encode(tex, callback, obj);
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("encode failed: " + e.what());
   }
   return -1;
 }
@@ -421,7 +415,7 @@ int amf_destroy_encoder(void *encoder) {
     AMFEncoder *enc = (AMFEncoder *)encoder;
     return enc->destroy();
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("destroy failed: " + e.what());
   }
   return -1;
 }
@@ -467,7 +461,7 @@ int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
     return 0;
 
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("test " + std::to_string(kbs) + "failed: " + e.what());
   }
   return -1;
 }
@@ -488,7 +482,8 @@ int amf_set_bitrate(void *encoder, int32_t kbs) {
     }
     return res == AMF_OK ? 0 : -1;
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("set bitrate to " + std::to_string(kbs) +
+              "k failed: " + e.what());
   }
   return -1;
 }
@@ -509,7 +504,8 @@ int amf_set_framerate(void *encoder, int32_t framerate) {
     }
     return res == AMF_OK ? 0 : -1;
   } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
+    LOG_ERROR("set framerate to " + std::to_string(framerate) +
+              " failed: " + e.what());
   }
   return -1;
 }
