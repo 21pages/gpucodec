@@ -118,10 +118,11 @@ int mfx_destroy_encoder(void *encoder) {
 
 void *mfx_new_encoder(void *handle, int64_t luid, API api,
                       DataFormat dataFormat, int32_t w, int32_t h, int32_t kbs,
-                      int32_t framerate, int32_t gop) {
+                      int32_t framerate, int32_t gop, int32_t q_min,
+                      int32_t q_max) {
   mfxStatus sts = MFX_ERR_NONE;
   mfxVersion ver = {{0, 1}};
-  mfxVideoParam mfxEncParams;
+  MfxVideoParamsWrapper mfxEncParams;
   memset(&mfxEncParams, 0, sizeof(mfxEncParams));
   mfxFrameAllocRequest EncRequest;
   memset(&EncRequest, 0, sizeof(EncRequest));
@@ -129,8 +130,9 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   mfxU16 width, height;
   mfxU32 surfaceSize;
   mfxU8 *surfaceBuffers;
-  mfxVideoParam par;
-  memset(&par, 0, sizeof(par));
+  MfxVideoParamsWrapper retrieved_par;
+  memset(&retrieved_par, 0, sizeof(retrieved_par));
+  mfxExtCodingOption2 *codingOption2 = nullptr;
 
   if (!convert_codec(dataFormat, mfxEncParams.mfx.CodecId))
     return NULL;
@@ -163,6 +165,14 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   mfxEncParams.AsyncDepth = 1; // 1 is best for low latency
   mfxEncParams.mfx.GopRefDist =
       1; // 1 is best for low latency, I and P frames only
+
+  codingOption2 = mfxEncParams.AddExtBuffer<mfxExtCodingOption2>();
+  codingOption2->MinQPI = q_min;
+  codingOption2->MinQPB = q_min;
+  codingOption2->MinQPP = q_min;
+  codingOption2->MaxQPI = q_max;
+  codingOption2->MaxQPB = q_max;
+  codingOption2->MaxQPP = q_max;
 
   MFXEncoder *p = new MFXEncoder();
   if (!p)
@@ -212,12 +222,12 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
 
   // Retrieve video parameters selected by encoder.
   // - BufferSizeInKB parameter is required to set bit stream buffer size
-  sts = p->mfxENC_->GetVideoParam(&par);
+  sts = p->mfxENC_->GetVideoParam(&retrieved_par);
   CHECK_STATUS_GOTO(sts, "GetVideoParam");
 
   // Prepare Media SDK bit stream buffer
   memset(&p->mfxBS_, 0, sizeof(p->mfxBS_));
-  p->mfxBS_.MaxLength = par.mfx.BufferSizeInKB * 1024;
+  p->mfxBS_.MaxLength = retrieved_par.mfx.BufferSizeInKB * 1024;
   p->bstData_.resize(p->mfxBS_.MaxLength);
   p->mfxBS_.Data = p->bstData_.data();
 
@@ -292,8 +302,8 @@ int mfx_encode(void *encoder, ID3D11Texture2D *tex, EncodeCallback callback,
 
 int mfx_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
                     API api, DataFormat dataFormat, int32_t width,
-                    int32_t height, int32_t kbs, int32_t framerate,
-                    int32_t gop) {
+                    int32_t height, int32_t kbs, int32_t framerate, int32_t gop,
+                    int32_t q_min, int32_t q_max) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -303,7 +313,7 @@ int mfx_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
     for (auto &adapter : adapters.adapters_) {
       MFXEncoder *e = (MFXEncoder *)mfx_new_encoder(
           (void *)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_),
-          api, dataFormat, width, height, kbs, framerate, gop);
+          api, dataFormat, width, height, kbs, framerate, gop, q_min, q_max);
       if (!e)
         continue;
       if (!e->native_->EnsureTexture(e->width_, e->height_))
@@ -331,7 +341,7 @@ int mfx_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
 // https://github.com/Intel-Media-SDK/MediaSDK/blob/master/doc/mediasdk-man.md#mfxinfomfx
 int mfx_set_bitrate(void *encoder, int32_t kbs) {
   MFXEncoder *p = (MFXEncoder *)encoder;
-  mfxVideoParam param = {0};
+  MfxVideoParamsWrapper param;
   mfxStatus sts = MFX_ERR_NONE;
   sts = MFXVideoENCODE_GetVideoParam(p->session_, &param);
   CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_GetVideoParam");

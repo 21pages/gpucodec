@@ -13,6 +13,8 @@ fn main() {
         framerate: 30,
         gop: MAX_GOP as _,
         device: None,
+        q_min: 12,
+        q_max: 35,
     });
     encoders.iter().map(|e| println!("{:?}", e)).count();
     println!("decoders:");

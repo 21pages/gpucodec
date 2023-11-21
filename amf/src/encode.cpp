@@ -76,6 +76,8 @@ private:
   int32_t bitRateIn_;
   int32_t frameRate_;
   int32_t gop_;
+  int32_t q_min_;
+  int32_t q_max_;
 
   // Buffers
   std::vector<uint8_t> packetDataBuffer_;
@@ -83,7 +85,8 @@ private:
 public:
   AMFEncoder(void *handle, amf::AMF_MEMORY_TYPE memoryType, amf_wstring codec,
              DataFormat dataFormat, int32_t width, int32_t height,
-             int32_t bitrate, int32_t framerate, int32_t gop) {
+             int32_t bitrate, int32_t framerate, int32_t gop, int32_t q_min,
+             int32_t q_max) {
     handle_ = handle;
     dataFormat_ = dataFormat;
     AMFMemoryType_ = memoryType;
@@ -92,6 +95,8 @@ public:
     bitRateIn_ = bitrate;
     frameRate_ = framerate;
     gop_ = gop;
+    q_min_ = q_min;
+    q_max = q_max;
     init_result_ = initialize();
   }
 
@@ -251,20 +256,17 @@ private:
       AMF_CHECK_RETURN(res,
                        "SetProperty AMF_VIDEO_ENCODER_LOWLATENCY_MODE failed");
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_QUALITY_PRESET,
-                                     AMF_VIDEO_ENCODER_QUALITY_PRESET_BALANCED);
+                                     AMF_VIDEO_ENCODER_QUALITY_PRESET_QUALITY);
       AMF_CHECK_RETURN(res,
                        "SetProperty AMF_VIDEO_ENCODER_QUALITY_PRESET failed");
       res =
           AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_COLOR_BIT_DEPTH, eDepth_);
       AMF_CHECK_RETURN(res,
                        "SetProperty(AMF_VIDEO_ENCODER_COLOR_BIT_DEPTH  failed");
-      // res =
-      // m_AMFEncoder->SetProperty(AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD,
-      // AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR);
-      // AMF_CHECK_RETURN(res,
-      // L"SetProperty(AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD,
-      // %d) failed",
-      // AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR);
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD,
+                                     AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD");
 
       // ------------- Encoder params dynamic ---------------
       AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_B_PIC_PATTERN, 0);
@@ -282,8 +284,16 @@ private:
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_FRAMERATE,
                                      ::AMFConstructRate(frameRate_, 1));
       AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_FRAMERATE failed");
+
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_IDR_PERIOD, gop_);
       AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_IDR_PERIOD failed");
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_MIN_QP, q_min_);
+      AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_MIN_QP failed");
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_MAX_QP, q_max_);
+      AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_MAX_QP failed");
+
     } else if (codecStr == amf_wstring(AMFVideoEncoder_HEVC)) {
       // ------------- Encoder params usage---------------
       res = AMFEncoder_->SetProperty(
@@ -297,19 +307,28 @@ private:
           ::AMFConstructSize(resolution_.first, resolution_.second));
       AMF_CHECK_RETURN(res,
                        "SetProperty AMF_VIDEO_ENCODER_HEVC_FRAMESIZE failed");
+
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_LOWLATENCY_MODE,
                                      true);
       AMF_CHECK_RETURN(res,
-                       "SetProperty(AMF_VIDEO_ENCODER_LOWLATENCY_MODE failed");
-      res =
-          AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET,
-                                   AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET_SPEED);
+                       "SetProperty AMF_VIDEO_ENCODER_LOWLATENCY_MODE failed");
+
+      res = AMFEncoder_->SetProperty(
+          AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET,
+          AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET_QUALITY);
       AMF_CHECK_RETURN(
           res, "SetProperty AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET failed");
+
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_COLOR_BIT_DEPTH,
                                      eDepth_);
       AMF_CHECK_RETURN(
           res, "SetProperty AMF_VIDEO_ENCODER_HEVC_COLOR_BIT_DEPTH failed");
+
+      res = AMFEncoder_->SetProperty(
+          AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD,
+          AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_CBR);
+      AMF_CHECK_RETURN(
+          res, "SetProperty AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD failed");
 
       // ------------- Encoder params dynamic ---------------
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_QUERY_TIMEOUT,
@@ -317,18 +336,38 @@ private:
       AMF_CHECK_RETURN(
           res, "SetProperty(AMF_VIDEO_ENCODER_HEVC_QUERY_TIMEOUT failed",
           query_timeout_);
+
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE,
                                      bitRateIn_);
       AMF_CHECK_RETURN(
           res, "SetProperty AMF_VIDEO_ENCODER_HEVC_TARGET_BITRATE failed");
+
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMERATE,
                                      ::AMFConstructRate(frameRate_, 1));
       AMF_CHECK_RETURN(res,
                        "SetProperty AMF_VIDEO_ENCODER_HEVC_FRAMERATE failed");
+
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_GOP_SIZE,
                                      gop_); // todo
       AMF_CHECK_RETURN(res,
                        "SetProperty AMF_VIDEO_ENCODER_HEVC_GOP_SIZE failed");
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MIN_QP_I, q_min_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MIN_QP_I failed");
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MAX_QP_I, q_max_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MAX_QP_I failed");
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MIN_QP_P, q_min_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MIN_QP_P failed");
+
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MAX_QP_P, q_max_);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MAX_QP_P failed");
+
     } else {
       return AMF_FAIL;
     }
@@ -373,7 +412,8 @@ extern "C" {
 
 void *amf_new_encoder(void *handle, int64_t luid, API api,
                       DataFormat dataFormat, int32_t width, int32_t height,
-                      int32_t kbs, int32_t framerate, int32_t gop) {
+                      int32_t kbs, int32_t framerate, int32_t gop,
+                      int32_t q_min, int32_t q_max) {
   try {
     if (width % 2 != 0 || height % 2 != 0) {
       return NULL;
@@ -386,8 +426,9 @@ void *amf_new_encoder(void *handle, int64_t luid, API api,
     if (!convert_api(api, memoryType)) {
       return NULL;
     }
-    AMFEncoder *enc = new AMFEncoder(handle, memoryType, codecStr, dataFormat,
-                                     width, height, kbs * 1000, framerate, gop);
+    AMFEncoder *enc =
+        new AMFEncoder(handle, memoryType, codecStr, dataFormat, width, height,
+                       kbs * 1000, framerate, gop, q_min, q_max);
     if (enc && enc->init_result_ != AMF_OK) {
       enc->destroy();
       delete enc;
@@ -435,8 +476,8 @@ int amf_driver_support() {
 
 int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
                     API api, DataFormat dataFormat, int32_t width,
-                    int32_t height, int32_t kbs, int32_t framerate,
-                    int32_t gop) {
+                    int32_t height, int32_t kbs, int32_t framerate, int32_t gop,
+                    int32_t q_min, int32_t q_max) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -446,7 +487,7 @@ int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
     for (auto &adapter : adapters.adapters_) {
       AMFEncoder *e = (AMFEncoder *)amf_new_encoder(
           (void *)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_),
-          api, dataFormat, width, height, kbs, framerate, gop);
+          api, dataFormat, width, height, kbs, framerate, gop, q_min, q_max);
       if (!e)
         continue;
       if (e->test() == AMF_OK) {

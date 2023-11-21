@@ -41,6 +41,8 @@ impl Encoder {
                 ctx.d.kbitrate,
                 ctx.d.framerate,
                 ctx.d.gop,
+                ctx.d.q_min,
+                ctx.d.q_max,
             );
             if codec.is_null() {
                 return Err(());
@@ -179,6 +181,8 @@ pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
                     input.d.kbitrate,
                     input.d.framerate,
                     input.d.gop,
+                    input.d.q_min,
+                    input.d.q_max,
                 )
             } {
                 if desc_count as usize <= descs.len() {

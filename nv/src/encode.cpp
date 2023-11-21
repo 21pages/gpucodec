@@ -154,7 +154,8 @@ int nv_destroy_encoder(void *encoder) {
 
 void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
                      int32_t width, int32_t height, int32_t kbs,
-                     int32_t framerate, int32_t gop) {
+                     int32_t framerate, int32_t gop, int32_t q_min,
+                     int32_t q_max) {
   NvencEncoder *e = NULL;
   try {
     if (width % 2 != 0 || height % 2 != 0) {
@@ -252,6 +253,18 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
       gop = NVENC_INFINITE_GOPLENGTH;
     }
     initializeParams.encodeConfig->gopLength = gop;
+    // rc method
+    initializeParams.encodeConfig->rcParams.rateControlMode =
+        NV_ENC_PARAMS_RC_CBR;
+    // qp
+    initializeParams.encodeConfig->rcParams.enableMinQP = 1;
+    initializeParams.encodeConfig->rcParams.enableMaxQP = 1;
+    initializeParams.encodeConfig->rcParams.minQP.qpIntra = q_min;
+    initializeParams.encodeConfig->rcParams.minQP.qpInterB = q_min;
+    initializeParams.encodeConfig->rcParams.minQP.qpInterP = q_min;
+    initializeParams.encodeConfig->rcParams.maxQP.qpIntra = q_max;
+    initializeParams.encodeConfig->rcParams.maxQP.qpInterB = q_max;
+    initializeParams.encodeConfig->rcParams.maxQP.qpInterP = q_max;
 
     e->pEnc_->CreateEncoder(&initializeParams);
     e->handle_ = handle;
@@ -325,8 +338,8 @@ int nv_encode(void *encoder, void *texture, EncodeCallback callback,
 
 int nv_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
                    API api, DataFormat dataFormat, int32_t width,
-                   int32_t height, int32_t kbs, int32_t framerate,
-                   int32_t gop) {
+                   int32_t height, int32_t kbs, int32_t framerate, int32_t gop,
+                   int32_t q_min, int32_t q_max) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -336,7 +349,7 @@ int nv_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
     for (auto &adapter : adapters.adapters_) {
       NvencEncoder *e = (NvencEncoder *)nv_new_encoder(
           (void *)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_),
-          api, dataFormat, width, height, kbs, framerate, gop);
+          api, dataFormat, width, height, kbs, framerate, gop, q_min, q_max);
       if (!e)
         continue;
       if (!e->native_->EnsureTexture(e->width_, e->height_))

@@ -41,6 +41,8 @@ pub struct DynamicContext {
     pub kbitrate: i32,
     pub framerate: i32,
     pub gop: i32,
+    pub q_min: i32,
+    pub q_max: i32,
 }
 
 unsafe impl Send for DynamicContext {}
