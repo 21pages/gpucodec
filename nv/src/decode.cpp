@@ -33,11 +33,13 @@ public:
   CUVIDAutoUnmapper(CudaFunctions *cudl, CUgraphicsResource *pCuResource)
       : cudl_(cudl), pCuResource_(pCuResource) {
     if (!ck(cudl->cuGraphicsMapResources(1, pCuResource, 0))) {
+      LOG_TRACE("cuGraphicsMapResources failed");
       NVDEC_THROW_ERROR("cuGraphicsMapResources failed", CUDA_ERROR_UNKNOWN);
     }
   }
   ~CUVIDAutoUnmapper() {
     if (!ck(cudl_->cuGraphicsUnmapResources(1, pCuResource_, 0))) {
+      LOG_TRACE("cuGraphicsUnmapResources failed");
       NVDEC_THROW_ERROR("cuGraphicsUnmapResources failed", CUDA_ERROR_UNKNOWN);
     }
   }
@@ -49,11 +51,13 @@ class CUVIDAutoCtxPopper {
 public:
   CUVIDAutoCtxPopper(CudaFunctions *cudl, CUcontext cuContext) : cudl_(cudl) {
     if (!ck(cudl->cuCtxPushCurrent(cuContext))) {
+      LOG_TRACE("cuCtxPushCurrent failed");
       NVDEC_THROW_ERROR("cuCtxPopCurrent failed", CUDA_ERROR_UNKNOWN);
     }
   }
   ~CUVIDAutoCtxPopper() {
     if (!ck(cudl_->cuCtxPopCurrent(NULL))) {
+      LOG_TRACE("cuCtxPopCurrent failed");
       NVDEC_THROW_ERROR("cuCtxPopCurrent failed", CUDA_ERROR_UNKNOWN);
     }
   }
@@ -61,9 +65,11 @@ public:
 
 void load_driver(CudaFunctions **pp_cudl, CuvidFunctions **pp_cvdl) {
   if (cuda_load_functions(pp_cudl, NULL) < 0) {
+    LOG_TRACE("cuda_load_functions failed");
     NVDEC_THROW_ERROR("cuda_load_functions failed", CUDA_ERROR_UNKNOWN);
   }
   if (cuvid_load_functions(pp_cvdl, NULL) < 0) {
+    LOG_TRACE("cuvid_load_functions failed");
     NVDEC_THROW_ERROR("cuvid_load_functions failed", CUDA_ERROR_UNKNOWN);
   }
 }
@@ -170,8 +176,9 @@ private:
     int width = dec_->GetWidth();
     int height = dec_->GetHeight();
     int chromaHeight = dec_->GetChromaHeight();
-    printf("width: %d, height %d, chromaHeight:%d\n", width, height,
-           chromaHeight);
+    LOG_TRACE("width:" + std::to_string(width) +
+              ", height:" + std::to_string(height) +
+              ", chromaHeight:" + std::to_string(chromaHeight));
 
     D3D11_TEXTURE2D_DESC desc;
     ZeroMemory(&desc, sizeof(desc));

@@ -34,9 +34,11 @@ namespace {
 
 void load_driver(CudaFunctions **pp_cuda_dl, NvencFunctions **pp_nvenc_dl) {
   if (cuda_load_functions(pp_cuda_dl, NULL) < 0) {
+    LOG_TRACE("cuda_load_functions failed");
     NVENC_THROW_ERROR("cuda_load_functions failed", NV_ENC_ERR_GENERIC);
   }
   if (nvenc_load_functions(pp_nvenc_dl, NULL) < 0) {
+    LOG_TRACE("nvenc_load_functions failed");
     NVENC_THROW_ERROR("nvenc_load_functions failed", NV_ENC_ERR_GENERIC);
   }
 }
@@ -124,6 +126,7 @@ int nv_encode_driver_support() {
     free_driver(&cuda_dl, &nvenc_dl);
     return 0;
   } catch (const std::exception &e) {
+    LOG_TRACE("driver not support" + e.what());
   }
   return -1;
 }
@@ -155,9 +158,13 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
   NvencEncoder *e = NULL;
   try {
     if (width % 2 != 0 || height % 2 != 0) {
+      LOG_ERROR("odd resolution, width: " + std::to_string(width) +
+                ", height: " + std::to_string(height));
       goto _exit;
     }
     if (dataFormat != H264 && dataFormat != H265) {
+      LOG_ERROR("dataFormat not support, dataFormat: " +
+                std::to_string(dataFormat));
       goto _exit;
     }
     GUID guidCodec = NV_ENC_CODEC_H264_GUID;
@@ -183,18 +190,22 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
       if (!e->native_->Init(luid, nullptr))
         goto _exit;
 #else
-      if (!e->native_->Init(luid, (ID3D11Device *)handle))
+      if (!e->native_->Init(luid, (ID3D11Device *)handle)) {
+        LOG_ERROR("d3d device init failed");
         goto _exit;
+      }
 #endif
     } else {
+      LOG_ERROR("api not support, api: " + std::to_string(api));
       goto _exit;
     }
     int nGpu = 0, gpu = 0;
     if (!ck(e->cuda_dl_->cuDeviceGetCount(&nGpu))) {
+      LOG_ERROR("cuDeviceGetCount failed");
       goto _exit;
     }
     if (gpu >= nGpu) {
-      LOG_TRACE("gpu out of range," + std::to_string(gpu) +
+      LOG_ERROR("gpu out of range," + std::to_string(gpu) +
                 ">=" + std::to_string(nGpu));
       goto _exit;
     }
