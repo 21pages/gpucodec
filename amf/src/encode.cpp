@@ -96,7 +96,7 @@ public:
     frameRate_ = framerate;
     gop_ = gop;
     q_min_ = q_min;
-    q_max = q_max;
+    q_max_ = q_max;
     init_result_ = initialize();
   }
 
@@ -289,10 +289,14 @@ private:
       AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_IDR_PERIOD failed");
 
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_MIN_QP, q_min_);
-      AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_MIN_QP failed");
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_MIN_QP failed, val = " +
+                           std::to_string(q_min_));
 
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_MAX_QP, q_max_);
-      AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_MAX_QP failed");
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_MAX_QP failed, val = " +
+                           std::to_string(q_max_));
 
     } else if (codecStr == amf_wstring(AMFVideoEncoder_HEVC)) {
       // ------------- Encoder params usage---------------
