@@ -1,4 +1,5 @@
 use capture::dxgi;
+use env_logger::{init_from_env, Env, DEFAULT_FILTER_ENV};
 use gpu_common::{
     DataFormat, DecodeContext, DecodeDriver, DynamicContext, EncodeContext, EncodeDriver,
     FeatureContext, API::*, MAX_GOP,
@@ -12,7 +13,8 @@ use std::{
 };
 
 fn main() {
-    let luid = 64068;
+    init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "trace"));
+    let luid = 66255;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;

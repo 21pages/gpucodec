@@ -3,7 +3,7 @@ use gpu_common::{DynamicContext, MAX_GOP};
 use gpucodec::{decode, encode};
 
 fn main() {
-    init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "info"));
+    init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "trace"));
 
     println!("encoders:");
     let encoders = encode::available(DynamicContext {

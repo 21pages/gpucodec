@@ -27,16 +27,21 @@ fn main() {
         ["d3d11", "dxgi"].map(|lib| println!("cargo:rustc-link-lib={}", lib));
     }
 
-    builder.include(manifest_dir.join("src"));
+    let src_path = manifest_dir.join("src");
+
+    builder.include(&src_path);
 
     // platform
-    let platform_path = manifest_dir.join("src").join("platform");
+    let platform_path = src_path.join("platform");
     #[cfg(windows)]
     {
         let win_path = platform_path.join("win");
         builder.include(&win_path);
         builder.file(win_path.join("win.cpp"));
     }
+
+    // tool
+    builder.file(src_path.join("log.cpp"));
 
     // video processer
     let dxgi_path = externals_dir.join("nvEncDXGIOutputDuplicationSample");
