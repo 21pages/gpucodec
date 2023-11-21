@@ -257,14 +257,18 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
     initializeParams.encodeConfig->rcParams.rateControlMode =
         NV_ENC_PARAMS_RC_CBR;
     // qp
-    initializeParams.encodeConfig->rcParams.enableMinQP = 1;
-    initializeParams.encodeConfig->rcParams.enableMaxQP = 1;
-    initializeParams.encodeConfig->rcParams.minQP.qpIntra = q_min;
-    initializeParams.encodeConfig->rcParams.minQP.qpInterB = q_min;
-    initializeParams.encodeConfig->rcParams.minQP.qpInterP = q_min;
-    initializeParams.encodeConfig->rcParams.maxQP.qpIntra = q_max;
-    initializeParams.encodeConfig->rcParams.maxQP.qpInterB = q_max;
-    initializeParams.encodeConfig->rcParams.maxQP.qpInterP = q_max;
+    bool q_valid = q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 &&
+                   q_min <= q_max;
+    if (q_valid) {
+      initializeParams.encodeConfig->rcParams.enableMinQP = 1;
+      initializeParams.encodeConfig->rcParams.enableMaxQP = 1;
+      initializeParams.encodeConfig->rcParams.minQP.qpIntra = q_min;
+      initializeParams.encodeConfig->rcParams.minQP.qpInterB = q_min;
+      initializeParams.encodeConfig->rcParams.minQP.qpInterP = q_min;
+      initializeParams.encodeConfig->rcParams.maxQP.qpIntra = q_max;
+      initializeParams.encodeConfig->rcParams.maxQP.qpInterB = q_max;
+      initializeParams.encodeConfig->rcParams.maxQP.qpInterP = q_max;
+    }
 
     e->pEnc_->CreateEncoder(&initializeParams);
     e->handle_ = handle;

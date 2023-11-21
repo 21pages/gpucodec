@@ -166,13 +166,17 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   mfxEncParams.mfx.GopRefDist =
       1; // 1 is best for low latency, I and P frames only
 
-  codingOption2 = mfxEncParams.AddExtBuffer<mfxExtCodingOption2>();
-  codingOption2->MinQPI = q_min;
-  codingOption2->MinQPB = q_min;
-  codingOption2->MinQPP = q_min;
-  codingOption2->MaxQPI = q_max;
-  codingOption2->MaxQPB = q_max;
-  codingOption2->MaxQPP = q_max;
+  bool q_valid =
+      q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 && q_min <= q_max;
+  if (q_valid) {
+    codingOption2 = mfxEncParams.AddExtBuffer<mfxExtCodingOption2>();
+    codingOption2->MinQPI = q_min;
+    codingOption2->MinQPB = q_min;
+    codingOption2->MinQPP = q_min;
+    codingOption2->MaxQPI = q_max;
+    codingOption2->MaxQPB = q_max;
+    codingOption2->MaxQPP = q_max;
+  }
 
   MFXEncoder *p = new MFXEncoder();
   if (!p)
