@@ -85,6 +85,8 @@ public:
   std::vector<mfxFrameSurface1> pEncSurfaces_;
   std::vector<mfxU8> bstData_;
   mfxBitstream mfxBS_;
+  MfxVideoParamsWrapper mfxEncParams;
+
   int width_ = 0;
   int height_ = 0;
 
@@ -143,8 +145,6 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
                       int32_t q_max) {
   mfxStatus sts = MFX_ERR_NONE;
   mfxVersion ver = {{0, 1}};
-  MfxVideoParamsWrapper mfxEncParams;
-  memset(&mfxEncParams, 0, sizeof(mfxEncParams));
   mfxFrameAllocRequest EncRequest;
   memset(&EncRequest, 0, sizeof(EncRequest));
   mfxU16 nEncSurfNum;
@@ -155,48 +155,53 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   memset(&retrieved_par, 0, sizeof(retrieved_par));
   mfxExtCodingOption2 *codingOption2 = nullptr;
 
-  if (!convert_codec(dataFormat, mfxEncParams.mfx.CodecId))
-    return NULL;
+  MFXEncoder *p = new MFXEncoder();
+  if (!p) {
+    LOG_ERROR("alloc MFXEncoder failed");
+    goto _exit;
+  }
+  memset(&p->mfxEncParams, 0, sizeof(p->mfxEncParams));
 
-  mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
-  mfxEncParams.mfx.TargetKbps = kbs;
-  mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
-  mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_BGR4;
-  mfxEncParams.mfx.FrameInfo.FrameRateExtN = framerate;
-  mfxEncParams.mfx.FrameInfo.FrameRateExtD = 1;
-  mfxEncParams.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
-  mfxEncParams.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
-  mfxEncParams.mfx.FrameInfo.CropX = 0;
-  mfxEncParams.mfx.FrameInfo.CropY = 0;
-  mfxEncParams.mfx.FrameInfo.CropW = w;
-  mfxEncParams.mfx.FrameInfo.CropH = h;
+  if (!convert_codec(dataFormat, p->mfxEncParams.mfx.CodecId)) {
+    LOG_ERROR("unsupported dataFormat: " + std::to_string(dataFormat));
+    return NULL;
+  }
+
+  p->mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
+  p->mfxEncParams.mfx.TargetKbps = kbs;
+  p->mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
+  p->mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_BGR4;
+  p->mfxEncParams.mfx.FrameInfo.FrameRateExtN = framerate;
+  p->mfxEncParams.mfx.FrameInfo.FrameRateExtD = 1;
+  p->mfxEncParams.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+  p->mfxEncParams.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
+  p->mfxEncParams.mfx.FrameInfo.CropX = 0;
+  p->mfxEncParams.mfx.FrameInfo.CropY = 0;
+  p->mfxEncParams.mfx.FrameInfo.CropW = w;
+  p->mfxEncParams.mfx.FrameInfo.CropH = h;
   // Width must be a multiple of 16
   // Height must be a multiple of 16 in case of frame picture and a multiple of
   // 32 in case of field picture
-  mfxEncParams.mfx.FrameInfo.Width = MSDK_ALIGN16(w); // todo
-  mfxEncParams.mfx.FrameInfo.Height =
-      (MFX_PICSTRUCT_PROGRESSIVE == mfxEncParams.mfx.FrameInfo.PicStruct)
+  p->mfxEncParams.mfx.FrameInfo.Width = MSDK_ALIGN16(w); // todo
+  p->mfxEncParams.mfx.FrameInfo.Height =
+      (MFX_PICSTRUCT_PROGRESSIVE == p->mfxEncParams.mfx.FrameInfo.PicStruct)
           ? MSDK_ALIGN16(h)
           : MSDK_ALIGN32(h);
-  mfxEncParams.mfx.EncodedOrder = 0;
+  p->mfxEncParams.mfx.EncodedOrder = 0;
 
-  mfxEncParams.IOPattern = MFX_IOPATTERN_IN_VIDEO_MEMORY;
+  p->mfxEncParams.IOPattern = MFX_IOPATTERN_IN_VIDEO_MEMORY;
 
   // Configuration for low latency
-  mfxEncParams.AsyncDepth = 1; // 1 is best for low latency
-  mfxEncParams.mfx.GopRefDist =
+  p->mfxEncParams.AsyncDepth = 1; // 1 is best for low latency
+  p->mfxEncParams.mfx.GopRefDist =
       1; // 1 is best for low latency, I and P frames only
 
   bool q_valid =
       q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 && q_min <= q_max;
   if (q_valid) {
-    codingOption2 = mfxEncParams.AddExtBuffer<mfxExtCodingOption2>();
+    codingOption2 = p->mfxEncParams.AddExtBuffer<mfxExtCodingOption2>();
     set_qp(codingOption2, q_min, q_max);
   }
-
-  MFXEncoder *p = new MFXEncoder();
-  if (!p)
-    goto _exit;
 
   p->width_ = w;
   p->height_ = h;
@@ -219,11 +224,11 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   // parameters are not supported,
   //   instead the encoder will select suitable parameters closest matching the
   //   requested configuration
-  sts = p->mfxENC_->Query(&mfxEncParams, &mfxEncParams);
+  sts = p->mfxENC_->Query(&p->mfxEncParams, &p->mfxEncParams);
   MSDK_IGNORE_MFX_STS(sts, MFX_WRN_INCOMPATIBLE_VIDEO_PARAM);
   CHECK_STATUS_GOTO(sts, "Query");
 
-  sts = p->mfxENC_->QueryIOSurf(&mfxEncParams, &EncRequest);
+  sts = p->mfxENC_->QueryIOSurf(&p->mfxEncParams, &EncRequest);
   CHECK_STATUS_GOTO(sts, "QueryIOSurf");
 
   nEncSurfNum = EncRequest.NumFrameSuggested;
@@ -232,11 +237,11 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   p->pEncSurfaces_.resize(nEncSurfNum);
   for (int i = 0; i < nEncSurfNum; i++) {
     memset(&p->pEncSurfaces_[i], 0, sizeof(mfxFrameSurface1));
-    p->pEncSurfaces_[i].Info = mfxEncParams.mfx.FrameInfo;
+    p->pEncSurfaces_[i].Info = p->mfxEncParams.mfx.FrameInfo;
   }
 
   // Initialize the Media SDK encoder
-  sts = p->mfxENC_->Init(&mfxEncParams);
+  sts = p->mfxENC_->Init(&p->mfxEncParams);
   MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
   CHECK_STATUS_GOTO(sts, "Init");
 
@@ -361,29 +366,24 @@ int mfx_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
 // https://github.com/Intel-Media-SDK/MediaSDK/blob/master/doc/mediasdk-man.md#mfxinfomfx
 int mfx_set_bitrate(void *encoder, int32_t kbs) {
   MFXEncoder *p = (MFXEncoder *)encoder;
-  MfxVideoParamsWrapper param;
   mfxStatus sts = MFX_ERR_NONE;
-  sts = MFXVideoENCODE_GetVideoParam(p->session_, &param);
-  CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_GetVideoParam");
-  param.mfx.TargetKbps = kbs;
-  sts = MFXVideoENCODE_Reset(p->session_, &param);
+  p->mfxEncParams.mfx.TargetKbps = kbs;
+  sts = MFXVideoENCODE_Reset(p->session_, &p->mfxEncParams);
   CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_Reset");
   return 0;
 }
 
 int mfx_set_qp(void *encoder, int32_t q_min, int32_t q_max) {
   MFXEncoder *p = (MFXEncoder *)encoder;
-  MfxVideoParamsWrapper param;
   mfxStatus sts = MFX_ERR_NONE;
-  sts = MFXVideoENCODE_GetVideoParam(p->session_, &param);
-  CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_GetVideoParam");
+
   mfxExtCodingOption2 *codingOption2 =
-      param.GetExtBuffer<mfxExtCodingOption2>();
+      p->mfxEncParams.GetExtBuffer<mfxExtCodingOption2>();
   if (codingOption2 != nullptr) {
     if (set_qp(codingOption2, q_min, q_max) != 0) {
       return -1;
     }
-    sts = MFXVideoENCODE_Reset(p->session_, &param);
+    sts = MFXVideoENCODE_Reset(p->session_, &p->mfxEncParams);
     CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_Reset");
     return 0;
   } else {
@@ -392,5 +392,8 @@ int mfx_set_qp(void *encoder, int32_t q_min, int32_t q_max) {
   }
 }
 
-int mfx_set_framerate(void *encoder, int32_t framerate) { return -1; }
+int mfx_set_framerate(void *encoder, int32_t framerate) {
+  LOG_WARN("not support change framerate");
+  return -1;
+}
 }
