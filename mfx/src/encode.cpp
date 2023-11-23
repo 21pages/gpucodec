@@ -77,6 +77,13 @@ int set_qp(mfxExtCodingOption2 *codingOption2, int32_t q_min, int32_t q_max) {
   codingOption2->MaxQPP = q_max;
   return 0;
 }
+
+struct encoder_input {
+  ComPtr<ID3D11VideoProcessorOutputView> vp_out_view;
+  mfxFrameSurface1 surface;
+  ComPtr<ID3D11Texture2D> texture;
+};
+
 class MFXEncoder {
 public:
   std::unique_ptr<NativeDevice> native_ = nullptr;
@@ -86,6 +93,9 @@ public:
   std::vector<mfxU8> bstData_;
   mfxBitstream mfxBS_;
   MfxVideoParamsWrapper mfxEncParams;
+  ComPtr<ID3D11VideoProcessorEnumerator1> vp_enum_ = nullptr;
+  ComPtr<ID3D11VideoProcessor> processor_ = nullptr;
+  std::vector<encoder_input> encode_inputs;
 
   int width_ = 0;
   int height_ = 0;
@@ -148,69 +158,88 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   mfxFrameAllocRequest EncRequest;
   memset(&EncRequest, 0, sizeof(EncRequest));
   mfxU16 nEncSurfNum;
-  mfxU16 width, height;
   mfxU32 surfaceSize;
   mfxU8 *surfaceBuffers;
   MfxVideoParamsWrapper retrieved_par;
   memset(&retrieved_par, 0, sizeof(retrieved_par));
   mfxExtCodingOption2 *codingOption2 = nullptr;
+  mfxExtCodingOption3 *codingOption3 = nullptr;
+  mfxExtVideoSignalInfo *videoSignalInfo = nullptr;
 
   MFXEncoder *p = new MFXEncoder();
   if (!p) {
     LOG_ERROR("alloc MFXEncoder failed");
     goto _exit;
   }
-  memset(&p->mfxEncParams, 0, sizeof(p->mfxEncParams));
 
-  if (!convert_codec(dataFormat, p->mfxEncParams.mfx.CodecId)) {
-    LOG_ERROR("unsupported dataFormat: " + std::to_string(dataFormat));
-    return NULL;
-  }
-
-  p->mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
-  p->mfxEncParams.mfx.TargetKbps = kbs;
-  p->mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
-  p->mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_BGR4;
-  p->mfxEncParams.mfx.FrameInfo.FrameRateExtN = framerate;
-  p->mfxEncParams.mfx.FrameInfo.FrameRateExtD = 1;
-  p->mfxEncParams.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
-  p->mfxEncParams.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
-  p->mfxEncParams.mfx.FrameInfo.CropX = 0;
-  p->mfxEncParams.mfx.FrameInfo.CropY = 0;
-  p->mfxEncParams.mfx.FrameInfo.CropW = w;
-  p->mfxEncParams.mfx.FrameInfo.CropH = h;
-  // Width must be a multiple of 16
-  // Height must be a multiple of 16 in case of frame picture and a multiple of
-  // 32 in case of field picture
-  p->mfxEncParams.mfx.FrameInfo.Width = MSDK_ALIGN16(w); // todo
-  p->mfxEncParams.mfx.FrameInfo.Height =
-      (MFX_PICSTRUCT_PROGRESSIVE == p->mfxEncParams.mfx.FrameInfo.PicStruct)
-          ? MSDK_ALIGN16(h)
-          : MSDK_ALIGN32(h);
-  p->mfxEncParams.mfx.EncodedOrder = 0;
-
-  p->mfxEncParams.IOPattern = MFX_IOPATTERN_IN_VIDEO_MEMORY;
-
-  // Configuration for low latency
-  p->mfxEncParams.AsyncDepth = 1; // 1 is best for low latency
-  p->mfxEncParams.mfx.GopRefDist =
-      1; // 1 is best for low latency, I and P frames only
-
-  bool q_valid =
-      q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 && q_min <= q_max;
-  if (q_valid) {
-    codingOption2 = p->mfxEncParams.AddExtBuffer<mfxExtCodingOption2>();
-    set_qp(codingOption2, q_min, q_max);
-  }
-
-  p->width_ = w;
-  p->height_ = h;
   p->native_ = std::make_unique<NativeDevice>();
   if (!p->native_->Init(luid, (ID3D11Device *)handle))
     goto _exit;
 
   sts = p->InitMFX();
   CHECK_STATUS_GOTO(sts, "InitMFX");
+
+  memset(&p->mfxEncParams, 0, sizeof(p->mfxEncParams));
+
+  p->mfxEncParams.IOPattern = MFX_IOPATTERN_IN_VIDEO_MEMORY;
+  if (!convert_codec(dataFormat, p->mfxEncParams.mfx.CodecId)) {
+    LOG_ERROR("unsupported dataFormat: " + std::to_string(dataFormat));
+    return NULL;
+  }
+  p->mfxEncParams.mfx.RateControlMethod = MFX_RATECONTROL_ICQ;
+  p->mfxEncParams.mfx.ICQQuality = 1;
+
+  p->mfxEncParams.mfx.TargetUsage = MFX_TARGETUSAGE_BEST_QUALITY;
+  p->mfxEncParams.mfx.EncodedOrder = 0;
+  p->mfxEncParams.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
+  // p->mfxEncParams.mfx.TargetKbps = kbs;
+  p->mfxEncParams.mfx.CodecLevel = MFX_LEVEL_AVC_52; // h264 tmp
+  p->mfxEncParams.mfx.CodecProfile =
+      MFX_PROFILE_AVC_PROGRESSIVE_HIGH; // h264 tmp
+
+  p->mfxEncParams.mfx.FrameInfo.CropW = w;
+  p->mfxEncParams.mfx.FrameInfo.CropH = h;
+  // Width must be a multiple of 16
+  // Height must be a multiple of 16 in case of frame picture and a multiple of
+  // 32 in case of field picture
+  p->mfxEncParams.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
+  p->mfxEncParams.mfx.FrameInfo.Width = MSDK_ALIGN16(w); // todo
+  p->mfxEncParams.mfx.FrameInfo.Height =
+      (MFX_PICSTRUCT_PROGRESSIVE == p->mfxEncParams.mfx.FrameInfo.PicStruct)
+          ? MSDK_ALIGN16(h)
+          : MSDK_ALIGN32(h);
+  // p->mfxEncParams.mfx.FrameInfo.CropX = 0;
+  // p->mfxEncParams.mfx.FrameInfo.CropY = 0;
+  p->mfxEncParams.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+  p->mfxEncParams.mfx.FrameInfo.FrameRateExtN = 141400000;
+  p->mfxEncParams.mfx.FrameInfo.FrameRateExtD = 2356200;
+
+  // Configuration for low latency
+  p->mfxEncParams.AsyncDepth = 1; // 1 is best for low latency
+  p->mfxEncParams.mfx.GopRefDist =
+      1; // 1 is best for low latency, I and P frames only
+
+  // bool q_valid =
+  //     q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 && q_min <=
+  //     q_max;
+  // if (q_valid) {
+  //   codingOption2 = p->mfxEncParams.AddExtBuffer<mfxExtCodingOption2>();
+  //   set_qp(codingOption2, q_min, q_max);
+  // }
+
+  // codingOption3 = p->mfxEncParams.AddExtBuffer<mfxExtCodingOption3>();
+  // if (codingOption3) {
+  //   codingOption3->ScenarioInfo = MFX_SCENARIO_DISPLAY_REMOTING;
+  // }
+
+  // videoSignalInfo = p->mfxEncParams.AddExtBuffer<mfxExtVideoSignalInfo>();
+  // if (videoSignalInfo) {
+  //   videoSignalInfo->ColourDescriptionPresent = 1;
+  //   videoSignalInfo->MatrixCoefficients = MFX_TRANSFERMATRIX_BT709;
+  // }
+
+  p->width_ = w;
+  p->height_ = h;
 
   // Create Media SDK encoder
   p->mfxENC_ = new MFXVideoENCODE(p->session_);
@@ -231,15 +260,6 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   sts = p->mfxENC_->QueryIOSurf(&p->mfxEncParams, &EncRequest);
   CHECK_STATUS_GOTO(sts, "QueryIOSurf");
 
-  nEncSurfNum = EncRequest.NumFrameSuggested;
-
-  // Allocate surface headers (mfxFrameSurface1) for encoder
-  p->pEncSurfaces_.resize(nEncSurfNum);
-  for (int i = 0; i < nEncSurfNum; i++) {
-    memset(&p->pEncSurfaces_[i], 0, sizeof(mfxFrameSurface1));
-    p->pEncSurfaces_[i].Info = p->mfxEncParams.mfx.FrameInfo;
-  }
-
   // Initialize the Media SDK encoder
   sts = p->mfxENC_->Init(&p->mfxEncParams);
   MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
@@ -247,14 +267,84 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
 
   // Retrieve video parameters selected by encoder.
   // - BufferSizeInKB parameter is required to set bit stream buffer size
-  sts = p->mfxENC_->GetVideoParam(&retrieved_par);
+  sts = p->mfxENC_->GetVideoParam(&p->mfxEncParams);
   CHECK_STATUS_GOTO(sts, "GetVideoParam");
+
+  nEncSurfNum = EncRequest.NumFrameSuggested;
 
   // Prepare Media SDK bit stream buffer
   memset(&p->mfxBS_, 0, sizeof(p->mfxBS_));
-  p->mfxBS_.MaxLength = retrieved_par.mfx.BufferSizeInKB * 1024;
+  p->mfxBS_.MaxLength = p->mfxEncParams.mfx.BufferSizeInKB * 1024;
   p->bstData_.resize(p->mfxBS_.MaxLength);
   p->mfxBS_.Data = p->bstData_.data();
+
+  HRESULT hr = S_OK;
+  D3D11_VIDEO_PROCESSOR_CONTENT_DESC vp_desc{
+      D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
+      DXGI_RATIONAL{141400000, 2356200},
+      w,
+      h,
+      DXGI_RATIONAL{141400000, 2356200},
+      w,
+      h,
+      D3D11_VIDEO_USAGE_OPTIMAL_QUALITY};
+  {
+    ID3D11VideoProcessorEnumerator *temp;
+    hr = p->native_->video_device_->CreateVideoProcessorEnumerator(&vp_desc,
+                                                                   &temp);
+    if (FAILED(hr))
+      exit(hr);
+    hr = temp->QueryInterface(IID_PPV_ARGS(&p->vp_enum_));
+    if (FAILED(hr))
+      exit(hr);
+    temp->Release();
+  }
+  BOOL supported;
+  hr = p->vp_enum_->CheckVideoProcessorFormatConversion(
+      DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709,
+      DXGI_FORMAT_NV12, DXGI_COLOR_SPACE_RGB_STUDIO_G22_NONE_P709, &supported);
+  if (FAILED(hr))
+    exit(hr);
+  if (!supported)
+    exit(-1);
+  D3D11_VIDEO_PROCESSOR_CAPS vp_caps{};
+  hr = p->vp_enum_->GetVideoProcessorCaps(&vp_caps);
+  if (FAILED(hr))
+    exit(hr);
+  // The first one has to be 1:1
+  hr = p->native_->video_device_->CreateVideoProcessor(p->vp_enum_.Get(), 0,
+                                                       &p->processor_);
+  if (FAILED(hr))
+    exit(hr);
+  D3D11_TEXTURE2D_DESC tex_desc{};
+  tex_desc.Width = EncRequest.Info.Width;
+  tex_desc.Height = EncRequest.Info.Height;
+  tex_desc.MipLevels = 1;
+  tex_desc.ArraySize = 1;
+  tex_desc.Format = DXGI_FORMAT_NV12;
+  tex_desc.SampleDesc = {1, 0};
+  tex_desc.Usage = D3D11_USAGE_DEFAULT;
+  tex_desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+  tex_desc.MiscFlags = 0;
+  p->encode_inputs.resize(EncRequest.NumFrameSuggested);
+  for (mfxU16 i = 0; i < EncRequest.NumFrameSuggested; ++i) {
+    HRESULT hr = p->native_->device_->CreateTexture2D(
+        &tex_desc, NULL, p->encode_inputs[i].texture.ReleaseAndGetAddressOf());
+    if (FAILED(hr))
+      exit(hr);
+    p->encode_inputs[i].surface.Data.MemId = p->encode_inputs[i].texture.Get();
+    D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC desc{};
+    desc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2DARRAY;
+    desc.Texture2DArray.MipSlice = 0;
+    desc.Texture2DArray.FirstArraySlice = 0;
+    desc.Texture2DArray.ArraySize = 1;
+    hr = p->native_->video_device_->CreateVideoProcessorOutputView(
+        p->encode_inputs[i].texture.Get(), p->vp_enum_.Get(), &desc,
+        p->encode_inputs[i].vp_out_view.ReleaseAndGetAddressOf());
+    if (FAILED(hr))
+      exit(hr);
+    p->encode_inputs[i].surface.Info = p->mfxEncParams.mfx.FrameInfo;
+  }
 
   return p;
 _exit:
@@ -263,6 +353,17 @@ _exit:
     delete p;
   }
   return NULL;
+}
+
+mfxU16 get_available_surf(MFXEncoder *p) {
+  mfxU16 rtn = -1;
+  for (mfxU16 index = 0; index < p->encode_inputs.size(); ++index) {
+    if (!p->encode_inputs[index].surface.Data.Locked) {
+      rtn = index;
+      break;
+    }
+  }
+  return rtn;
 }
 
 int mfx_encode(void *encoder, ID3D11Texture2D *tex, EncodeCallback callback,
@@ -276,18 +377,29 @@ int mfx_encode(void *encoder, ID3D11Texture2D *tex, EncodeCallback callback,
   p->mfxBS_.DataLength = 0;
   p->mfxBS_.DataOffset = 0;
 
-  nEncSurfIdx =
-      GetFreeSurfaceIndex(p->pEncSurfaces_.data(),
-                          p->pEncSurfaces_.size()); // Find free frame surface
-  if (nEncSurfIdx >= p->pEncSurfaces_.size()) {
-    return -1;
-  }
-
-  p->pEncSurfaces_[nEncSurfIdx].Data.MemId = tex;
+  D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC input_desc{
+      0, D3D11_VPIV_DIMENSION_TEXTURE2D};
+  // input_desc.Texture2D.ArraySlice = 0;
+  // input_desc.Texture2D.MipSlice = 0;
+  ID3D11VideoProcessorInputView *in_view;
+  HRESULT hr = p->native_->video_device_->CreateVideoProcessorInputView(
+      tex, p->vp_enum_.Get(), &input_desc, &in_view);
+  if (FAILED(hr))
+    exit(hr);
+  D3D11_VIDEO_PROCESSOR_STREAM stream_desc{
+      TRUE, 0, 0, 0, 0, NULL, in_view, NULL,
+  };
+  mfxU16 index = get_available_surf(p);
+  hr = p->native_->video_context_->VideoProcessorBlt(
+      p->processor_.Get(), p->encode_inputs[index].vp_out_view.Get(), 0, 1,
+      &stream_desc);
+  if (FAILED(hr))
+    exit(hr);
+  in_view->Release();
 
   for (;;) {
     // Encode a frame asychronously (returns immediately)
-    sts = p->mfxENC_->EncodeFrameAsync(NULL, &p->pEncSurfaces_[nEncSurfIdx],
+    sts = p->mfxENC_->EncodeFrameAsync(NULL, &p->encode_inputs[index].surface,
                                        &p->mfxBS_, &syncp);
 
     if (MFX_ERR_NONE < sts &&
@@ -306,7 +418,7 @@ int mfx_encode(void *encoder, ID3D11Texture2D *tex, EncodeCallback callback,
 
   if (MFX_ERR_NONE == sts) {
     sts = p->session_.SyncOperation(
-        syncp, 1000); // Synchronize. Wait until encoded frame is ready
+        syncp, INFINITE); // Synchronize. Wait until encoded frame is ready
     CHECK_STATUS_RETURN(sts, "SyncOperation");
     if (p->mfxBS_.DataLength > 0) {
       int key = (p->mfxBS_.FrameType & MFX_FRAMETYPE_I) ||

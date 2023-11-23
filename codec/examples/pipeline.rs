@@ -14,7 +14,7 @@ use std::{
 
 fn main() {
     init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "trace"));
-    let luid = 66255;
+    let luid = 95733;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;
@@ -24,15 +24,15 @@ fn main() {
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
-                driver: EncodeDriver::AMF,
+                driver: EncodeDriver::MFX,
                 api: API_DX11,
                 data_format,
                 luid,
             },
             d: DynamicContext {
                 device: Some(capturer.device()),
-                width: 2880,
-                height: 1800,
+                width: 1920,
+                height: 1080,
                 kbitrate: 5000,
                 framerate: 30,
                 gop: MAX_GOP as _,
@@ -46,7 +46,7 @@ fn main() {
             } else {
                 Some(render.device())
             },
-            driver: DecodeDriver::AMF,
+            driver: DecodeDriver::MFX,
             api: API_DX11,
             data_format,
             output_shared_handle,
@@ -64,7 +64,7 @@ fn main() {
             let start = Instant::now();
             let texture = capturer.capture(100);
             if texture.is_null() {
-                println!("texture is null");
+                // println!("texture is null");
                 continue;
             }
             dup_sum += start.elapsed();
@@ -72,7 +72,7 @@ fn main() {
             let frame = enc.encode(texture).unwrap();
             enc_sum += start.elapsed();
             for f in frame {
-                println!("len:{}", f.data.len());
+                // println!("len:{}", f.data.len());
                 file.write_all(&mut f.data).unwrap();
                 let start = Instant::now();
                 let frames = dec.decode(&f.data).unwrap();

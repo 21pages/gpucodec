@@ -2,6 +2,7 @@
 #define WIN_H
 
 #include <d3d11.h>
+#include <d3d11_1.h>
 #include <iostream>
 #include <wrl/client.h>
 
@@ -70,6 +71,8 @@ public:
   ComPtr<ID3D11Device> device_ = nullptr;
   ComPtr<ID3D11DeviceContext> context_ = nullptr;
   ComPtr<ID3D11Query> query_ = nullptr;
+  ComPtr<ID3D11VideoDevice> video_device_ = nullptr;
+  ComPtr<ID3D11VideoContext> video_context_ = nullptr;
   int count_;
   int index_ = 0;
 

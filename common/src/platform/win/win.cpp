@@ -24,6 +24,8 @@ bool NativeDevice::Init(int64_t luid, ID3D11Device *device, int pool_size) {
     return false;
   if (!InitQuery())
     return false;
+  HRB(device_.As(&video_device_));
+  HRB(context_.As(&video_context_));
   count_ = pool_size;
   texture_.resize(count_);
   std::fill(texture_.begin(), texture_.end(), nullptr);
@@ -56,7 +58,7 @@ bool NativeDevice::InitFromLuid(int64_t luid) {
   UINT createDeviceFlags =
       D3D11_CREATE_DEVICE_VIDEO_SUPPORT | D3D11_CREATE_DEVICE_BGRA_SUPPORT;
   D3D_FEATURE_LEVEL featureLevels[] = {
-      D3D_FEATURE_LEVEL_11_0,
+      D3D_FEATURE_LEVEL_11_1,
   };
   UINT numFeatureLevels = ARRAYSIZE(featureLevels);
 
@@ -72,10 +74,10 @@ bool NativeDevice::InitFromLuid(int64_t luid) {
     return false;
   }
 
-  if (featureLevel != D3D_FEATURE_LEVEL_11_0) {
-    std::cerr << "Direct3D Feature Level 11 unsupported." << std::endl;
-    return false;
-  }
+  // if (featureLevel != D3D_FEATURE_LEVEL_11_0) {
+  //   std::cerr << "Direct3D Feature Level 11 unsupported." << std::endl;
+  //   return false;
+  // }
   return true;
 }
 
