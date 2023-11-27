@@ -148,7 +148,6 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   mfxFrameAllocRequest EncRequest;
   memset(&EncRequest, 0, sizeof(EncRequest));
   mfxU16 nEncSurfNum;
-  mfxU16 width, height;
   mfxU32 surfaceSize;
   mfxU8 *surfaceBuffers;
   MfxVideoParamsWrapper retrieved_par;

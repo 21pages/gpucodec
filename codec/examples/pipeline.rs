@@ -14,7 +14,7 @@ use std::{
 
 fn main() {
     init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "trace"));
-    let luid = 66255;
+    let luid = 95759;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;
@@ -24,15 +24,15 @@ fn main() {
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
-                driver: EncodeDriver::AMF,
+                driver: EncodeDriver::MFX,
                 api: API_DX11,
                 data_format,
                 luid,
             },
             d: DynamicContext {
                 device: Some(capturer.device()),
-                width: 2880,
-                height: 1800,
+                width: 1920,
+                height: 1080,
                 kbitrate: 5000,
                 framerate: 30,
                 gop: MAX_GOP as _,
@@ -46,7 +46,7 @@ fn main() {
             } else {
                 Some(render.device())
             },
-            driver: DecodeDriver::AMF,
+            driver: DecodeDriver::MFX,
             api: API_DX11,
             data_format,
             output_shared_handle,

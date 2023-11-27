@@ -42,7 +42,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -135,7 +135,7 @@
     <ClCompile Include="..\..\codec\src\utils.c" />
     <ClCompile Include="..\..\common\src\log.cpp" />
     <ClCompile Include="..\..\common\src\platform\win\win.cpp" />
-    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mf_dispatcher_main.cpp" />
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_dispatcher_main.cpp" />
     <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_critical_section.cpp" />
     <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_dispatcher.cpp" />
     <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_dispatcher_log.cpp" />

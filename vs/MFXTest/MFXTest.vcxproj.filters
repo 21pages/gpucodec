@@ -90,7 +90,7 @@
     <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\sample_utils.cpp">
       <Filter>Source Files\external\MediaSDK_22.5.4\samples</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mf_dispatcher_main.cpp">
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_dispatcher_main.cpp">
       <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
     </ClCompile>
     <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_critical_section.cpp">

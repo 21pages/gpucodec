@@ -4,28 +4,27 @@
 #include <iostream>
 #include <stdint.h>
 
-extern "C" void *dxgi_new_capturer();
-extern "C" void *dxgi_device(void *self);
-extern "C" void *dxgi_capture(void *self, int wait_ms);
-extern "C" void destroy_dxgi_capturer(void *self);
-
-extern "C" void *amf_new_encoder(void *hdl, int64_t luid, API api,
-                                 DataFormat dataFormat, int32_t width,
-                                 int32_t height, int32_t kbs, int32_t framerate,
-                                 int32_t gop);
-extern "C" int amf_encode(void *e, void *tex, EncodeCallback callback,
-                          void *obj);
-extern "C" int amf_destroy_encoder(void *e);
-
-extern "C" void *amf_new_decoder(int64_t luid, API api, DataFormat dataFormat,
-                                 SurfaceFormat outputSurfaceFormat);
-extern "C" int amf_decode(void *decoder, uint8_t *data, int32_t length,
-                          DecodeCallback callback, void *obj);
-extern "C" int amf_destroy_decoder(void *decoder);
-
-extern "C" void *CreateDXGIRender(int64_t luid);
-extern "C" int DXGIRenderTexture(void *render, HANDLE shared_handle);
-extern "C" void DestroyDXGIRender(void *render);
+extern "C" {
+void *dxgi_new_capturer();
+void *dxgi_device(void *self);
+void *dxgi_capture(void *self, int wait_ms);
+void destroy_dxgi_capturer(void *self);
+void *amf_new_encoder(void *hdl, int64_t luid, API api, DataFormat dataFormat,
+                      int32_t width, int32_t height, int32_t kbs,
+                      int32_t framerate, int32_t gop, int32_t q_min,
+                      int32_t q_max);
+int amf_encode(void *e, void *tex, EncodeCallback callback, void *obj);
+int amf_destroy_encoder(void *e);
+void *amf_new_decoder(void *device, int64_t luid, int32_t api,
+                      int32_t dataFormat, bool outputSharedHandle);
+int amf_decode(void *decoder, uint8_t *data, int32_t length,
+               DecodeCallback callback, void *obj);
+int amf_destroy_decoder(void *decoder);
+void *CreateDXGIRender(long long luid, bool inputSharedHandle);
+int DXGIRenderTexture(void *render, HANDLE shared_handle);
+void DestroyDXGIRender(void *render);
+void *DXGIDevice(void *render);
+}
 
 static const uint8_t *encode_data;
 static int32_t encode_len;
@@ -42,8 +41,8 @@ extern "C" static void decode_callback(void *shared_handle, const void *obj) {
   decode_shared_handle = shared_handle;
 }
 
-extern "C"  void log_gpucodec(int level, const char* message) {
-    std::cout << message << std::endl;
+extern "C" void log_gpucodec(int level, const char *message) {
+  std::cout << message << std::endl;
 }
 
 int main() {
@@ -59,20 +58,21 @@ int main() {
   }
   void *device = dxgi_device(dup);
   void *encoder = amf_new_encoder(device, luid, API_DX11, dataFormat, width,
-                                  height, 4000, 30, 0xFFFF);
+                                  height, 4000, 30, 0xFFFF, 5, 35);
   if (!encoder) {
     std::cerr << "create encoder failed" << std::endl;
     return -1;
   }
-  void *decoder =
-      amf_new_decoder(luid, API_DX11, dataFormat, SURFACE_FORMAT_BGRA);
-  if (!decoder) {
-    std::cerr << "create decoder failed" << std::endl;
-    return -1;
-  }
-  void *render = CreateDXGIRender(luid);
+  void *render = CreateDXGIRender(luid, false);
   if (!render) {
     std::cerr << "create render failed" << std::endl;
+    return -1;
+  }
+
+  void *decoder =
+      amf_new_decoder(DXGIDevice(render), luid, API_DX11, dataFormat, false);
+  if (!decoder) {
+    std::cerr << "create decoder failed" << std::endl;
     return -1;
   }
 
