@@ -198,7 +198,7 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
 
   q_valid =
       q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 && q_min <= q_max;
-  if (q_valid) {
+  if (false /*q_valid*/) {
     codingOption2 = p->mfxEncParams.AddExtBuffer<mfxExtCodingOption2>();
     set_qp(codingOption2, q_min, q_max);
   }
@@ -374,6 +374,7 @@ int mfx_set_bitrate(void *encoder, int32_t kbs) {
 }
 
 int mfx_set_qp(void *encoder, int32_t q_min, int32_t q_max) {
+  /*
   MFXEncoder *p = (MFXEncoder *)encoder;
   mfxStatus sts = MFX_ERR_NONE;
 
@@ -390,6 +391,8 @@ int mfx_set_qp(void *encoder, int32_t q_min, int32_t q_max) {
     LOG_ERROR("codingOption2 is null");
     return -1;
   }
+  */
+    return -1;
 }
 
 int mfx_set_framerate(void *encoder, int32_t framerate) {
