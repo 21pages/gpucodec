@@ -76,5 +76,8 @@
     <ClCompile Include="..\..\amf\src\encode.cpp">
       <Filter>source\codec</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\common\src\log.cpp">
+      <Filter>source\common</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

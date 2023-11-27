@@ -42,6 +42,10 @@ extern "C" static void decode_callback(void *shared_handle, const void *obj) {
   decode_shared_handle = shared_handle;
 }
 
+extern "C"  void log_gpucodec(int level, const char* message) {
+    std::cout << message << std::endl;
+}
+
 int main() {
   int64_t luid = 63666; // get from texcodec/example/available
   DataFormat dataFormat = H265;

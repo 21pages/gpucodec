@@ -1,0 +1,148 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\capture">
+      <UniqueIdentifier>{bd78eb0e-0894-4f11-a2f5-2cc02731bc52}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\codec">
+      <UniqueIdentifier>{dd2d68d6-6559-413b-948b-f718b34cde0a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\external">
+      <UniqueIdentifier>{fd52358a-9b99-43b4-b717-f3a77580a52b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\external\MediaSDK_22.5.4">
+      <UniqueIdentifier>{485da189-ad9b-4e73-a88c-36c287577048}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\external\nvEncDXGIOutputDuplicationSample">
+      <UniqueIdentifier>{bdbd71f9-8ed4-4bdd-a8c3-612f5858504d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\render">
+      <UniqueIdentifier>{2089080f-479d-4d89-8cf5-7ac8e52b11d1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\external\MediaSDK_22.5.4\samples">
+      <UniqueIdentifier>{7a8773c4-2421-4bde-81ed-3c5c8a6b314c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\external\MediaSDK_22.5.4\api">
+      <UniqueIdentifier>{790ab16a-de09-4063-b089-5f5e0094015f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\common">
+      <UniqueIdentifier>{3514d21d-4a74-44b9-b21b-bea909cda0b2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\external\MediaSDK_22.5.4\samples\vm">
+      <UniqueIdentifier>{e8a2e3fa-9a4e-4dae-820a-658d7404d702}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\capture\src\dxgi.cpp">
+      <Filter>Source Files\capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\codec\src\data.c">
+      <Filter>Source Files\codec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\codec\src\utils.c">
+      <Filter>Source Files\codec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mfx\src\decode.cpp">
+      <Filter>Source Files\codec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mfx\src\encode.cpp">
+      <Filter>Source Files\codec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\DDAImpl.cpp">
+      <Filter>Source Files\external\nvEncDXGIOutputDuplicationSample</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\Preproc.cpp">
+      <Filter>Source Files\external\nvEncDXGIOutputDuplicationSample</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\render\src\dxgi_sdl.cpp">
+      <Filter>Source Files\render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\avc_bitstream.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\samples</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\avc_nal_spl.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\samples</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\avc_spl.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\samples</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\base_allocator.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\samples</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\d3d11_allocator.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\samples</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\sample_utils.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\samples</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mf_dispatcher_main.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_critical_section.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_dispatcher.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_dispatcher_log.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_driver_store_loader.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_dxva2_device.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_function_table.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_library_iterator.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_load_dll.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_load_plugin.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_plugin_hive.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\api\mfx_dispatch\windows\src\mfx_win_reg_key.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\api</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\src\platform\win\win.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\vm\atomic.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\samples\vm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\vm\shared_object.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\samples\vm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\vm\thread_windows.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\samples\vm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\vm\time.cpp">
+      <Filter>Source Files\external\MediaSDK_22.5.4\samples\vm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\src\log.cpp">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

@@ -44,7 +44,7 @@ fn main() {
             .include(mfx_path.join("windows").join("include"))
             .files(
                 [
-                    "main.cpp",
+                    "mfx_dispatcher_main.cpp",
                     "mfx_dispatcher.cpp",
                     "mfx_dxva2_device.cpp",
                     "mfx_library_iterator.cpp",

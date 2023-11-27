@@ -154,6 +154,7 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   MfxVideoParamsWrapper retrieved_par;
   memset(&retrieved_par, 0, sizeof(retrieved_par));
   mfxExtCodingOption2 *codingOption2 = nullptr;
+  bool q_valid = false;
 
   MFXEncoder *p = new MFXEncoder();
   if (!p) {
@@ -196,7 +197,7 @@ void *mfx_new_encoder(void *handle, int64_t luid, API api,
   p->mfxEncParams.mfx.GopRefDist =
       1; // 1 is best for low latency, I and P frames only
 
-  bool q_valid =
+  q_valid =
       q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 && q_min <= q_max;
   if (q_valid) {
     codingOption2 = p->mfxEncParams.AddExtBuffer<mfxExtCodingOption2>();
