@@ -149,7 +149,7 @@ int nv_encode_driver_support() {
     free_driver(&cuda_dl, &nvenc_dl);
     return 0;
   } catch (const std::exception &e) {
-    LOG_TRACE("driver not support" + e.what());
+    LOG_TRACE("driver not support, " + e.what());
   }
   return -1;
 }

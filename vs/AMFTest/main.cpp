@@ -46,7 +46,7 @@ extern "C" void log_gpucodec(int level, const char *message) {
 }
 
 int main() {
-  int64_t luid = 63666; // get from texcodec/example/available
+  int64_t luid = 63793; // get from example/available
   DataFormat dataFormat = H265;
   int width = 2880;
   int height = 1800;

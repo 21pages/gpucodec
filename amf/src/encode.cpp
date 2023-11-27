@@ -207,9 +207,6 @@ public:
                            std::to_string(q_max_));
       break;
     case H265:
-      AMF_CHECK_RETURN(res,
-                       "SetProperty AMF_VIDEO_ENCODER_HEVC_GOP_SIZE failed");
-
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MIN_QP_I, q_min_);
       AMF_CHECK_RETURN(res,
                        "SetProperty AMF_VIDEO_ENCODER_HEVC_MIN_QP_I failed");
@@ -391,6 +388,8 @@ private:
 
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_GOP_SIZE,
                                      gop_); // todo
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_HEVC_GOP_SIZE failed");
       set_qp(q_min_, q_max_);
 
     } else {
