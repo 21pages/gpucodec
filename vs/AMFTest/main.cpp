@@ -8,8 +8,8 @@
 extern "C" {
 void *dxgi_new_capturer();
 void *dxgi_device(void *self);
-int dxgi_width(void *self);
-int dxgi_height(void *self);
+int dxgi_width(const void *self);
+int dxgi_height(const void *self);
 void *dxgi_capture(void *self, int wait_ms);
 void destroy_dxgi_capturer(void *self);
 void *amf_new_encoder(void *hdl, int64_t luid, API api, DataFormat dataFormat,

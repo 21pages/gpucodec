@@ -26,6 +26,14 @@ impl Capturer {
         dxgi_device(self.inner.as_mut())
     }
 
+    pub unsafe fn width(&self) -> i32 {
+        dxgi_width(self.inner.as_ref())
+    }
+
+    pub unsafe fn height(&self) -> i32 {
+        dxgi_height(self.inner.as_ref())
+    }
+
     pub unsafe fn capture(&mut self, wait_ms: i32) -> *mut c_void {
         dxgi_capture(self.inner.as_mut(), wait_ms)
     }

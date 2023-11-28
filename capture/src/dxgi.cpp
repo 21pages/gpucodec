@@ -19,12 +19,12 @@ extern "C" void *dxgi_device(void *capturer) {
   return d->Device();
 }
 
-extern "C" int dxgi_width(void *capturer) {
+extern "C" int dxgi_width(const void *capturer) {
   DemoApplication *d = (DemoApplication *)capturer;
   return d->width();
 }
 
-extern "C" int dxgi_height(void *capturer) {
+extern "C" int dxgi_height(const void *capturer) {
   DemoApplication *d = (DemoApplication *)capturer;
   return d->height();
 }
