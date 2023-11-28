@@ -3,10 +3,13 @@
 #include <common.h>
 #include <iostream>
 #include <stdint.h>
+#include <system.h>
 
 extern "C" {
 void *dxgi_new_capturer();
 void *dxgi_device(void *self);
+int dxgi_width(void *self);
+int dxgi_height(void *self);
 void *dxgi_capture(void *self, int wait_ms);
 void destroy_dxgi_capturer(void *self);
 void *amf_new_encoder(void *hdl, int64_t luid, API api, DataFormat dataFormat,
@@ -46,16 +49,22 @@ extern "C" void log_gpucodec(int level, const char *message) {
 }
 
 int main() {
-  int64_t luid = 63793; // get from example/available
-  DataFormat dataFormat = H265;
-  int width = 2880;
-  int height = 1800;
-
+  Adapters adapters;
+  adapters.Init(ADAPTER_VENDOR_AMD);
+  if (adapters.adapters_.size() == 0) {
+    std::cout << "no amd adapter" << std::endl;
+    return -1;
+  }
+  int64_t luid = LUID(adapters.adapters_[0].get()->desc1_);
+  DataFormat dataFormat = H264;
   void *dup = dxgi_new_capturer();
   if (!dup) {
     std::cerr << "create duplicator failed" << std::endl;
     return -1;
   }
+  int width = dxgi_width(dup);
+  int height = dxgi_height(dup);
+  std::cout << "width: " << width << " height: " << height << std::endl;
   void *device = dxgi_device(dup);
   void *encoder = amf_new_encoder(device, luid, API_DX11, dataFormat, width,
                                   height, 4000, 30, 0xFFFF, 5, 35);

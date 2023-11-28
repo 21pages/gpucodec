@@ -19,6 +19,16 @@ extern "C" void *dxgi_device(void *capturer) {
   return d->Device();
 }
 
+extern "C" int dxgi_width(void *capturer) {
+  DemoApplication *d = (DemoApplication *)capturer;
+  return d->width();
+}
+
+extern "C" int dxgi_height(void *capturer) {
+  DemoApplication *d = (DemoApplication *)capturer;
+  return d->height();
+}
+
 extern "C" void *dxgi_capture(void *capturer, int wait_ms) {
   DemoApplication *d = (DemoApplication *)capturer;
   void *texture = d->Capture(wait_ms);

@@ -4,10 +4,12 @@
 #include <d3d11.h>
 #include <iostream>
 #include <wrl/client.h>
+#include <vector>
 
 #include "../../common.h"
 
 using Microsoft::WRL::ComPtr;
+using namespace std;
 
 #define IF_FAILED_RETURN(X)                                                    \
   if (FAILED(hr = (X))) {                                                      \

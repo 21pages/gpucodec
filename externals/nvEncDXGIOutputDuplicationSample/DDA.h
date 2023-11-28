@@ -116,6 +116,10 @@ public:
         return pD3DDev;
     }
 
+    int width() { return pDDAWrapper->getWidth(); }
+
+    int height() { return pDDAWrapper->getHeight(); }
+
     /// Capture a frame using DDA
     ID3D11Texture2D *Capture(int wait)
     {
