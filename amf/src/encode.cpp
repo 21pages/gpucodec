@@ -438,6 +438,7 @@ void *amf_new_encoder(void *handle, int64_t luid, API api,
                       DataFormat dataFormat, int32_t width, int32_t height,
                       int32_t kbs, int32_t framerate, int32_t gop,
                       int32_t q_min, int32_t q_max) {
+  AMFEncoder *enc = NULL;
   try {
     if (width % 2 != 0 || height % 2 != 0) {
       return NULL;
@@ -450,17 +451,18 @@ void *amf_new_encoder(void *handle, int64_t luid, API api,
     if (!convert_api(api, memoryType)) {
       return NULL;
     }
-    AMFEncoder *enc =
-        new AMFEncoder(handle, memoryType, codecStr, dataFormat, width, height,
-                       kbs * 1000, framerate, gop, q_min, q_max);
-    if (enc && enc->init_result_ != AMF_OK) {
-      enc->destroy();
-      delete enc;
-      enc = NULL;
+    enc = new AMFEncoder(handle, memoryType, codecStr, dataFormat, width,
+                         height, kbs * 1000, framerate, gop, q_min, q_max);
+    if (enc && enc->init_result_ == AMF_OK) {
+      return enc;
     }
-    return enc;
   } catch (const std::exception &e) {
     LOG_ERROR("new failed: " + e.what());
+  }
+  if (enc) {
+    enc->destroy();
+    delete enc;
+    enc = NULL;
   }
   return NULL;
 }
