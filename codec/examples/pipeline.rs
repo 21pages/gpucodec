@@ -14,7 +14,7 @@ use std::{
 
 fn main() {
     init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "trace"));
-    let luid = 95759;
+    let luid = 95733;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;
@@ -31,8 +31,8 @@ fn main() {
             },
             d: DynamicContext {
                 device: Some(capturer.device()),
-                width: 1920,
-                height: 1080,
+                width: capturer.width(),
+                height: capturer.height(),
                 kbitrate: 5000,
                 framerate: 30,
                 gop: MAX_GOP as _,
@@ -55,7 +55,7 @@ fn main() {
 
         let mut enc = Encoder::new(en_ctx).unwrap();
         let mut dec = Decoder::new(de_ctx).unwrap();
-        let filename = PathBuf::from("D:\\tmp\\1.264");
+        let filename = PathBuf::from(".\\1.264");
         let mut file = std::fs::File::create(filename).unwrap();
         let mut dup_sum = Duration::ZERO;
         let mut enc_sum = Duration::ZERO;
