@@ -276,6 +276,36 @@ bool NativeDevice::Process(ID3D11Texture2D *in, ID3D11Texture2D *out,
   return true;
 }
 
+bool NativeDevice::ToNV12(ID3D11Texture2D *texture, int width, int height,
+                          bool bt709, bool fullRange) {
+  if (!nv12_texture_) {
+    D3D11_TEXTURE2D_DESC desc;
+    ZeroMemory(&desc, sizeof(desc));
+    texture->GetDesc(&desc);
+    desc.Format = DXGI_FORMAT_NV12;
+    desc.MiscFlags = 0;
+    HRB(device_->CreateTexture2D(&desc, NULL,
+                                 nv12_texture_.ReleaseAndGetAddressOf()));
+  }
+  D3D11_VIDEO_PROCESSOR_CONTENT_DESC contentDesc;
+  ZeroMemory(&contentDesc, sizeof(contentDesc));
+  contentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
+  contentDesc.InputFrameRate.Numerator = 60;
+  contentDesc.InputFrameRate.Denominator = 1;
+  contentDesc.InputWidth = width;
+  contentDesc.InputHeight = height;
+  contentDesc.OutputWidth = width;
+  contentDesc.OutputHeight = height;
+  contentDesc.OutputFrameRate.Numerator = 60;
+  contentDesc.OutputFrameRate.Denominator = 1;
+  D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace;
+  ZeroMemory(&colorSpace, sizeof(colorSpace));
+  colorSpace.YCbCr_Matrix = bt709 ? 1 : 0; // 0:601, 1:709
+  colorSpace.Nominal_Range = fullRange
+                                 ? D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255
+                                 : D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
+  return Process(texture, nv12_texture_.Get(), contentDesc, colorSpace);
+}
 bool Adapter::Init(IDXGIAdapter1 *adapter1) {
   HRESULT hr = S_OK;
 

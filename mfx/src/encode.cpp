@@ -87,7 +87,6 @@ public:
   std::vector<mfxU8> bstData_;
   mfxBitstream mfxBS_;
   MfxVideoParamsWrapper mfxEncParams_;
-  ComPtr<ID3D11Texture2D> nv12_texture_ = nullptr;
 
   void *handle_ = nullptr;
   int64_t luid_;
@@ -234,32 +233,8 @@ public:
     mfxSyncPoint syncp;
 
     // bgra -> nv12
-    if (!nv12_texture_) {
-      D3D11_TEXTURE2D_DESC desc;
-      ZeroMemory(&desc, sizeof(desc));
-      tex->GetDesc(&desc);
-      desc.Format = DXGI_FORMAT_NV12;
-      desc.MiscFlags = 0;
-      HRI(native_->device_->CreateTexture2D(
-          &desc, NULL, nv12_texture_.ReleaseAndGetAddressOf()));
-    }
-    D3D11_VIDEO_PROCESSOR_CONTENT_DESC contentDesc;
-    ZeroMemory(&contentDesc, sizeof(contentDesc));
-    contentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
-    contentDesc.InputFrameRate.Numerator = framerate_;
-    contentDesc.InputFrameRate.Denominator = 1;
-    contentDesc.InputWidth = width_;
-    contentDesc.InputHeight = height_;
-    contentDesc.OutputWidth = width_;
-    contentDesc.OutputHeight = height_;
-    contentDesc.OutputFrameRate.Numerator = framerate_;
-    contentDesc.OutputFrameRate.Denominator = 1;
-    D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace;
-    ZeroMemory(&colorSpace, sizeof(colorSpace));
-    colorSpace.YCbCr_Matrix = 0; // 0:601, 1:709
-    colorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
-    if (!native_->Process(tex, nv12_texture_.Get(), contentDesc, colorSpace)) {
-      LOG_ERROR("Failed to process");
+    if (!native_->ToNV12(tex, width_, height_, false, false)) {
+      LOG_ERROR("bgra to nv12 failed");
       return -1;
     }
 
@@ -273,7 +248,8 @@ public:
       return -1;
     }
 
-    pEncSurfaces_[nEncSurfIdx].Data.MemId = nv12_texture_.Get(); // tex;
+    pEncSurfaces_[nEncSurfIdx].Data.MemId =
+        native_->nv12_texture_.Get(); // tex;
 
     for (;;) {
       // Encode a frame asychronously (returns immediately)
