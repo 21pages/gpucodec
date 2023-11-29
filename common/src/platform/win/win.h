@@ -3,8 +3,8 @@
 
 #include <d3d11.h>
 #include <iostream>
-#include <wrl/client.h>
 #include <vector>
+#include <wrl/client.h>
 
 #include "../../common.h"
 
@@ -57,12 +57,16 @@ public:
   void BeginQuery();
   void EndQuery();
   bool Query();
+  bool Process(ID3D11Texture2D *in, ID3D11Texture2D *out,
+               D3D11_VIDEO_PROCESSOR_CONTENT_DESC content_desc,
+               D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace);
 
 private:
   bool InitFromLuid(int64_t luid);
   bool InitFromDevice(ID3D11Device *device);
   bool SetMultithreadProtected();
   bool InitQuery();
+  bool InitVideoDevice();
 
 public:
   // Direct3D 11
@@ -72,6 +76,12 @@ public:
   ComPtr<ID3D11Device> device_ = nullptr;
   ComPtr<ID3D11DeviceContext> context_ = nullptr;
   ComPtr<ID3D11Query> query_ = nullptr;
+  ComPtr<ID3D11VideoDevice> video_device_ = nullptr;
+  ComPtr<ID3D11VideoContext> video_context_ = nullptr;
+  ComPtr<ID3D11VideoProcessorEnumerator> video_processor_enumerator_ = nullptr;
+  ComPtr<ID3D11VideoProcessor> video_processor_ = nullptr;
+  D3D11_VIDEO_PROCESSOR_CONTENT_DESC last_content_desc_ = {0};
+
   int count_;
   int index_ = 0;
 

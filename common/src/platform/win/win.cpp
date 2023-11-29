@@ -24,6 +24,8 @@ bool NativeDevice::Init(int64_t luid, ID3D11Device *device, int pool_size) {
     return false;
   if (!InitQuery())
     return false;
+  if (!InitVideoDevice())
+    return false;
   count_ = pool_size;
   texture_.resize(count_);
   std::fill(texture_.begin(), texture_.end(), nullptr);
@@ -112,6 +114,12 @@ bool NativeDevice::InitQuery() {
   return true;
 }
 
+bool NativeDevice::InitVideoDevice() {
+  HRB(device_.As(&video_device_));
+  HRB(context_.As(&video_context_));
+  return true;
+}
+
 bool NativeDevice::EnsureTexture(int width, int height) {
   D3D11_TEXTURE2D_DESC desc;
   ZeroMemory(&desc, sizeof(desc));
@@ -189,6 +197,73 @@ bool NativeDevice::Query() {
       break;
   }
   return bResult == TRUE;
+}
+
+bool NativeDevice::Process(ID3D11Texture2D *in, ID3D11Texture2D *out,
+                           D3D11_VIDEO_PROCESSOR_CONTENT_DESC content_desc,
+                           D3D11_VIDEO_PROCESSOR_COLOR_SPACE color_space) {
+  D3D11_TEXTURE2D_DESC inDesc = {0};
+  D3D11_TEXTURE2D_DESC outDesc = {0};
+  in->GetDesc(&inDesc);
+  out->GetDesc(&outDesc);
+  if (memcmp(&last_content_desc_, &content_desc, sizeof(content_desc)) != 0) {
+    if (video_processor_enumerator_) {
+      video_processor_enumerator_.Reset();
+    }
+    if (video_processor_) {
+      video_processor_.Reset();
+    }
+  }
+  memcpy(&last_content_desc_, &content_desc, sizeof(content_desc));
+
+  if (!video_processor_enumerator_ || !video_processor_) {
+    HRB(video_device_->CreateVideoProcessorEnumerator(
+        &content_desc, video_processor_enumerator_.ReleaseAndGetAddressOf()));
+    HRB(video_device_->CreateVideoProcessor(
+        video_processor_enumerator_.Get(), 0,
+        video_processor_.ReleaseAndGetAddressOf()));
+  }
+
+  video_context_->VideoProcessorSetStreamAutoProcessingMode(
+      video_processor_.Get(), 0, FALSE);
+  video_context_->VideoProcessorSetStreamColorSpace(video_processor_.Get(), 0,
+                                                    &color_space);
+  RECT rect = {0};
+  rect.right = content_desc.OutputWidth;
+  rect.bottom = content_desc.OutputHeight;
+  video_context_->VideoProcessorSetStreamSourceRect(video_processor_.Get(), 0,
+                                                    true, &rect);
+  video_context_->VideoProcessorSetStreamFrameFormat(
+      video_processor_.Get(), 0, D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE);
+
+  D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC InputViewDesc;
+  ZeroMemory(&InputViewDesc, sizeof(InputViewDesc));
+  InputViewDesc.FourCC = 0;
+  InputViewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+  InputViewDesc.Texture2D.MipSlice = 0;
+  InputViewDesc.Texture2D.ArraySlice = 0;
+  ComPtr<ID3D11VideoProcessorInputView> inputView = nullptr;
+  HRB(video_device_->CreateVideoProcessorInputView(
+      in, video_processor_enumerator_.Get(), &InputViewDesc,
+      inputView.ReleaseAndGetAddressOf()));
+
+  D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC OutputViewDesc;
+  ZeroMemory(&OutputViewDesc, sizeof(OutputViewDesc));
+  OutputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+  OutputViewDesc.Texture2D.MipSlice = 0;
+  ComPtr<ID3D11VideoProcessorOutputView> outputView = nullptr;
+  video_device_->CreateVideoProcessorOutputView(
+      out, video_processor_enumerator_.Get(), &OutputViewDesc,
+      outputView.ReleaseAndGetAddressOf());
+
+  D3D11_VIDEO_PROCESSOR_STREAM StreamData;
+  ZeroMemory(&StreamData, sizeof(StreamData));
+  StreamData.Enable = TRUE;
+  StreamData.pInputSurface = inputView.Get();
+  HRB(video_context_->VideoProcessorBlt(video_processor_.Get(),
+                                        outputView.Get(), 0, 1, &StreamData));
+
+  return true;
 }
 
 bool Adapter::Init(IDXGIAdapter1 *adapter1) {

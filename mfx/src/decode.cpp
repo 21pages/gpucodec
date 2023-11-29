@@ -1,6 +1,5 @@
 #include <cstring>
 
-#include <Preproc.h>
 #include <d3d11_allocator.h>
 #include <sample_defs.h>
 #include <sample_utils.h>
@@ -49,7 +48,6 @@ public:
   mfxVideoParam mfxVideoParams_;
   bool initialized_ = false;
   D3D11FrameAllocator d3d11FrameAllocator_;
-  std::unique_ptr<RGBToNV12> nv12torgb_ = NULL;
   mfxFrameAllocResponse mfxResponse_;
   bool outputSharedHandle_;
 
@@ -157,11 +155,6 @@ void *mfx_new_decoder(void *device, int64_t luid, API api, DataFormat codecID,
   p->native_ = std::make_unique<NativeDevice>();
   if (!p->native_->Init(luid, (ID3D11Device *)device, 4))
     goto _exit;
-  p->nv12torgb_ = std::make_unique<RGBToNV12>(p->native_->device_.Get(),
-                                              p->native_->context_.Get());
-  if (FAILED(p->nv12torgb_->Init())) {
-    goto _exit;
-  }
   if (!p) {
     goto _exit;
   }
@@ -279,12 +272,29 @@ int mfx_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
       }
       p->native_->next(); // comment out to remove picture shaking
       p->native_->BeginQuery();
-      if (FAILED(p->nv12torgb_->Convert(texture,
-                                        p->native_->GetCurrentTexture()))) {
-        std::cerr << "Failed to convert to bgra" << std::endl;
+
+      // nv12 -> bgra
+      D3D11_VIDEO_PROCESSOR_CONTENT_DESC contentDesc;
+      ZeroMemory(&contentDesc, sizeof(contentDesc));
+      contentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
+      contentDesc.InputFrameRate.Numerator = 30000;
+      contentDesc.InputFrameRate.Denominator = 1000;
+      contentDesc.InputWidth = pmfxOutSurface->Info.CropW;
+      contentDesc.InputHeight = pmfxOutSurface->Info.CropH;
+      contentDesc.OutputWidth = pmfxOutSurface->Info.CropW;
+      contentDesc.OutputHeight = pmfxOutSurface->Info.CropH;
+      contentDesc.OutputFrameRate.Numerator = 30000;
+      contentDesc.OutputFrameRate.Denominator = 1000;
+      D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace;
+      ZeroMemory(&colorSpace, sizeof(colorSpace));
+      colorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
+      if (!p->native_->Process(texture, p->native_->GetCurrentTexture(),
+                               contentDesc, colorSpace)) {
+        LOG_ERROR("Failed to process");
         p->native_->EndQuery();
         return -1;
       }
+
       p->native_->context_->Flush();
       p->native_->EndQuery();
       if (!p->native_->Query()) {

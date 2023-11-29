@@ -43,12 +43,6 @@ fn main() {
     // tool
     builder.file(src_path.join("log.cpp"));
 
-    // video processer
-    let dxgi_path = externals_dir.join("nvEncDXGIOutputDuplicationSample");
-    builder.include(&dxgi_path);
-    for f in vec!["Preproc.cpp"] {
-        builder.file(format!("{}/{}", dxgi_path.display(), f));
-    }
     builder.compile("gvc_common");
 }
 

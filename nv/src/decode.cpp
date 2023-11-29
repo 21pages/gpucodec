@@ -2,7 +2,6 @@
 #define FFNV_DEBUG_LOG_FUNC
 
 #include <DirectXMath.h>
-#include <Preproc.h>
 #include <Samples/NvCodec/NvDecoder/NvDecoder.h>
 #include <Samples/Utils/NvCodecUtils.h>
 #include <algorithm>
@@ -104,7 +103,6 @@ public:
   ComPtr<ID3D11PixelShader> pixelShader_ = NULL;
   ComPtr<ID3D11SamplerState> samplerLinear_ = NULL;
   ComPtr<ID3D11Texture2D> bgraTexture_ = NULL;
-  std::unique_ptr<RGBToNV12> nv12torgb_ = NULL;
   std::unique_ptr<NativeDevice> native_ = nullptr;
   bool outputSharedHandle_;
   bool prepare_tried_ = false;
@@ -537,11 +535,6 @@ void *nv_new_decoder(void *device, int64_t luid, API api, DataFormat dataFormat,
      * codecs PFNVIDOPPOINTCALLBACK Callback from video parser will pick
      * operating point set to NvDecoder  */
     p->dec_->SetOperatingPoint(opPoint, bDispAllLayers);
-    p->nv12torgb_ = std::make_unique<RGBToNV12>(p->native_->device_.Get(),
-                                                p->native_->context_.Get());
-    if (FAILED(p->nv12torgb_->Init())) {
-      goto _exit;
-    }
     p->outputSharedHandle_ = outputSharedHandle;
     return p;
   } catch (const std::exception &ex) {
@@ -593,8 +586,6 @@ int nv_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
         return -1;
       }
       p->native_->next();
-      // HRI(p->nv12torgb->Convert(p->bgraTexture.Get(),
-      //                           p->nativeDevice->GetCurrentTexture()));
       p->native_->context_->CopyResource(p->native_->GetCurrentTexture(),
                                          p->bgraTexture_.Get());
 

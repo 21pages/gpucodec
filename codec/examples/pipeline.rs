@@ -14,7 +14,7 @@ use std::{
 
 fn main() {
     init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "trace"));
-    let luid = 95733;
+    let luid = 94758;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;
@@ -64,7 +64,6 @@ fn main() {
             let start = Instant::now();
             let texture = capturer.capture(100);
             if texture.is_null() {
-                println!("texture is null");
                 continue;
             }
             dup_sum += start.elapsed();
@@ -72,7 +71,6 @@ fn main() {
             let frame = enc.encode(texture).unwrap();
             enc_sum += start.elapsed();
             for f in frame {
-                println!("len:{}", f.data.len());
                 file.write_all(&mut f.data).unwrap();
                 let start = Instant::now();
                 let frames = dec.decode(&f.data).unwrap();

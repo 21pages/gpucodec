@@ -66,9 +66,6 @@
     <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\DDAImpl.cpp">
       <Filter>Source Files\external\nvEncDXGIOutputDuplicationSample</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\Preproc.cpp">
-      <Filter>Source Files\external\nvEncDXGIOutputDuplicationSample</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\render\src\dxgi_sdl.cpp">
       <Filter>Source Files\render</Filter>
     </ClCompile>

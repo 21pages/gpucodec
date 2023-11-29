@@ -158,7 +158,6 @@
     <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\vm\thread_windows.cpp" />
     <ClCompile Include="..\..\externals\MediaSDK_22.5.4\samples\sample_common\src\vm\time.cpp" />
     <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\DDAImpl.cpp" />
-    <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\Preproc.cpp" />
     <ClCompile Include="..\..\mfx\src\decode.cpp" />
     <ClCompile Include="..\..\mfx\src\encode.cpp" />
     <ClCompile Include="..\..\render\src\dxgi_sdl.cpp" />
