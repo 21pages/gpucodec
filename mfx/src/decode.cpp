@@ -277,16 +277,17 @@ int mfx_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
       D3D11_VIDEO_PROCESSOR_CONTENT_DESC contentDesc;
       ZeroMemory(&contentDesc, sizeof(contentDesc));
       contentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
-      contentDesc.InputFrameRate.Numerator = 30000;
-      contentDesc.InputFrameRate.Denominator = 1000;
+      contentDesc.InputFrameRate.Numerator = 60;
+      contentDesc.InputFrameRate.Denominator = 1;
       contentDesc.InputWidth = pmfxOutSurface->Info.CropW;
       contentDesc.InputHeight = pmfxOutSurface->Info.CropH;
       contentDesc.OutputWidth = pmfxOutSurface->Info.CropW;
       contentDesc.OutputHeight = pmfxOutSurface->Info.CropH;
-      contentDesc.OutputFrameRate.Numerator = 30000;
-      contentDesc.OutputFrameRate.Denominator = 1000;
+      contentDesc.OutputFrameRate.Numerator = 60;
+      contentDesc.OutputFrameRate.Denominator = 1;
       D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace;
       ZeroMemory(&colorSpace, sizeof(colorSpace));
+      colorSpace.YCbCr_Matrix = 0; // 0:601, 1:709
       colorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
       if (!p->native_->Process(texture, p->native_->GetCurrentTexture(),
                                contentDesc, colorSpace)) {

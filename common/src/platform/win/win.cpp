@@ -222,19 +222,29 @@ bool NativeDevice::Process(ID3D11Texture2D *in, ID3D11Texture2D *out,
     HRB(video_device_->CreateVideoProcessor(
         video_processor_enumerator_.Get(), 0,
         video_processor_.ReleaseAndGetAddressOf()));
+    // This fix too dark or too light, and also make in/out colorspace work
+    video_context_->VideoProcessorSetStreamAutoProcessingMode(
+        video_processor_.Get(), 0, FALSE);
+    video_context_->VideoProcessorSetStreamFrameFormat(
+        video_processor_.Get(), 0, D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE);
   }
 
-  video_context_->VideoProcessorSetStreamAutoProcessingMode(
-      video_processor_.Get(), 0, FALSE);
-  video_context_->VideoProcessorSetStreamColorSpace(video_processor_.Get(), 0,
-                                                    &color_space);
+  // https://chromium.googlesource.com/chromium/src/media/+/refs/heads/main/gpu/windows/d3d11_video_processor_proxy.cc#138
+  ComPtr<ID3D11VideoContext1> video_context1 = nullptr;
+  video_context_.As(&video_context1);
+  if (video_context1) {
+    video_context1->VideoProcessorSetStreamColorSpace(video_processor_.Get(), 0,
+                                                      &color_space);
+  } else {
+    video_context_->VideoProcessorSetStreamColorSpace(video_processor_.Get(), 0,
+                                                      &color_space);
+  }
+
   RECT rect = {0};
-  rect.right = content_desc.OutputWidth;
-  rect.bottom = content_desc.OutputHeight;
+  rect.right = content_desc.InputWidth;
+  rect.bottom = content_desc.InputHeight;
   video_context_->VideoProcessorSetStreamSourceRect(video_processor_.Get(), 0,
                                                     true, &rect);
-  video_context_->VideoProcessorSetStreamFrameFormat(
-      video_processor_.Get(), 0, D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE);
 
   D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC InputViewDesc;
   ZeroMemory(&InputViewDesc, sizeof(InputViewDesc));

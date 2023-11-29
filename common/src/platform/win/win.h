@@ -2,6 +2,7 @@
 #define WIN_H
 
 #include <d3d11.h>
+#include <d3d11_1.h>
 #include <iostream>
 #include <vector>
 #include <wrl/client.h>
