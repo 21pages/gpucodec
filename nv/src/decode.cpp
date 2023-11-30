@@ -107,9 +107,33 @@ public:
   bool outputSharedHandle_;
   bool prepare_tried_ = false;
   bool prepare_ok_ = false;
+  int width_ = 0;
+  int height_ = 0;
 
 public:
   CuvidDecoder() { load_driver(&cudl_, &cvdl_); }
+
+  void reset_prepare() {
+    prepare_tried_ = false;
+    prepare_ok_ = false;
+    if (cudl_ && cuContext_) {
+      cudl_->cuCtxPushCurrent(cuContext_);
+      for (int i = 0; i < 2; i++) {
+        if (cuResource_[i])
+          cudl_->cuGraphicsUnregisterResource(cuResource_[i]);
+      }
+      cudl_->cuCtxPopCurrent(NULL);
+    }
+    for (int i = 0; i < 2; i++) {
+      textures_[i].Reset();
+      SRV_[i].Reset();
+    }
+    RTV_.Reset();
+    vertexShader_.Reset();
+    pixelShader_.Reset();
+    samplerLinear_.Reset();
+    bgraTexture_.Reset();
+  }
 
   bool prepare() {
     if (prepare_tried_) {
@@ -558,25 +582,34 @@ int nv_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
     NvDecoder *dec = p->dec_;
 
     int nFrameReturned = dec->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
-    if (!nFrameReturned)
+    if (nFrameReturned <= 0)
       return -1;
     cudaVideoSurfaceFormat format = dec->GetOutputFormat();
     int width = dec->GetWidth();
     int height = dec->GetHeight();
+    if (p->prepare_tried_ && (width != p->width_ || height != p->height_)) {
+      LOG_INFO("resolution changed, (" + std::to_string(p->width_) + "," +
+               std::to_string(p->height_) + ") -> (" + std::to_string(width) +
+               "," + std::to_string(height) + ")");
+      p->reset_prepare();
+      p->width_ = width;
+      p->height_ = height;
+    }
+    if (!p->prepare()) {
+      LOG_ERROR("prepare failed");
+      return -1;
+    }
     bool decoded = false;
     for (int i = 0; i < nFrameReturned; i++) {
       uint8_t *pFrame = dec->GetFrame();
-      if (!p->vertexShader_) {
-        if (!p->prepare()) {
-          return -1;
-        }
-      }
       p->native_->BeginQuery();
       if (!p->copy_cuda_frame(pFrame)) {
+        LOG_ERROR("copy_cuda_frame failed");
         p->native_->EndQuery();
         return -1;
       }
       if (!p->draw()) {
+        LOG_ERROR("draw failed");
         p->native_->EndQuery();
         return -1;
       }
