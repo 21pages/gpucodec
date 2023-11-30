@@ -42,6 +42,8 @@ private:
   amf::AMF_SURFACE_FORMAT decodeFormatOut_ = amf::AMF_SURFACE_NV12;
   amf::AMF_SURFACE_FORMAT textureFormatOut_;
   amf::AMFComponentPtr AMFConverter_ = NULL;
+  int last_width_ = 0;
+  int last_height_ = 0;
   amf_wstring codec_;
   bool outputSharedHandle_;
 
@@ -131,6 +133,10 @@ public:
   }
 
   AMF_RESULT destroy() {
+    if (AMFConverter_ != NULL) {
+      AMFConverter_->Terminate();
+      AMFConverter_ = NULL;
+    }
     if (AMFDecoder_ != NULL) {
       AMFDecoder_->Terminate();
       AMFDecoder_ = NULL;
@@ -224,12 +230,21 @@ private:
       return AMF_OK;
     AMF_RESULT res;
 
+    int width = surface->GetPlaneAt(0)->GetWidth();
+    int height = surface->GetPlaneAt(0)->GetHeight();
+    if (AMFConverter_ != NULL) {
+      if (width != last_width_ || height != last_height_) {
+        LOG_INFO("Convert size changed, (" + std::to_string(last_width_) + "x" +
+                 std::to_string(last_height_) + ") -> (" +
+                 std::to_string(width) + "x" + std::to_string(width) + ")");
+        AMFConverter_->Terminate();
+        AMFConverter_ = NULL;
+      }
+    }
     if (!AMFConverter_) {
       res = AMFFactory_.GetFactory()->CreateComponent(
           AMFContext_, AMFVideoConverter, &AMFConverter_);
       AMF_CHECK_RETURN(res, "Convert CreateComponent failed");
-      int width = surface->GetPlaneAt(0)->GetWidth();
-      int height = surface->GetPlaneAt(0)->GetHeight();
       res = AMFConverter_->SetProperty(AMF_VIDEO_CONVERTER_MEMORY_TYPE,
                                        AMFMemoryType_);
       AMF_CHECK_RETURN(res,
@@ -245,6 +260,8 @@ private:
       res = AMFConverter_->Init(decodeFormatOut_, width, height);
       AMF_CHECK_RETURN(res, "Init converter failed");
     }
+    last_width_ = width;
+    last_height_ = height;
     res = AMFConverter_->SubmitInput(surface);
     AMF_CHECK_RETURN(res, "Convert SubmitInput failed");
     res = AMFConverter_->QueryOutput(&convertData);
