@@ -195,8 +195,7 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
     if (H265 == dataFormat) {
       guidCodec = NV_ENC_CODEC_HEVC_GUID;
     }
-    NV_ENC_BUFFER_FORMAT surfaceFormat =
-        NV_ENC_BUFFER_FORMAT_ARGB; // NV_ENC_BUFFER_FORMAT_ABGR;
+    NV_ENC_BUFFER_FORMAT surfaceFormat = NV_ENC_BUFFER_FORMAT_ARGB;
 
     e = new NvencEncoder(width, height, surfaceFormat);
     if (!e) {
@@ -258,7 +257,7 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
 
     initializeParams.encodeConfig = &encodeConfig;
     e->pEnc_->CreateDefaultEncoderParams(
-        &initializeParams, NV_ENC_CODEC_H264_GUID,
+        &initializeParams, guidCodec,
         NV_ENC_PRESET_P3_GUID /*NV_ENC_PRESET_LOW_LATENCY_HP_GUID*/,
         NV_ENC_TUNING_INFO_LOW_LATENCY);
 
@@ -309,11 +308,11 @@ int nv_encode(void *encoder, void *texture, EncodeCallback callback,
     std::vector<NvPacket> vPacket;
     const NvEncInputFrame *pEncInput = pEnc->GetNextInputFrame();
 
-#ifdef CONFIG_NV_OPTIMUS_FOR_DEV
-    copy_texture(e, texture, pEncInput->inputPtr);
-#else
     ID3D11Texture2D *pBgraTextyure =
         reinterpret_cast<ID3D11Texture2D *>(pEncInput->inputPtr);
+#ifdef CONFIG_NV_OPTIMUS_FOR_DEV
+    copy_texture(e, texture, pBgraTextyure);
+#else
     e->native_->context_->CopyResource(
         pBgraTextyure, reinterpret_cast<ID3D11Texture2D *>(texture));
 #endif
