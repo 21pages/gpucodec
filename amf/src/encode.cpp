@@ -470,7 +470,7 @@ void *amf_new_encoder(void *handle, int64_t luid, API api,
 int amf_encode(void *encoder, void *tex, EncodeCallback callback, void *obj) {
   try {
     AMFEncoder *enc = (AMFEncoder *)encoder;
-    return enc->encode(tex, callback, obj);
+    return -enc->encode(tex, callback, obj);
   } catch (const std::exception &e) {
     LOG_ERROR("encode failed: " + e.what());
   }
