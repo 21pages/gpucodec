@@ -180,6 +180,7 @@ int NvDecoder::HandleVideoSequence(CUVIDEOFORMAT *pVideoFormat)
         << "\tBit depth    : " << pVideoFormat->bit_depth_luma_minus8 + 8
     ;
     m_videoInfo << std::endl;
+    m_latestVideoFormat = *pVideoFormat;
 
     int nDecodeSurface = pVideoFormat->min_num_decode_surfaces;
 

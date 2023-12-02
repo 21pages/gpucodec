@@ -238,6 +238,10 @@ public:
     static void addDecoderSessionOverHead(int sessionID, int64_t duration) { sessionOverHead[sessionID] += duration; }
     static int64_t getDecoderSessionOverHead(int sessionID) { return sessionOverHead[sessionID]; }
 
+    unsigned int GetMaxWidth() { return m_nMaxWidth; }
+    unsigned int GetMaxHeight() { return m_nMaxHeight; }
+    CUVIDEOFORMAT GetLatestVideoFormat() { return m_latestVideoFormat; }
+
 private:
     int decoderSessionID; // Decoder session identifier. Used to gather session level stats.
     static std::map<int, int64_t> sessionOverHead; // Records session overhead of initialization+deinitialization time. Format is (thread id, duration)
@@ -339,4 +343,7 @@ private:
     // latency for All-Intra and IPPP sequences, the below flag will enable
     // the display callback immediately after the decode callback.
     bool m_bForce_zero_latency = false;
+
+    // my variables
+    CUVIDEOFORMAT m_latestVideoFormat = {};
 };

@@ -39,7 +39,8 @@ public:
   ~CUVIDAutoUnmapper() {
     if (!ck(cudl_->cuGraphicsUnmapResources(1, pCuResource_, 0))) {
       LOG_TRACE("cuGraphicsUnmapResources failed");
-      NVDEC_THROW_ERROR("cuGraphicsUnmapResources failed", CUDA_ERROR_UNKNOWN);
+      // NVDEC_THROW_ERROR("cuGraphicsUnmapResources failed",
+      // CUDA_ERROR_UNKNOWN);
     }
   }
 };
@@ -57,7 +58,7 @@ public:
   ~CUVIDAutoCtxPopper() {
     if (!ck(cudl_->cuCtxPopCurrent(NULL))) {
       LOG_TRACE("cuCtxPopCurrent failed");
-      NVDEC_THROW_ERROR("cuCtxPopCurrent failed", CUDA_ERROR_UNKNOWN);
+      // NVDEC_THROW_ERROR("cuCtxPopCurrent failed", CUDA_ERROR_UNKNOWN);
     }
   }
 };
@@ -104,11 +105,16 @@ public:
   ComPtr<ID3D11SamplerState> samplerLinear_ = NULL;
   ComPtr<ID3D11Texture2D> bgraTexture_ = NULL;
   std::unique_ptr<NativeDevice> native_ = nullptr;
+
   bool outputSharedHandle_;
+  DataFormat dataFormat_;
+
   bool prepare_tried_ = false;
   bool prepare_ok_ = false;
+
   int width_ = 0;
   int height_ = 0;
+  CUVIDEOFORMAT last_video_format_ = {};
 
 public:
   CuvidDecoder() { load_driver(&cudl_, &cvdl_); }
@@ -184,12 +190,80 @@ public:
       if (!ck(cudl_->cuMemcpy2D(&m)))
         return false;
     }
+    return true;
   }
 
   bool draw() {
     native_->context_->Draw(NUMVERTICES, 0);
     native_->context_->Flush();
 
+    return true;
+  }
+
+  // return:
+  // >=0: no reconfigure, return frame count
+  // -1: failed
+  // -2: reconfigured, decode again
+  int decode_and_reconfigure(uint8_t *data, int len) {
+    try {
+      int nFrameReturned = dec_->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
+      if (nFrameReturned <= 0)
+        return -1;
+      CUVIDEOFORMAT video_format = dec_->GetLatestVideoFormat();
+      auto d1 = last_video_format_.display_area;
+      auto d2 = video_format.display_area;
+      if (last_video_format_.coded_width != 0 &&
+          (d1.left != d2.left || d1.right != d2.right || d1.top != d2.top ||
+           d1.bottom != d2.bottom)) {
+        LOG_INFO("display area changed from (" + std::to_string(d1.left) +
+                 ", " + std::to_string(d1.top) + ", " +
+                 std::to_string(d1.right) + ", " + std::to_string(d1.bottom) +
+                 ") to (" + std::to_string(d2.left) + ", " +
+                 std::to_string(d2.top) + ", " + std::to_string(d2.right) +
+                 ", " + std::to_string(d2.bottom) + ")");
+        if (create_nvdecoder()) {
+          return -2;
+        }
+        return -1;
+      } else {
+        return nFrameReturned;
+      }
+    } catch (const std::exception &e) {
+      LOG_ERROR("Exception decode_and_reconfigure: " + e.what());
+      unsigned int maxWidth = dec_->GetMaxWidth();
+      unsigned int maxHeight = dec_->GetMaxWidth();
+      CUVIDEOFORMAT video_format = dec_->GetLatestVideoFormat();
+      if (maxWidth > 0 && (video_format.coded_width > maxWidth ||
+                           video_format.coded_height > maxHeight)) {
+        LOG_INFO("Exceed maxWidth/maxHeight: (" +
+                 std::to_string(video_format.coded_width) + ", " +
+                 std::to_string(video_format.coded_height) + " > (" +
+                 std::to_string(maxWidth) + ", " + std::to_string(maxHeight) +
+                 ")");
+        if (create_nvdecoder()) {
+          return -2;
+        }
+      }
+    }
+
+    return -1;
+  }
+
+  bool create_nvdecoder() {
+    LOG_TRACE("create nvdecoder");
+    bool bUseDeviceFrame = true;
+    bool bLowLatency = true;
+    bool bDeviceFramePitched = false; // width=pitch
+    cudaVideoCodec cudaCodecID;
+    if (!dataFormat_to_cuCodecID(dataFormat_, cudaCodecID)) {
+      return false;
+    }
+    if (dec_) {
+      delete dec_;
+      dec_ = nullptr;
+    }
+    dec_ = new NvDecoder(cudl_, cvdl_, cuContext_, bUseDeviceFrame, cudaCodecID,
+                         bLowLatency, bDeviceFramePitched);
     return true;
   }
 
@@ -455,21 +529,21 @@ float4 PS(PS_INPUT input) : SV_TARGET{
 
     return ret;
   }
-};
 
-bool dataFormat_to_cuCodecID(DataFormat dataFormat, cudaVideoCodec &cuda) {
-  switch (dataFormat) {
-  case H264:
-    cuda = cudaVideoCodec_H264;
-    break;
-  case H265:
-    cuda = cudaVideoCodec_HEVC;
-    break;
-  default:
-    return false;
+  bool dataFormat_to_cuCodecID(DataFormat dataFormat, cudaVideoCodec &cuda) {
+    switch (dataFormat) {
+    case H264:
+      cuda = cudaVideoCodec_H264;
+      break;
+    case H265:
+      cuda = cudaVideoCodec_HEVC;
+      break;
+    default:
+      return false;
+    }
+    return true;
   }
-  return true;
-}
+};
 
 } // namespace
 
@@ -521,8 +595,7 @@ void *nv_new_decoder(void *device, int64_t luid, API api, DataFormat dataFormat,
     if (!p) {
       goto _exit;
     }
-    Rect cropRect = {};
-    Dim resizeDim = {};
+    p->dataFormat_ = dataFormat;
     unsigned int opPoint = 0;
     bool bDispAllLayers = false;
     if (!ck(p->cudl_->cuInit(0))) {
@@ -545,21 +618,16 @@ void *nv_new_decoder(void *device, int64_t luid, API api, DataFormat dataFormat,
       goto _exit;
     }
 
-    cudaVideoCodec cudaCodecID;
-    if (!dataFormat_to_cuCodecID(dataFormat, cudaCodecID)) {
+    if (!p->create_nvdecoder()) {
       goto _exit;
     }
-    bool bUseDeviceFrame = true;
-    bool bLowLatency = true;
-    bool bDeviceFramePitched = false; // width=pitch
-    p->dec_ = new NvDecoder(p->cudl_, p->cvdl_, p->cuContext_, bUseDeviceFrame,
-                            cudaCodecID, bLowLatency, bDeviceFramePitched,
-                            &cropRect, &resizeDim);
     /* Set operating point for AV1 SVC. It has no impact for other profiles or
      * codecs PFNVIDOPPOINTCALLBACK Callback from video parser will pick
      * operating point set to NvDecoder  */
     p->dec_->SetOperatingPoint(opPoint, bDispAllLayers);
     p->outputSharedHandle_ = outputSharedHandle;
+    ZeroMemory(&p->last_video_format_, sizeof(p->last_video_format_));
+
     return p;
   } catch (const std::exception &ex) {
     LOG_ERROR("destroy failed: " + ex.what());
@@ -575,18 +643,24 @@ _exit:
 }
 
 // ref: HandlePictureDisplay
+// resolution change:
+// https://github.com/NVIDIA/DALI/blob/4f5ee72b287cfbbe0d400734416ff37bd8027099/dali/operators/reader/loader/video/frames_decoder_gpu.cc#L212
 int nv_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
               void *obj) {
   try {
     CuvidDecoder *p = (CuvidDecoder *)decoder;
-    NvDecoder *dec = p->dec_;
 
-    int nFrameReturned = dec->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
-    if (nFrameReturned <= 0)
+    int nFrameReturned = p->decode_and_reconfigure(data, len);
+    if (nFrameReturned == -2) {
+      nFrameReturned = p->dec_->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
+    }
+    if (nFrameReturned <= 0) {
       return -1;
-    cudaVideoSurfaceFormat format = dec->GetOutputFormat();
-    int width = dec->GetWidth();
-    int height = dec->GetHeight();
+    }
+    p->last_video_format_ = p->dec_->GetLatestVideoFormat();
+    cudaVideoSurfaceFormat format = p->dec_->GetOutputFormat();
+    int width = p->dec_->GetWidth();
+    int height = p->dec_->GetHeight();
     if (p->prepare_tried_ && (width != p->width_ || height != p->height_)) {
       LOG_INFO("resolution changed, (" + std::to_string(p->width_) + "," +
                std::to_string(p->height_) + ") -> (" + std::to_string(width) +
@@ -601,7 +675,7 @@ int nv_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
     }
     bool decoded = false;
     for (int i = 0; i < nFrameReturned; i++) {
-      uint8_t *pFrame = dec->GetFrame();
+      uint8_t *pFrame = p->dec_->GetFrame();
       p->native_->BeginQuery();
       if (!p->copy_cuda_frame(pFrame)) {
         LOG_ERROR("copy_cuda_frame failed");
