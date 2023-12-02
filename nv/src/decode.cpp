@@ -106,8 +106,11 @@ public:
   ComPtr<ID3D11Texture2D> bgraTexture_ = NULL;
   std::unique_ptr<NativeDevice> native_ = nullptr;
 
-  bool outputSharedHandle_;
+  void *device_;
+  int64_t luid_;
+  API api_;
   DataFormat dataFormat_;
+  bool outputSharedHandle_;
 
   bool prepare_tried_ = false;
   bool prepare_ok_ = false;
@@ -117,8 +120,133 @@ public:
   CUVIDEOFORMAT last_video_format_ = {};
 
 public:
-  CuvidDecoder() { load_driver(&cudl_, &cvdl_); }
+  CuvidDecoder(void *device, int64_t luid, API api, DataFormat dataFormat,
+               bool outputSharedHandle) {
+    device_ = device;
+    luid_ = luid;
+    api_ = api;
+    dataFormat_ = dataFormat;
+    outputSharedHandle_ = outputSharedHandle;
+    ZeroMemory(&last_video_format_, sizeof(last_video_format_));
+    load_driver(&cudl_, &cvdl_);
+  }
 
+  bool init() {
+    if (!ck(cudl_->cuInit(0))) {
+      LOG_ERROR("cuInit failed");
+      return false;
+    }
+    CUdevice cuDevice = 0;
+    native_ = std::make_unique<NativeDevice>();
+    if (!native_->Init(luid_, (ID3D11Device *)device_, 4)) {
+      LOG_ERROR("Failed to init native device");
+      return false;
+    }
+    if (!ck(cudl_->cuD3D11GetDevice(&cuDevice, native_->adapter_.Get()))) {
+      LOG_ERROR("Failed to get cuDevice");
+      return false;
+    }
+
+    if (!ck(cudl_->cuCtxCreate(&cuContext_, 0, cuDevice))) {
+      LOG_ERROR("Failed to create cuContext");
+      return false;
+    }
+    if (!create_nvdecoder()) {
+      LOG_ERROR("Failed to create nvdecoder");
+      return false;
+    }
+    return true;
+  }
+
+  // ref: HandlePictureDisplay
+  int decode(uint8_t *data, int len, DecodeCallback callback, void *obj) {
+    int nFrameReturned = decode_and_recreate(data, len);
+    if (nFrameReturned == -2) {
+      nFrameReturned = dec_->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
+    }
+    if (nFrameReturned <= 0) {
+      return -1;
+    }
+    last_video_format_ = dec_->GetLatestVideoFormat();
+    cudaVideoSurfaceFormat format = dec_->GetOutputFormat();
+    int width = dec_->GetWidth();
+    int height = dec_->GetHeight();
+    if (prepare_tried_ && (width != width_ || height != height_)) {
+      LOG_INFO("resolution changed, (" + std::to_string(width_) + "," +
+               std::to_string(height_) + ") -> (" + std::to_string(width) +
+               "," + std::to_string(height) + ")");
+      reset_prepare();
+      width_ = width;
+      height_ = height;
+    }
+    if (!prepare()) {
+      LOG_ERROR("prepare failed");
+      return -1;
+    }
+    bool decoded = false;
+    for (int i = 0; i < nFrameReturned; i++) {
+      uint8_t *pFrame = dec_->GetFrame();
+      native_->BeginQuery();
+      if (!copy_cuda_frame(pFrame)) {
+        LOG_ERROR("copy_cuda_frame failed");
+        native_->EndQuery();
+        return -1;
+      }
+      if (!draw()) {
+        LOG_ERROR("draw failed");
+        native_->EndQuery();
+        return -1;
+      }
+      if (!native_->EnsureTexture(width, height)) {
+        LOG_ERROR("EnsureTexture failed");
+        native_->EndQuery();
+        return -1;
+      }
+      native_->next();
+      native_->context_->CopyResource(native_->GetCurrentTexture(),
+                                      bgraTexture_.Get());
+
+      native_->EndQuery();
+      if (!native_->Query()) {
+        LOG_ERROR("Query failed");
+      }
+
+      void *opaque = nullptr;
+      if (outputSharedHandle_) {
+        HANDLE sharedHandle = native_->GetSharedHandle();
+        if (!sharedHandle) {
+          LOG_ERROR("GetSharedHandle failed");
+          return -1;
+        }
+        opaque = sharedHandle;
+      } else {
+        opaque = native_->GetCurrentTexture();
+      }
+
+      if (callback)
+        callback(opaque, obj);
+      decoded = true;
+    }
+    return decoded ? 0 : -1;
+  }
+
+  void destroy() {
+    if (dec_) {
+      delete dec_;
+    }
+    if (cudl_ && cuContext_) {
+      cudl_->cuCtxPushCurrent(cuContext_);
+      for (int i = 0; i < 2; i++) {
+        if (cuResource_[i])
+          cudl_->cuGraphicsUnregisterResource(cuResource_[i]);
+      }
+      cudl_->cuCtxPopCurrent(NULL);
+      cudl_->cuCtxDestroy(cuContext_);
+    }
+    free_driver(&cudl_, &cvdl_);
+  }
+
+private:
   void reset_prepare() {
     prepare_tried_ = false;
     prepare_ok_ = false;
@@ -201,10 +329,10 @@ public:
   }
 
   // return:
-  // >=0: no reconfigure, return frame count
+  // >=0: nFrameReturned
   // -1: failed
-  // -2: reconfigured, decode again
-  int decode_and_reconfigure(uint8_t *data, int len) {
+  // -2: recreated, please decode again
+  int decode_and_recreate(uint8_t *data, int len) {
     try {
       int nFrameReturned = dec_->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
       if (nFrameReturned <= 0)
@@ -212,62 +340,50 @@ public:
       CUVIDEOFORMAT video_format = dec_->GetLatestVideoFormat();
       auto d1 = last_video_format_.display_area;
       auto d2 = video_format.display_area;
+      // reconfigure may cause wrong display area
       if (last_video_format_.coded_width != 0 &&
           (d1.left != d2.left || d1.right != d2.right || d1.top != d2.top ||
            d1.bottom != d2.bottom)) {
-        LOG_INFO("display area changed from (" + std::to_string(d1.left) +
-                 ", " + std::to_string(d1.top) + ", " +
-                 std::to_string(d1.right) + ", " + std::to_string(d1.bottom) +
-                 ") to (" + std::to_string(d2.left) + ", " +
-                 std::to_string(d2.top) + ", " + std::to_string(d2.right) +
-                 ", " + std::to_string(d2.bottom) + ")");
+        LOG_INFO(
+            "recreate, display area changed from (" + std::to_string(d1.left) +
+            ", " + std::to_string(d1.top) + ", " + std::to_string(d1.right) +
+            ", " + std::to_string(d1.bottom) + ") to (" +
+            std::to_string(d2.left) + ", " + std::to_string(d2.top) + ", " +
+            std::to_string(d2.right) + ", " + std::to_string(d2.bottom) + ")");
         if (create_nvdecoder()) {
           return -2;
+        } else {
+          LOG_ERROR("create_nvdecoder failed");
         }
         return -1;
       } else {
         return nFrameReturned;
       }
     } catch (const std::exception &e) {
-      LOG_ERROR("Exception decode_and_reconfigure: " + e.what());
       unsigned int maxWidth = dec_->GetMaxWidth();
       unsigned int maxHeight = dec_->GetMaxWidth();
       CUVIDEOFORMAT video_format = dec_->GetLatestVideoFormat();
+      // https://github.com/NVIDIA/DALI/blob/4f5ee72b287cfbbe0d400734416ff37bd8027099/dali/operators/reader/loader/video/frames_decoder_gpu.cc#L212
       if (maxWidth > 0 && (video_format.coded_width > maxWidth ||
                            video_format.coded_height > maxHeight)) {
-        LOG_INFO("Exceed maxWidth/maxHeight: (" +
+        LOG_INFO("recreate, exceed maxWidth/maxHeight: (" +
                  std::to_string(video_format.coded_width) + ", " +
                  std::to_string(video_format.coded_height) + " > (" +
                  std::to_string(maxWidth) + ", " + std::to_string(maxHeight) +
                  ")");
         if (create_nvdecoder()) {
           return -2;
+        } else {
+          LOG_ERROR("create_nvdecoder failed");
         }
+      } else {
+        LOG_ERROR("Exception decode_and_recreate: " + e.what());
       }
     }
 
     return -1;
   }
 
-  bool create_nvdecoder() {
-    LOG_TRACE("create nvdecoder");
-    bool bUseDeviceFrame = true;
-    bool bLowLatency = true;
-    bool bDeviceFramePitched = false; // width=pitch
-    cudaVideoCodec cudaCodecID;
-    if (!dataFormat_to_cuCodecID(dataFormat_, cudaCodecID)) {
-      return false;
-    }
-    if (dec_) {
-      delete dec_;
-      dec_ = nullptr;
-    }
-    dec_ = new NvDecoder(cudl_, cvdl_, cuContext_, bUseDeviceFrame, cudaCodecID,
-                         bLowLatency, bDeviceFramePitched);
-    return true;
-  }
-
-private:
   bool set_srv() {
     int width = dec_->GetWidth();
     int height = dec_->GetHeight();
@@ -543,6 +659,24 @@ float4 PS(PS_INPUT input) : SV_TARGET{
     }
     return true;
   }
+
+  bool create_nvdecoder() {
+    LOG_TRACE("create nvdecoder");
+    bool bUseDeviceFrame = true;
+    bool bLowLatency = true;
+    bool bDeviceFramePitched = false; // width=pitch
+    cudaVideoCodec cudaCodecID;
+    if (!dataFormat_to_cuCodecID(dataFormat_, cudaCodecID)) {
+      return false;
+    }
+    if (dec_) {
+      delete dec_;
+      dec_ = nullptr;
+    }
+    dec_ = new NvDecoder(cudl_, cvdl_, cuContext_, bUseDeviceFrame, cudaCodecID,
+                         bLowLatency, bDeviceFramePitched);
+    return true;
+  }
 };
 
 } // namespace
@@ -565,19 +699,7 @@ int nv_destroy_decoder(void *decoder) {
   try {
     CuvidDecoder *p = (CuvidDecoder *)decoder;
     if (p) {
-      if (p->dec_) {
-        delete p->dec_;
-      }
-      if (p->cudl_ && p->cuContext_) {
-        p->cudl_->cuCtxPushCurrent(p->cuContext_);
-        for (int i = 0; i < 2; i++) {
-          if (p->cuResource_[i])
-            p->cudl_->cuGraphicsUnregisterResource(p->cuResource_[i]);
-        }
-        p->cudl_->cuCtxPopCurrent(NULL);
-        p->cudl_->cuCtxDestroy(p->cuContext_);
-      }
-      free_driver(&p->cudl_, &p->cvdl_);
+      p->destroy();
     }
     return 0;
   } catch (const std::exception &e) {
@@ -590,45 +712,12 @@ void *nv_new_decoder(void *device, int64_t luid, API api, DataFormat dataFormat,
                      bool outputSharedHandle) {
   CuvidDecoder *p = NULL;
   try {
-    (void)api;
-    p = new CuvidDecoder();
+    p = new CuvidDecoder(device, luid, api, dataFormat, outputSharedHandle);
     if (!p) {
       goto _exit;
     }
-    p->dataFormat_ = dataFormat;
-    unsigned int opPoint = 0;
-    bool bDispAllLayers = false;
-    if (!ck(p->cudl_->cuInit(0))) {
-      goto _exit;
-    }
-
-    CUdevice cuDevice = 0;
-    p->native_ = std::make_unique<NativeDevice>();
-    if (!p->native_->Init(luid, (ID3D11Device *)device, 4))
-      goto _exit;
-    if (!ck(p->cudl_->cuD3D11GetDevice(&cuDevice, p->native_->adapter_.Get())))
-      goto _exit;
-    char szDeviceName[80];
-    if (!ck(p->cudl_->cuDeviceGetName(szDeviceName, sizeof(szDeviceName),
-                                      cuDevice))) {
-      goto _exit;
-    }
-
-    if (!ck(p->cudl_->cuCtxCreate(&p->cuContext_, 0, cuDevice))) {
-      goto _exit;
-    }
-
-    if (!p->create_nvdecoder()) {
-      goto _exit;
-    }
-    /* Set operating point for AV1 SVC. It has no impact for other profiles or
-     * codecs PFNVIDOPPOINTCALLBACK Callback from video parser will pick
-     * operating point set to NvDecoder  */
-    p->dec_->SetOperatingPoint(opPoint, bDispAllLayers);
-    p->outputSharedHandle_ = outputSharedHandle;
-    ZeroMemory(&p->last_video_format_, sizeof(p->last_video_format_));
-
-    return p;
+    if (p->init())
+      return p;
   } catch (const std::exception &ex) {
     LOG_ERROR("destroy failed: " + ex.what());
     goto _exit;
@@ -642,82 +731,11 @@ _exit:
   return NULL;
 }
 
-// ref: HandlePictureDisplay
-// resolution change:
-// https://github.com/NVIDIA/DALI/blob/4f5ee72b287cfbbe0d400734416ff37bd8027099/dali/operators/reader/loader/video/frames_decoder_gpu.cc#L212
 int nv_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
               void *obj) {
   try {
     CuvidDecoder *p = (CuvidDecoder *)decoder;
-
-    int nFrameReturned = p->decode_and_reconfigure(data, len);
-    if (nFrameReturned == -2) {
-      nFrameReturned = p->dec_->Decode(data, len, CUVID_PKT_ENDOFPICTURE);
-    }
-    if (nFrameReturned <= 0) {
-      return -1;
-    }
-    p->last_video_format_ = p->dec_->GetLatestVideoFormat();
-    cudaVideoSurfaceFormat format = p->dec_->GetOutputFormat();
-    int width = p->dec_->GetWidth();
-    int height = p->dec_->GetHeight();
-    if (p->prepare_tried_ && (width != p->width_ || height != p->height_)) {
-      LOG_INFO("resolution changed, (" + std::to_string(p->width_) + "," +
-               std::to_string(p->height_) + ") -> (" + std::to_string(width) +
-               "," + std::to_string(height) + ")");
-      p->reset_prepare();
-      p->width_ = width;
-      p->height_ = height;
-    }
-    if (!p->prepare()) {
-      LOG_ERROR("prepare failed");
-      return -1;
-    }
-    bool decoded = false;
-    for (int i = 0; i < nFrameReturned; i++) {
-      uint8_t *pFrame = p->dec_->GetFrame();
-      p->native_->BeginQuery();
-      if (!p->copy_cuda_frame(pFrame)) {
-        LOG_ERROR("copy_cuda_frame failed");
-        p->native_->EndQuery();
-        return -1;
-      }
-      if (!p->draw()) {
-        LOG_ERROR("draw failed");
-        p->native_->EndQuery();
-        return -1;
-      }
-      if (!p->native_->EnsureTexture(width, height)) {
-        LOG_ERROR("EnsureTexture failed");
-        p->native_->EndQuery();
-        return -1;
-      }
-      p->native_->next();
-      p->native_->context_->CopyResource(p->native_->GetCurrentTexture(),
-                                         p->bgraTexture_.Get());
-
-      p->native_->EndQuery();
-      if (!p->native_->Query()) {
-        LOG_ERROR("Query failed");
-      }
-
-      void *opaque = nullptr;
-      if (p->outputSharedHandle_) {
-        HANDLE sharedHandle = p->native_->GetSharedHandle();
-        if (!sharedHandle) {
-          LOG_ERROR("GetSharedHandle failed");
-          return -1;
-        }
-        opaque = sharedHandle;
-      } else {
-        opaque = p->native_->GetCurrentTexture();
-      }
-
-      if (callback)
-        callback(opaque, obj);
-      decoded = true;
-    }
-    return decoded ? 0 : -1;
+    return p->decode(data, len, callback, obj);
   } catch (const std::exception &e) {
     LOG_ERROR("decode failed" + e.what());
   }
