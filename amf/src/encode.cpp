@@ -56,7 +56,6 @@ struct encoder_packet {
 class AMFEncoder {
 
 public:
-  AMF_RESULT init_result_ = AMF_FAIL;
   DataFormat dataFormat_;
   amf::AMFComponentPtr AMFEncoder_ = NULL;
   amf::AMFContextPtr AMFContext_ = NULL;
@@ -97,7 +96,6 @@ public:
     gop_ = gop;
     q_min_ = q_min;
     q_max_ = q_max;
-    init_result_ = initialize();
   }
 
   AMF_RESULT encode(void *tex, EncodeCallback callback, void *obj) {
@@ -228,7 +226,6 @@ public:
     return res;
   }
 
-private:
   AMF_RESULT initialize() {
     AMF_RESULT res;
 
@@ -278,6 +275,7 @@ private:
     return AMF_OK;
   }
 
+private:
   AMF_RESULT SetParams(const amf_wstring &codecStr) {
     AMF_RESULT res;
     if (codecStr == amf_wstring(AMFVideoEncoderVCE_AVC)) {
@@ -434,15 +432,22 @@ bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
 
 extern "C" {
 
+int amf_destroy_encoder(void *encoder) {
+  try {
+    AMFEncoder *enc = (AMFEncoder *)encoder;
+    return enc->destroy();
+  } catch (const std::exception &e) {
+    LOG_ERROR("destroy failed: " + e.what());
+  }
+  return -1;
+}
+
 void *amf_new_encoder(void *handle, int64_t luid, API api,
                       DataFormat dataFormat, int32_t width, int32_t height,
                       int32_t kbs, int32_t framerate, int32_t gop,
                       int32_t q_min, int32_t q_max) {
   AMFEncoder *enc = NULL;
   try {
-    if (width % 2 != 0 || height % 2 != 0) {
-      return NULL;
-    }
     amf_wstring codecStr;
     if (!convert_codec(dataFormat, codecStr)) {
       return NULL;
@@ -453,14 +458,16 @@ void *amf_new_encoder(void *handle, int64_t luid, API api,
     }
     enc = new AMFEncoder(handle, memoryType, codecStr, dataFormat, width,
                          height, kbs * 1000, framerate, gop, q_min, q_max);
-    if (enc && enc->init_result_ == AMF_OK) {
-      return enc;
+    if (enc) {
+      if (AMF_OK == enc->initialize()) {
+        return enc;
+      }
     }
   } catch (const std::exception &e) {
     LOG_ERROR("new failed: " + e.what());
   }
   if (enc) {
-    enc->destroy();
+    amf_destroy_encoder(enc);
     delete enc;
     enc = NULL;
   }
@@ -473,16 +480,6 @@ int amf_encode(void *encoder, void *tex, EncodeCallback callback, void *obj) {
     return -enc->encode(tex, callback, obj);
   } catch (const std::exception &e) {
     LOG_ERROR("encode failed: " + e.what());
-  }
-  return -1;
-}
-
-int amf_destroy_encoder(void *encoder) {
-  try {
-    AMFEncoder *enc = (AMFEncoder *)encoder;
-    return enc->destroy();
-  } catch (const std::exception &e) {
-    LOG_ERROR("destroy failed: " + e.what());
   }
   return -1;
 }

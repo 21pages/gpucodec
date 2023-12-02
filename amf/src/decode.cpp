@@ -26,8 +26,6 @@
 
 namespace {
 class AMFDecoder {
-public:
-  AMF_RESULT init_result_ = AMF_FAIL;
 
 private:
   // system
@@ -53,11 +51,13 @@ private:
 public:
   AMFDecoder(void *device, int64_t luid, amf::AMF_MEMORY_TYPE memoryTypeOut,
              amf_wstring codec, amf::AMF_SURFACE_FORMAT textureFormatOut,
-             bool outputSharedHandle)
-      : device_(device), luid_(luid), AMFMemoryType_(memoryTypeOut),
-        textureFormatOut_(textureFormatOut), codec_(codec),
-        outputSharedHandle_(outputSharedHandle) {
-    init_result_ = initialize();
+             bool outputSharedHandle) {
+    device_ = device;
+    luid_ = luid;
+    AMFMemoryType_ = memoryTypeOut;
+    textureFormatOut_ = textureFormatOut;
+    codec_ = codec;
+    outputSharedHandle_ = outputSharedHandle;
   }
 
   AMF_RESULT decode(uint8_t *iData, uint32_t iDataSize, DecodeCallback callback,
@@ -149,7 +149,6 @@ public:
     return AMF_OK;
   }
 
-private:
   AMF_RESULT initialize() {
     AMF_RESULT res;
 
@@ -208,6 +207,7 @@ private:
     return AMF_OK;
   }
 
+private:
   AMF_RESULT setParameters() {
     AMF_RESULT res;
     res = AMFDecoder_->SetProperty(
@@ -291,8 +291,21 @@ bool convert_codec(DataFormat lhs, amf_wstring &rhs) {
 
 extern "C" {
 
+int amf_destroy_decoder(void *decoder) {
+  try {
+    AMFDecoder *dec = (AMFDecoder *)decoder;
+    if (dec) {
+      return dec->destroy();
+    }
+  } catch (const std::exception &e) {
+    LOG_ERROR("destroy failed: " + e.what());
+  }
+  return -1;
+}
+
 void *amf_new_decoder(void *device, int64_t luid, API api,
                       DataFormat dataFormat, bool outputSharedHandle) {
+  AMFDecoder *dec = NULL;
   try {
     amf_wstring codecStr;
     amf::AMF_MEMORY_TYPE memory;
@@ -303,16 +316,20 @@ void *amf_new_decoder(void *device, int64_t luid, API api,
     if (!convert_codec(dataFormat, codecStr)) {
       return NULL;
     }
-    AMFDecoder *dec = new AMFDecoder(device, luid, memory, codecStr,
-                                     amf::AMF_SURFACE_BGRA, outputSharedHandle);
-    if (dec && dec->init_result_ != AMF_OK) {
-      dec->destroy();
-      delete dec;
-      dec = NULL;
+    dec = new AMFDecoder(device, luid, memory, codecStr, amf::AMF_SURFACE_BGRA,
+                         outputSharedHandle);
+    if (dec) {
+      if (dec->initialize() == AMF_OK) {
+        return dec;
+      }
     }
-    return dec;
   } catch (const std::exception &e) {
     LOG_ERROR("new failed: " + e.what());
+  }
+  if (dec) {
+    amf_destroy_decoder(dec);
+    delete dec;
+    dec = NULL;
   }
   return NULL;
 }
@@ -359,15 +376,4 @@ int amf_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
   return -1;
 }
 
-int amf_destroy_decoder(void *decoder) {
-  try {
-    AMFDecoder *dec = (AMFDecoder *)decoder;
-    if (dec) {
-      return dec->destroy();
-    }
-  } catch (const std::exception &e) {
-    LOG_ERROR("destroy failed: " + e.what());
-  }
-  return -1;
-}
 } // extern "C"
