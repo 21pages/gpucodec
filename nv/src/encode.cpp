@@ -60,82 +60,224 @@ public:
   NvEncoderD3D11 *pEnc_ = nullptr;
   CudaFunctions *cuda_dl_ = nullptr;
   NvencFunctions *nvenc_dl_ = nullptr;
+  CUcontext cuContext_ = nullptr;
+
+  void *handle_ = nullptr;
+  int64_t luid_;
+  API api_;
+  DataFormat dataFormat_;
   int32_t width_;
   int32_t height_;
-  NV_ENC_BUFFER_FORMAT format_;
-  CUcontext cuContext_ = nullptr;
-  void *handle_ = nullptr;
+  int32_t kbs_;
+  int32_t framerate_;
+  int32_t gop_;
+  int32_t q_min_;
+  int32_t q_max_;
+  NV_ENC_CONFIG encodeConfig_ = {0};
 
-  NvencEncoder(int32_t width, int32_t height, NV_ENC_BUFFER_FORMAT format)
-      : width_(width), height_(height), format_(format) {
+  NvencEncoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
+               int32_t width, int32_t height, int32_t kbs, int32_t framerate,
+               int32_t gop, int32_t q_min, int32_t q_max) {
+    handle_ = handle;
+    luid_ = luid;
+    api_ = api;
+    dataFormat_ = dataFormat;
+    width_ = width;
+    height_ = height;
+    kbs_ = kbs;
+    framerate_ = framerate;
+    gop_ = gop;
+    q_min_ = q_min;
+    q_max_ = q_max;
+
     load_driver(&cuda_dl_, &nvenc_dl_);
   }
-};
 
+  bool init() {
+    GUID guidCodec;
+    switch (dataFormat_) {
+    case H264:
+      guidCodec = NV_ENC_CODEC_H264_GUID;
+      break;
+    case H265:
+      guidCodec = NV_ENC_CODEC_HEVC_GUID;
+      break;
+    default:
+      LOG_ERROR("dataFormat not support, dataFormat: " +
+                std::to_string(dataFormat_));
+      return false;
+    }
+    if (!ck(cuda_dl_->cuInit(0))) {
+      LOG_TRACE("cuInit failed");
+      return false;
+    }
+
+    native_ = std::make_unique<NativeDevice>();
 #ifdef CONFIG_NV_OPTIMUS_FOR_DEV
-int copy_texture(NvencEncoder *e, void *src, void *dst) {
-  ComPtr<ID3D11Device> src_device = (ID3D11Device *)e->handle_;
-  ComPtr<ID3D11DeviceContext> src_deviceContext;
-  src_device->GetImmediateContext(src_deviceContext.ReleaseAndGetAddressOf());
-  ComPtr<ID3D11Texture2D> src_tex = (ID3D11Texture2D *)src;
-  ComPtr<ID3D11Texture2D> dst_tex = (ID3D11Texture2D *)dst;
-  HRESULT hr;
-
-  D3D11_TEXTURE2D_DESC desc;
-  ZeroMemory(&desc, sizeof(desc));
-  src_tex->GetDesc(&desc);
-  desc.Usage = D3D11_USAGE_STAGING;
-  desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-  desc.BindFlags = 0;
-  desc.MiscFlags = 0;
-  ComPtr<ID3D11Texture2D> staging_tex;
-  src_device->CreateTexture2D(&desc, NULL,
-                              staging_tex.ReleaseAndGetAddressOf());
-  src_deviceContext->CopyResource(staging_tex.Get(), src_tex.Get());
-
-  D3D11_MAPPED_SUBRESOURCE map;
-  src_deviceContext->Map(staging_tex.Get(), 0, D3D11_MAP_READ, 0, &map);
-  std::unique_ptr<uint8_t[]> buffer(new uint8_t[desc.Width * desc.Height * 4]);
-  memcpy(buffer.get(), map.pData, desc.Width * desc.Height * 4);
-  src_deviceContext->Unmap(staging_tex.Get(), 0);
-
-  D3D11_BOX Box;
-  Box.left = 0;
-  Box.right = desc.Width;
-  Box.top = 0;
-  Box.bottom = desc.Height;
-  Box.front = 0;
-  Box.back = 1;
-  e->native_->context_->UpdateSubresource(dst_tex.Get(), 0, &Box, buffer.get(),
-                                          desc.Width * 4,
-                                          desc.Width * desc.Height * 4);
-
-  return 0;
-}
+    if (!native_->Init(luid_, nullptr))
+      return false;
+#else
+    if (!native_->Init(luid_, (ID3D11Device *)handle_)) {
+      LOG_ERROR("d3d device init failed");
+      return false;
+    }
 #endif
 
-int set_qp(NV_ENC_CONFIG *encodeConfig, int32_t q_min, int32_t q_max) {
-  bool q_valid =
-      q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 && q_min <= q_max;
-  if (!q_valid) {
-    LOG_WARN("invalid qp range: [" + std::to_string(q_min) + ", " +
-             std::to_string(q_max) + "]");
-    return -1;
+    CUdevice cuDevice = 0;
+    if (!ck(cuda_dl_->cuD3D11GetDevice(&cuDevice, native_->adapter_.Get()))) {
+      LOG_ERROR("Failed to get cuDevice");
+      return false;
+    }
+    if (!ck(cuda_dl_->cuCtxCreate(&cuContext_, 0, cuDevice))) {
+      LOG_TRACE("cuCtxCreate failed");
+      return false;
+    }
+
+    int nExtraOutputDelay = 0;
+    pEnc_ = new NvEncoderD3D11(cuda_dl_, nvenc_dl_, native_->device_.Get(),
+                               width_, height_, NV_ENC_BUFFER_FORMAT_ARGB,
+                               nExtraOutputDelay, false, false); // no delay
+    NV_ENC_INITIALIZE_PARAMS initializeParams = {0};
+    ZeroMemory(&initializeParams, sizeof(initializeParams));
+    ZeroMemory(&encodeConfig_, sizeof(encodeConfig_));
+    initializeParams.encodeConfig = &encodeConfig_;
+    pEnc_->CreateDefaultEncoderParams(
+        &initializeParams, guidCodec,
+        NV_ENC_PRESET_P3_GUID /*NV_ENC_PRESET_LOW_LATENCY_HP_GUID*/,
+        NV_ENC_TUNING_INFO_LOW_LATENCY);
+
+    // no delay
+    initializeParams.encodeConfig->frameIntervalP = 1;
+    initializeParams.encodeConfig->rcParams.lookaheadDepth = 0;
+
+    // bitrate
+    initializeParams.encodeConfig->rcParams.averageBitRate = kbs_ * 1000;
+    // framerate
+    initializeParams.frameRateNum = framerate_;
+    initializeParams.frameRateDen = 1;
+    // gop
+    if (gop_ == MAX_GOP) {
+      gop_ = NVENC_INFINITE_GOPLENGTH;
+    }
+    initializeParams.encodeConfig->gopLength = gop_;
+    // rc method
+    initializeParams.encodeConfig->rcParams.rateControlMode =
+        NV_ENC_PARAMS_RC_CBR;
+    // qp
+    set_qp(initializeParams.encodeConfig, q_min_, q_max_);
+
+    pEnc_->CreateEncoder(&initializeParams);
+    return true;
   }
-  if (!encodeConfig) {
-    LOG_ERROR("encodeConfig is null");
-    return -1;
+
+  int encode(void *texture, EncodeCallback callback, void *obj) {
+    bool encoded = false;
+    std::vector<NvPacket> vPacket;
+    const NvEncInputFrame *pEncInput = pEnc_->GetNextInputFrame();
+
+    ID3D11Texture2D *pBgraTextyure =
+        reinterpret_cast<ID3D11Texture2D *>(pEncInput->inputPtr);
+#ifdef CONFIG_NV_OPTIMUS_FOR_DEV
+    copy_texture(texture, pBgraTextyure);
+#else
+    native_->context_->CopyResource(
+        pBgraTextyure, reinterpret_cast<ID3D11Texture2D *>(texture));
+#endif
+
+    pEnc_->EncodeFrame(vPacket);
+    for (NvPacket &packet : vPacket) {
+      int32_t key = (packet.pictureType == NV_ENC_PIC_TYPE_IDR ||
+                     packet.pictureType == NV_ENC_PIC_TYPE_I)
+                        ? 1
+                        : 0;
+      if (packet.data.size() > 0) {
+        if (callback)
+          callback(packet.data.data(), packet.data.size(), key, obj);
+        encoded = true;
+      }
+    }
+    return encoded ? 0 : -1;
   }
-  encodeConfig->rcParams.enableMinQP = 1;
-  encodeConfig->rcParams.enableMaxQP = 1;
-  encodeConfig->rcParams.minQP.qpIntra = q_min;
-  encodeConfig->rcParams.minQP.qpInterB = q_min;
-  encodeConfig->rcParams.minQP.qpInterP = q_min;
-  encodeConfig->rcParams.maxQP.qpIntra = q_max;
-  encodeConfig->rcParams.maxQP.qpInterB = q_max;
-  encodeConfig->rcParams.maxQP.qpInterP = q_max;
-  return 0;
-}
+
+  void destroy() {
+    if (pEnc_) {
+      pEnc_->DestroyEncoder();
+      delete pEnc_;
+      pEnc_ = nullptr;
+    }
+    if (cuContext_) {
+      cuda_dl_->cuCtxDestroy(cuContext_);
+    }
+    free_driver(&cuda_dl_, &nvenc_dl_);
+  }
+
+  int set_qp(NV_ENC_CONFIG *encodeConfig, int32_t q_min, int32_t q_max) {
+    bool q_valid = q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 &&
+                   q_min <= q_max;
+    if (!q_valid) {
+      LOG_WARN("invalid qp range: [" + std::to_string(q_min) + ", " +
+               std::to_string(q_max) + "]");
+      return -1;
+    }
+    if (!encodeConfig) {
+      LOG_ERROR("encodeConfig is null");
+      return -1;
+    }
+    encodeConfig->rcParams.enableMinQP = 1;
+    encodeConfig->rcParams.enableMaxQP = 1;
+    encodeConfig->rcParams.minQP.qpIntra = q_min;
+    encodeConfig->rcParams.minQP.qpInterB = q_min;
+    encodeConfig->rcParams.minQP.qpInterP = q_min;
+    encodeConfig->rcParams.maxQP.qpIntra = q_max;
+    encodeConfig->rcParams.maxQP.qpInterB = q_max;
+    encodeConfig->rcParams.maxQP.qpInterP = q_max;
+    return 0;
+  }
+
+private:
+#ifdef CONFIG_NV_OPTIMUS_FOR_DEV
+  int copy_texture(void *src, void *dst) {
+    ComPtr<ID3D11Device> src_device = (ID3D11Device *)handle_;
+    ComPtr<ID3D11DeviceContext> src_deviceContext;
+    src_device->GetImmediateContext(src_deviceContext.ReleaseAndGetAddressOf());
+    ComPtr<ID3D11Texture2D> src_tex = (ID3D11Texture2D *)src;
+    ComPtr<ID3D11Texture2D> dst_tex = (ID3D11Texture2D *)dst;
+    HRESULT hr;
+
+    D3D11_TEXTURE2D_DESC desc;
+    ZeroMemory(&desc, sizeof(desc));
+    src_tex->GetDesc(&desc);
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    desc.BindFlags = 0;
+    desc.MiscFlags = 0;
+    ComPtr<ID3D11Texture2D> staging_tex;
+    src_device->CreateTexture2D(&desc, NULL,
+                                staging_tex.ReleaseAndGetAddressOf());
+    src_deviceContext->CopyResource(staging_tex.Get(), src_tex.Get());
+
+    D3D11_MAPPED_SUBRESOURCE map;
+    src_deviceContext->Map(staging_tex.Get(), 0, D3D11_MAP_READ, 0, &map);
+    std::unique_ptr<uint8_t[]> buffer(
+        new uint8_t[desc.Width * desc.Height * 4]);
+    memcpy(buffer.get(), map.pData, desc.Width * desc.Height * 4);
+    src_deviceContext->Unmap(staging_tex.Get(), 0);
+
+    D3D11_BOX Box;
+    Box.left = 0;
+    Box.right = desc.Width;
+    Box.top = 0;
+    Box.bottom = desc.Height;
+    Box.front = 0;
+    Box.back = 1;
+    native_->context_->UpdateSubresource(dst_tex.Get(), 0, &Box, buffer.get(),
+                                         desc.Width * 4,
+                                         desc.Width * desc.Height * 4);
+
+    return 0;
+  }
+#endif
+};
 
 } // namespace
 
@@ -158,15 +300,7 @@ int nv_destroy_encoder(void *encoder) {
   try {
     NvencEncoder *e = (NvencEncoder *)encoder;
     if (e) {
-      if (e->pEnc_) {
-        e->pEnc_->DestroyEncoder();
-        delete e->pEnc_;
-        e->pEnc_ = nullptr;
-      }
-      if (e->cuContext_) {
-        e->cuda_dl_->cuCtxDestroy(e->cuContext_);
-      }
-      free_driver(&e->cuda_dl_, &e->nvenc_dl_);
+      e->destroy();
     }
     return 0;
   } catch (const std::exception &e) {
@@ -181,109 +315,11 @@ void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
                      int32_t q_max) {
   NvencEncoder *e = NULL;
   try {
-    if (width % 2 != 0 || height % 2 != 0) {
-      LOG_ERROR("odd resolution, width: " + std::to_string(width) +
-                ", height: " + std::to_string(height));
+    e = new NvencEncoder(handle, luid, api, dataFormat, width, height, kbs,
+                         framerate, gop, q_min, q_max);
+    if (!e->init()) {
       goto _exit;
     }
-    if (dataFormat != H264 && dataFormat != H265) {
-      LOG_ERROR("dataFormat not support, dataFormat: " +
-                std::to_string(dataFormat));
-      goto _exit;
-    }
-    GUID guidCodec = NV_ENC_CODEC_H264_GUID;
-    if (H265 == dataFormat) {
-      guidCodec = NV_ENC_CODEC_HEVC_GUID;
-    }
-    NV_ENC_BUFFER_FORMAT surfaceFormat = NV_ENC_BUFFER_FORMAT_ARGB;
-
-    e = new NvencEncoder(width, height, surfaceFormat);
-    if (!e) {
-      LOG_TRACE("new NvencEncoder failed");
-      goto _exit;
-    }
-    if (!ck(e->cuda_dl_->cuInit(0))) {
-      LOG_TRACE("cuInit failed");
-      goto _exit;
-    }
-
-    if (API_DX11 == api) {
-      e->native_ = std::make_unique<NativeDevice>();
-#ifdef CONFIG_NV_OPTIMUS_FOR_DEV
-      if (!e->native_->Init(luid, nullptr))
-        goto _exit;
-#else
-      if (!e->native_->Init(luid, (ID3D11Device *)handle)) {
-        LOG_ERROR("d3d device init failed");
-        goto _exit;
-      }
-#endif
-    } else {
-      LOG_ERROR("api not support, api: " + std::to_string(api));
-      goto _exit;
-    }
-    int nGpu = 0, gpu = 0;
-    if (!ck(e->cuda_dl_->cuDeviceGetCount(&nGpu))) {
-      LOG_ERROR("cuDeviceGetCount failed");
-      goto _exit;
-    }
-    if (gpu >= nGpu) {
-      LOG_ERROR("gpu out of range," + std::to_string(gpu) +
-                ">=" + std::to_string(nGpu));
-      goto _exit;
-    }
-    CUdevice cuDevice = 0;
-    if (!ck(e->cuda_dl_->cuDeviceGet(&cuDevice, gpu))) {
-      LOG_TRACE("cuDeviceGet failed");
-      goto _exit;
-    }
-    // char szDeviceName[80];
-    // if (!ck(e->cuda_dl_->cuDeviceGetName(szDeviceName, sizeof(szDeviceName),
-    //                                      cuDevice))) {
-    //   LOG_TRACE("cuDeviceGetName failed");
-    //   goto _exit;
-    // }
-    if (!ck(e->cuda_dl_->cuCtxCreate(&e->cuContext_, 0, cuDevice))) {
-      LOG_TRACE("cuCtxCreate failed");
-      goto _exit;
-    }
-
-    int nExtraOutputDelay = 0;
-    e->pEnc_ = new NvEncoderD3D11(
-        e->cuda_dl_, e->nvenc_dl_, e->native_->device_.Get(), e->width_,
-        e->height_, e->format_, nExtraOutputDelay, false, false); // no delay
-    NV_ENC_INITIALIZE_PARAMS initializeParams = {0};
-    NV_ENC_CONFIG encodeConfig = {0};
-
-    initializeParams.encodeConfig = &encodeConfig;
-    e->pEnc_->CreateDefaultEncoderParams(
-        &initializeParams, guidCodec,
-        NV_ENC_PRESET_P3_GUID /*NV_ENC_PRESET_LOW_LATENCY_HP_GUID*/,
-        NV_ENC_TUNING_INFO_LOW_LATENCY);
-
-    // no delay
-    initializeParams.encodeConfig->frameIntervalP = 1;
-    initializeParams.encodeConfig->rcParams.lookaheadDepth = 0;
-
-    // bitrate
-    initializeParams.encodeConfig->rcParams.averageBitRate = kbs * 1000;
-    // framerate
-    initializeParams.frameRateNum = framerate;
-    initializeParams.frameRateDen = 1;
-    // gop
-    if (gop == MAX_GOP) {
-      gop = NVENC_INFINITE_GOPLENGTH;
-    }
-    initializeParams.encodeConfig->gopLength = gop;
-    // rc method
-    initializeParams.encodeConfig->rcParams.rateControlMode =
-        NV_ENC_PARAMS_RC_CBR;
-    // qp
-    set_qp(initializeParams.encodeConfig, q_min, q_max);
-
-    e->pEnc_->CreateEncoder(&initializeParams);
-    e->handle_ = handle;
-
     return e;
   } catch (const std::exception &ex) {
     LOG_ERROR("new failed: " + ex.what());
@@ -302,34 +338,7 @@ int nv_encode(void *encoder, void *texture, EncodeCallback callback,
               void *obj) {
   try {
     NvencEncoder *e = (NvencEncoder *)encoder;
-    NvEncoderD3D11 *pEnc = e->pEnc_;
-    CUcontext cuContext = e->cuContext_;
-    bool encoded = false;
-    std::vector<NvPacket> vPacket;
-    const NvEncInputFrame *pEncInput = pEnc->GetNextInputFrame();
-
-    ID3D11Texture2D *pBgraTextyure =
-        reinterpret_cast<ID3D11Texture2D *>(pEncInput->inputPtr);
-#ifdef CONFIG_NV_OPTIMUS_FOR_DEV
-    copy_texture(e, texture, pBgraTextyure);
-#else
-    e->native_->context_->CopyResource(
-        pBgraTextyure, reinterpret_cast<ID3D11Texture2D *>(texture));
-#endif
-
-    pEnc->EncodeFrame(vPacket);
-    for (NvPacket &packet : vPacket) {
-      int32_t key = (packet.pictureType == NV_ENC_PIC_TYPE_IDR ||
-                     packet.pictureType == NV_ENC_PIC_TYPE_I)
-                        ? 1
-                        : 0;
-      if (packet.data.size() > 0) {
-        if (callback)
-          callback(packet.data.data(), packet.data.size(), key, obj);
-        encoded = true;
-      }
-    }
-    return encoded ? 0 : -1;
+    return e->encode(texture, callback, obj);
   } catch (const std::exception &e) {
     LOG_ERROR("encode failed: " + e.what());
   }
@@ -406,7 +415,8 @@ int nv_set_bitrate(void *e, int32_t kbs) {
 int nv_set_qp(void *e, int32_t q_min, int32_t q_max) {
   try {
     RECONFIGURE_HEAD
-    if (set_qp(params.reInitEncodeParams.encodeConfig, q_min, q_max) != 0) {
+    if (enc->set_qp(params.reInitEncodeParams.encodeConfig, q_min, q_max) !=
+        0) {
       return -1;
     }
     RECONFIGURE_TAIL
