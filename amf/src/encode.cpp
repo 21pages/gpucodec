@@ -77,6 +77,7 @@ private:
   int32_t gop_;
   int32_t q_min_;
   int32_t q_max_;
+  bool enable4K_ = false;
 
   // Buffers
   std::vector<uint8_t> packetDataBuffer_;
@@ -96,6 +97,7 @@ public:
     gop_ = gop;
     q_min_ = q_min;
     q_max_ = q_max;
+    enable4K_ = width > 1920 && height > 1080;
   }
 
   AMF_RESULT encode(void *tex, EncodeCallback callback, void *obj) {
@@ -308,6 +310,16 @@ private:
                                      AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR);
       AMF_CHECK_RETURN(res,
                        "SetProperty AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD");
+      if (enable4K_) {
+        res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_PROFILE,
+                                       AMF_VIDEO_ENCODER_PROFILE_HIGH);
+        AMF_CHECK_RETURN(res, "SetProperty(AMF_VIDEO_ENCODER_PROFILE failed");
+
+        res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_PROFILE_LEVEL,
+                                       AMF_H264_LEVEL__5_1);
+        AMF_CHECK_RETURN(res,
+                         "SetProperty AMF_VIDEO_ENCODER_PROFILE_LEVEL failed");
+      }
 
       // ------------- Encoder params dynamic ---------------
       AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_B_PIC_PATTERN, 0);
@@ -366,6 +378,17 @@ private:
           AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_CBR);
       AMF_CHECK_RETURN(
           res, "SetProperty AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD failed");
+
+      if (enable4K_) {
+        res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_TIER,
+                                       AMF_VIDEO_ENCODER_HEVC_TIER_HIGH);
+        AMF_CHECK_RETURN(res, "SetProperty(AMF_VIDEO_ENCODER_HEVC_TIER failed");
+
+        res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_PROFILE_LEVEL,
+                                       AMF_LEVEL_5_1);
+        AMF_CHECK_RETURN(
+            res, "SetProperty AMF_VIDEO_ENCODER_HEVC_PROFILE_LEVEL failed");
+      }
 
       // ------------- Encoder params dynamic ---------------
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_QUERY_TIMEOUT,
