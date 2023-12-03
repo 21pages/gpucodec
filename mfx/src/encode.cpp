@@ -174,6 +174,7 @@ public:
 
     native_ = std::make_unique<NativeDevice>();
     if (!native_->Init(luid_, (ID3D11Device *)handle_)) {
+      LOG_ERROR("failed to init native device");
       return MFX_ERR_DEVICE_FAILED;
     }
 
@@ -183,6 +184,7 @@ public:
     // Create Media SDK encoder
     mfxENC_ = new MFXVideoENCODE(session_);
     if (!mfxENC_) {
+      LOG_ERROR("failed to create MFXVideoENCODE");
       return MFX_ERR_NOT_INITIALIZED;
     }
 

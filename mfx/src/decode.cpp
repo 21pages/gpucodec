@@ -49,13 +49,156 @@ public:
   bool initialized_ = false;
   D3D11FrameAllocator d3d11FrameAllocator_;
   mfxFrameAllocResponse mfxResponse_;
+
+  void *device_;
+  int64_t luid_;
+  API api_;
+  DataFormat codecID_;
   bool outputSharedHandle_;
 
-  MFXDecoder() {
+  MFXDecoder(void *device, int64_t luid, API api, DataFormat codecID,
+             bool outputSharedHandle) {
+    device_ = device;
+    luid_ = luid;
+    api_ = api;
+    codecID_ = codecID;
+    outputSharedHandle_ = outputSharedHandle;
     ZeroMemory(&mfxVideoParams_, sizeof(mfxVideoParams_));
     ZeroMemory(&mfxResponse_, sizeof(mfxResponse_));
   }
 
+  mfxStatus init() {
+    mfxStatus sts = MFX_ERR_NONE;
+    native_ = std::make_unique<NativeDevice>();
+    if (!native_->Init(luid_, (ID3D11Device *)device_, 4)) {
+      LOG_ERROR("Failed to initialize native device");
+      return MFX_ERR_DEVICE_FAILED;
+    }
+    sts = InitializeMFX();
+    CHECK_STATUS_RETURN(sts, "InitializeMFX");
+
+    // Create Media SDK decoder
+    mfxDEC_ = new MFXVideoDECODE(session_);
+    if (!mfxDEC_) {
+      LOG_ERROR("Failed to create MFXVideoDECODE");
+      return MFX_ERR_NOT_INITIALIZED;
+    }
+
+    memset(&mfxVideoParams_, 0, sizeof(mfxVideoParams_));
+    if (!convert_codec(codecID_, mfxVideoParams_.mfx.CodecId)) {
+      LOG_ERROR("Unsupported codec");
+      return MFX_ERR_UNSUPPORTED;
+    }
+
+    mfxVideoParams_.IOPattern = MFX_IOPATTERN_OUT_VIDEO_MEMORY;
+    // AsyncDepth: sSpecifies how many asynchronous operations an
+    // application performs before the application explicitly synchronizes the
+    // result. If zero, the value is not specified
+    mfxVideoParams_.AsyncDepth = 1; // Not important.
+    // DecodedOrder: For AVC and HEVC, used to instruct the decoder
+    // to return output frames in the decoded order. Must be zero for all other
+    // decoders.
+    mfxVideoParams_.mfx.DecodedOrder = true; // Not important.
+
+    // Validate video decode parameters (optional)
+    sts = mfxDEC_->Query(&mfxVideoParams_, &mfxVideoParams_);
+    CHECK_STATUS_RETURN(sts, "Query");
+
+    return MFX_ERR_NONE;
+  }
+
+  int decode(uint8_t *data, int len, DecodeCallback callback, void *obj) {
+    mfxStatus sts = MFX_ERR_NONE;
+    mfxSyncPoint syncp;
+    mfxFrameSurface1 *pmfxOutSurface = NULL;
+    int nIndex = 0;
+    bool decoded = false;
+    mfxBitstream mfxBS;
+
+    setBitStream(&mfxBS, data, len);
+    if (!initialized_) {
+      sts = initializeDecode(&mfxBS, false);
+      CHECK_STATUS_RETURN(sts, "initializeDecode");
+      initialized_ = true;
+    }
+    setBitStream(&mfxBS, data, len);
+
+    int loop_counter = 0;
+    do {
+      if (loop_counter++ > 100) {
+        std::cerr << "mfx decode loop two many times" << std::endl;
+        break;
+      }
+
+      if (MFX_WRN_DEVICE_BUSY == sts)
+        MSDK_SLEEP(1);
+      if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_NONE == sts) {
+        nIndex = GetFreeSurfaceIndex(
+            pmfxSurfaces_.data(),
+            pmfxSurfaces_.size()); // Find free frame surface
+        if (nIndex >= pmfxSurfaces_.size()) {
+          LOG_ERROR("GetFreeSurfaceIndex failed, nIndex=" +
+                    std::to_string(nIndex));
+          return -1;
+        }
+      }
+
+      sts = mfxDEC_->DecodeFrameAsync(&mfxBS, &pmfxSurfaces_[nIndex],
+                                      &pmfxOutSurface, &syncp);
+
+      if (MFX_ERR_INCOMPATIBLE_VIDEO_PARAM == sts) {
+        // https://github.com/FFmpeg/FFmpeg/blob/f84412d6f4e9c1f1d1a2491f9337d7e789c688ba/libavcodec/qsvdec.c#L736
+        setBitStream(&mfxBS, data, len);
+        LOG_INFO("Incompatible video parameters, resetting decoder");
+        sts = initializeDecode(&mfxBS, true);
+        CHECK_STATUS_RETURN(sts, "initialize");
+        continue;
+      }
+
+      // Ignore warnings if output is available,
+      if (MFX_ERR_NONE < sts && syncp)
+        sts = MFX_ERR_NONE;
+
+      if (MFX_ERR_NONE == sts)
+        sts = session_.SyncOperation(syncp, 1000);
+      if (MFX_ERR_NONE == sts) {
+        if (!pmfxOutSurface) {
+          LOG_ERROR("pmfxOutSurface is null");
+          return -1;
+        }
+        if (!convert(pmfxOutSurface)) {
+          LOG_ERROR("Failed to convert");
+          return -1;
+        }
+        void *output = nullptr;
+        if (outputSharedHandle_) {
+          HANDLE sharedHandle = native_->GetSharedHandle();
+          if (!sharedHandle) {
+            LOG_ERROR("Failed to GetSharedHandle");
+            return -1;
+          }
+          output = sharedHandle;
+        } else {
+          output = native_->GetCurrentTexture();
+        }
+
+        if (MFX_ERR_NONE == sts) {
+          if (callback)
+            callback(output, obj);
+          decoded = true;
+        }
+        break;
+      }
+    } while (MFX_ERR_NONE <= sts || MFX_ERR_MORE_SURFACE == sts);
+
+    if (!decoded) {
+      std::cerr << "decoded failed, sts=" << sts << std::endl;
+    }
+
+    return decoded ? 0 : -1;
+  }
+
+private:
   mfxStatus InitializeMFX() {
     mfxStatus sts = MFX_ERR_NONE;
     mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
@@ -80,7 +223,19 @@ public:
     return MFX_ERR_NONE;
   }
 
-  mfxStatus initialize(mfxBitstream *mfxBS, bool reinit) {
+  bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId) {
+    switch (dataFormat) {
+    case H264:
+      CodecId = MFX_CODEC_AVC;
+      return true;
+    case H265:
+      CodecId = MFX_CODEC_HEVC;
+      return true;
+    }
+    return false;
+  }
+
+  mfxStatus initializeDecode(mfxBitstream *mfxBS, bool reinit) {
     mfxStatus sts = MFX_ERR_NONE;
     mfxFrameAllocRequest Request;
     memset(&Request, 0, sizeof(Request));
@@ -106,8 +261,8 @@ public:
 
     // Allocate surfaces for decoder
     if (reinit) {
-        sts = d3d11FrameAllocator_.FreeFrames(&mfxResponse_);
-        MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+      sts = d3d11FrameAllocator_.FreeFrames(&mfxResponse_);
+      MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
     }
     sts = d3d11FrameAllocator_.AllocFrames(&Request, &mfxResponse_);
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
@@ -133,19 +288,66 @@ public:
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
     return MFX_ERR_NONE;
   }
-};
 
-bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId) {
-  switch (dataFormat) {
-  case H264:
-    CodecId = MFX_CODEC_AVC;
-    return true;
-  case H265:
-    CodecId = MFX_CODEC_HEVC;
+  void setBitStream(mfxBitstream *mfxBS, uint8_t *data, int len) {
+    memset(mfxBS, 0, sizeof(mfxBitstream));
+    mfxBS->Data = data;
+    mfxBS->DataLength = len;
+    mfxBS->MaxLength = len;
+    mfxBS->DataFlag = MFX_BITSTREAM_COMPLETE_FRAME;
+  }
+
+  bool convert(mfxFrameSurface1 *pmfxOutSurface) {
+    mfxStatus sts = MFX_ERR_NONE;
+    mfxHDLPair pair = {NULL};
+    sts = d3d11FrameAllocator_.GetFrameHDL(pmfxOutSurface->Data.MemId,
+                                           (mfxHDL *)&pair);
+    if (MFX_ERR_NONE != sts) {
+      LOG_ERROR("Failed to GetFrameHDL");
+      return false;
+    }
+    ID3D11Texture2D *texture = (ID3D11Texture2D *)pair.first;
+    D3D11_TEXTURE2D_DESC desc2D;
+    texture->GetDesc(&desc2D);
+    if (!native_->EnsureTexture(desc2D.Width, desc2D.Height)) {
+      LOG_ERROR("Failed to EnsureTexture");
+      return false;
+    }
+    native_->next(); // comment out to remove picture shaking
+    native_->BeginQuery();
+
+    // nv12 -> bgra
+    D3D11_VIDEO_PROCESSOR_CONTENT_DESC contentDesc;
+    ZeroMemory(&contentDesc, sizeof(contentDesc));
+    contentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
+    contentDesc.InputFrameRate.Numerator = 60;
+    contentDesc.InputFrameRate.Denominator = 1;
+    contentDesc.InputWidth = pmfxOutSurface->Info.CropW;
+    contentDesc.InputHeight = pmfxOutSurface->Info.CropH;
+    contentDesc.OutputWidth = pmfxOutSurface->Info.CropW;
+    contentDesc.OutputHeight = pmfxOutSurface->Info.CropH;
+    contentDesc.OutputFrameRate.Numerator = 60;
+    contentDesc.OutputFrameRate.Denominator = 1;
+    D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace;
+    ZeroMemory(&colorSpace, sizeof(colorSpace));
+    colorSpace.YCbCr_Matrix = 0; // 0:601, 1:709
+    colorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
+    if (!native_->Process(texture, native_->GetCurrentTexture(), contentDesc,
+                          colorSpace)) {
+      LOG_ERROR("Failed to process");
+      native_->EndQuery();
+      return false;
+    }
+
+    native_->context_->Flush();
+    native_->EndQuery();
+    if (!native_->Query()) {
+      LOG_ERROR("Failed to query");
+      return false;
+    }
     return true;
   }
-  return false;
-}
+};
 
 } // namespace
 
@@ -164,198 +366,35 @@ int mfx_destroy_decoder(void *decoder) {
 
 void *mfx_new_decoder(void *device, int64_t luid, API api, DataFormat codecID,
                       bool outputSharedHandle) {
-  mfxStatus sts = MFX_ERR_NONE;
-
-  MFXDecoder *p = new MFXDecoder();
-  p->native_ = std::make_unique<NativeDevice>();
-  if (!p->native_->Init(luid, (ID3D11Device *)device, 4))
-    goto _exit;
-  if (!p) {
-    goto _exit;
-  }
-  sts = p->InitializeMFX();
-  CHECK_STATUS_GOTO(sts, "InitializeMFX");
-
-  // Create Media SDK decoder
-  p->mfxDEC_ = new MFXVideoDECODE(p->session_);
-
-  memset(&p->mfxVideoParams_, 0, sizeof(p->mfxVideoParams_));
-  if (!convert_codec(codecID, p->mfxVideoParams_.mfx.CodecId)) {
-    goto _exit;
+  MFXDecoder *p = NULL;
+  try {
+    p = new MFXDecoder(device, luid, api, codecID, outputSharedHandle);
+    if (p) {
+      if (p->init() == MFX_ERR_NONE) {
+        return p;
+      }
+    }
+  } catch (const std::exception &e) {
+    LOG_ERROR("new failed: " + e.what());
   }
 
-  p->mfxVideoParams_.IOPattern = MFX_IOPATTERN_OUT_VIDEO_MEMORY;
-  // AsyncDepth: sSpecifies how many asynchronous operations an
-  // application performs before the application explicitly synchronizes the
-  // result. If zero, the value is not specified
-  p->mfxVideoParams_.AsyncDepth = 1; // Not important.
-  // DecodedOrder: For AVC and HEVC, used to instruct the decoder
-  // to return output frames in the decoded order. Must be zero for all other
-  // decoders.
-  p->mfxVideoParams_.mfx.DecodedOrder = true; // Not important.
-
-  // Validate video decode parameters (optional)
-  sts = p->mfxDEC_->Query(&p->mfxVideoParams_, &p->mfxVideoParams_);
-  p->outputSharedHandle_ = outputSharedHandle;
-
-  return p;
-
-_exit:
   if (p) {
     mfx_destroy_decoder(p);
     delete p;
+    p = NULL;
   }
   return NULL;
 }
 
 int mfx_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
                void *obj) {
-  MFXDecoder *p = (MFXDecoder *)decoder;
-  mfxStatus sts = MFX_ERR_NONE;
-  mfxSyncPoint syncp;
-  mfxFrameSurface1 *pmfxOutSurface = NULL;
-  mfxFrameSurface1 *pmfxConvertSurface = NULL;
-  int nIndex = 0;
-  bool decoded = false;
-  mfxBitstream mfxBS;
-  mfxU32 decodedSize = 0;
-
-  memset(&mfxBS, 0, sizeof(mfxBS));
-  mfxBS.Data = data;
-  mfxBS.DataLength = len;
-  mfxBS.MaxLength = len;
-
-  if (!p->initialized_) {
-  sts = p->initialize(&mfxBS, false);
-  CHECK_STATUS_RETURN(sts, "initialize");
-    p->initialized_ = true;
+  try {
+    MFXDecoder *p = (MFXDecoder *)decoder;
+    return p->decode(data, len, callback, obj);
+  } catch (const std::exception &e) {
+    LOG_ERROR("decode failed: " + e.what());
   }
-
-  decodedSize = mfxBS.DataLength;
-
-  memset(&mfxBS, 0, sizeof(mfxBS));
-  mfxBS.Data = data;
-  mfxBS.DataLength = len;
-  mfxBS.MaxLength = len;
-  mfxBS.DataFlag = MFX_BITSTREAM_COMPLETE_FRAME;
-  int loop_counter = 0;
-
-  do {
-    if (loop_counter++ > 100) {
-      std::cerr << "mfx decode loop two many times" << std::endl;
-      break;
-    }
-
-    if (MFX_WRN_DEVICE_BUSY == sts)
-      MSDK_SLEEP(1); // Wait if device is busy, then repeat the same call to
-                     // DecodeFrameAsync
-    if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_NONE == sts) {
-      nIndex = GetFreeSurfaceIndex(
-          p->pmfxSurfaces_.data(),
-          p->pmfxSurfaces_.size()); // Find free frame surface
-      if (nIndex >= p->pmfxSurfaces_.size()) {
-        std::cerr << "GetFreeSurfaceIndex failed, nIndex=" << nIndex
-                  << std::endl;
-        return -1;
-      }
-    }
-    // Decode a frame asychronously (returns immediately)
-    //  - If input bitstream contains multiple frames DecodeFrameAsync will
-    //  start decoding multiple frames, and remove them from bitstream
-    sts = p->mfxDEC_->DecodeFrameAsync(&mfxBS, &p->pmfxSurfaces_[nIndex],
-                                       &pmfxOutSurface, &syncp);
-
-    // https://github.com/FFmpeg/FFmpeg/blob/f84412d6f4e9c1f1d1a2491f9337d7e789c688ba/libavcodec/qsvdec.c#L736
-    if (MFX_ERR_INCOMPATIBLE_VIDEO_PARAM == sts) {
-      memset(&mfxBS, 0, sizeof(mfxBS));
-      mfxBS.Data = data;
-      mfxBS.DataLength = len;
-      mfxBS.MaxLength = len;
-      mfxBS.DataFlag = MFX_BITSTREAM_COMPLETE_FRAME;
-      LOG_INFO("Incompatible video parameters, resetting decoder");
-      sts = p->initialize(&mfxBS, true);
-      CHECK_STATUS_RETURN(sts, "initialize");
-      continue;
-    }
-
-    // Ignore warnings if output is available,
-    // if no output and no action required just repeat the DecodeFrameAsync call
-    if (MFX_ERR_NONE < sts && syncp)
-      sts = MFX_ERR_NONE;
-
-    if (MFX_ERR_NONE == sts)
-      sts = p->session_.SyncOperation(
-          syncp, 1000); // Synchronize. Wait until decoded frame is ready
-
-    if (MFX_ERR_NONE == sts) {
-      mfxHDLPair pair = {NULL};
-      sts = p->d3d11FrameAllocator_.GetFrameHDL(pmfxOutSurface->Data.MemId,
-                                                (mfxHDL *)&pair);
-      ID3D11Texture2D *texture = (ID3D11Texture2D *)pair.first;
-      D3D11_TEXTURE2D_DESC desc2D;
-      texture->GetDesc(&desc2D);
-      if (!p->native_->EnsureTexture(desc2D.Width, desc2D.Height)) {
-        std::cerr << "Failed to EnsureTexture" << std::endl;
-        return -1;
-      }
-      p->native_->next(); // comment out to remove picture shaking
-      p->native_->BeginQuery();
-
-      // nv12 -> bgra
-      D3D11_VIDEO_PROCESSOR_CONTENT_DESC contentDesc;
-      ZeroMemory(&contentDesc, sizeof(contentDesc));
-      contentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
-      contentDesc.InputFrameRate.Numerator = 60;
-      contentDesc.InputFrameRate.Denominator = 1;
-      contentDesc.InputWidth = pmfxOutSurface->Info.CropW;
-      contentDesc.InputHeight = pmfxOutSurface->Info.CropH;
-      contentDesc.OutputWidth = pmfxOutSurface->Info.CropW;
-      contentDesc.OutputHeight = pmfxOutSurface->Info.CropH;
-      contentDesc.OutputFrameRate.Numerator = 60;
-      contentDesc.OutputFrameRate.Denominator = 1;
-      D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace;
-      ZeroMemory(&colorSpace, sizeof(colorSpace));
-      colorSpace.YCbCr_Matrix = 0; // 0:601, 1:709
-      colorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
-      if (!p->native_->Process(texture, p->native_->GetCurrentTexture(),
-                               contentDesc, colorSpace)) {
-        LOG_ERROR("Failed to process");
-        p->native_->EndQuery();
-        return -1;
-      }
-
-      p->native_->context_->Flush();
-      p->native_->EndQuery();
-      if (!p->native_->Query()) {
-        std::cerr << "Failed to query" << std::endl;
-      }
-      void *output = nullptr;
-      if (p->outputSharedHandle_) {
-        HANDLE sharedHandle = p->native_->GetSharedHandle();
-        if (!sharedHandle) {
-          std::cerr << "Failed to GetSharedHandle" << std::endl;
-          return -1;
-        }
-        output = sharedHandle;
-      } else {
-        output = p->native_->GetCurrentTexture();
-      }
-
-      if (MFX_ERR_NONE == sts) {
-        if (callback)
-          callback(output, obj);
-        decoded = true;
-      }
-      break;
-    }
-
-  } while (MFX_ERR_NONE <= sts || MFX_ERR_MORE_SURFACE == sts);
-
-  if (!decoded) {
-    std::cerr << "decoded failed, sts=" << sts << std::endl;
-  }
-
-  return decoded ? 0 : -1;
+  return -1;
 }
 
 int mfx_test_decode(AdapterDesc *outDescs, int32_t maxDescNum,
