@@ -51,6 +51,11 @@ public:
   mfxFrameAllocResponse mfxResponse_;
   bool outputSharedHandle_;
 
+  MFXDecoder() {
+    ZeroMemory(&mfxVideoParams_, sizeof(mfxVideoParams_));
+    ZeroMemory(&mfxResponse_, sizeof(mfxResponse_));
+  }
+
   mfxStatus InitializeMFX() {
     mfxStatus sts = MFX_ERR_NONE;
     mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
@@ -75,7 +80,7 @@ public:
     return MFX_ERR_NONE;
   }
 
-  mfxStatus initialize(mfxBitstream *mfxBS) {
+  mfxStatus initialize(mfxBitstream *mfxBS, bool reinit) {
     mfxStatus sts = MFX_ERR_NONE;
     mfxFrameAllocRequest Request;
     memset(&Request, 0, sizeof(Request));
@@ -85,6 +90,7 @@ public:
     mfxU32 surfaceSize;
     mfxU8 *surfaceBuffers;
 
+    // https://spec.oneapi.io/versions/1.1-rev-1/elements/oneVPL/source/API_ref/VPL_func_vid_decode.html#mfxvideodecode-decodeheader
     sts = mfxDEC_->DecodeHeader(mfxBS, &mfxVideoParams_);
     MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
@@ -99,6 +105,10 @@ public:
     // DirectX11 to ensure that surfaces can be retrieved by the application
 
     // Allocate surfaces for decoder
+    if (reinit) {
+        sts = d3d11FrameAllocator_.FreeFrames(&mfxResponse_);
+        MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    }
     sts = d3d11FrameAllocator_.AllocFrames(&Request, &mfxResponse_);
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
@@ -113,6 +123,11 @@ public:
     }
 
     // Initialize the Media SDK decoder
+    if (reinit) {
+      // https://github.com/FFmpeg/FFmpeg/blob/f84412d6f4e9c1f1d1a2491f9337d7e789c688ba/libavcodec/qsvdec.c#L181
+      sts = mfxDEC_->Close();
+      MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    }
     sts = mfxDEC_->Init(&mfxVideoParams_);
     MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
     MSDK_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
@@ -211,8 +226,8 @@ int mfx_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
   mfxBS.MaxLength = len;
 
   if (!p->initialized_) {
-    sts = p->initialize(&mfxBS);
-    CHECK_STATUS_RETURN(sts, "initialize");
+  sts = p->initialize(&mfxBS, false);
+  CHECK_STATUS_RETURN(sts, "initialize");
     p->initialized_ = true;
   }
 
@@ -249,6 +264,19 @@ int mfx_decode(void *decoder, uint8_t *data, int len, DecodeCallback callback,
     //  start decoding multiple frames, and remove them from bitstream
     sts = p->mfxDEC_->DecodeFrameAsync(&mfxBS, &p->pmfxSurfaces_[nIndex],
                                        &pmfxOutSurface, &syncp);
+
+    // https://github.com/FFmpeg/FFmpeg/blob/f84412d6f4e9c1f1d1a2491f9337d7e789c688ba/libavcodec/qsvdec.c#L736
+    if (MFX_ERR_INCOMPATIBLE_VIDEO_PARAM == sts) {
+      memset(&mfxBS, 0, sizeof(mfxBS));
+      mfxBS.Data = data;
+      mfxBS.DataLength = len;
+      mfxBS.MaxLength = len;
+      mfxBS.DataFlag = MFX_BITSTREAM_COMPLETE_FRAME;
+      LOG_INFO("Incompatible video parameters, resetting decoder");
+      sts = p->initialize(&mfxBS, true);
+      CHECK_STATUS_RETURN(sts, "initialize");
+      continue;
+    }
 
     // Ignore warnings if output is available,
     // if no output and no action required just repeat the DecodeFrameAsync call
