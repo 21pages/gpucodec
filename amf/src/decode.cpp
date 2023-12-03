@@ -70,6 +70,19 @@ public:
                                                   &iDataWrapBuffer, NULL);
     AMF_CHECK_RETURN(res, "CreateBufferFromHostNative failed");
     res = AMFDecoder_->SubmitInput(iDataWrapBuffer);
+    if (res == AMF_RESOLUTION_CHANGED) {
+      LOG_INFO("resolution changed");
+      res = AMFDecoder_->Drain();
+      AMF_CHECK_RETURN(res, "Drain failed");
+      res = AMFDecoder_->Terminate();
+      AMF_CHECK_RETURN(res, "Terminate failed");
+      res = AMFDecoder_->Init(decodeFormatOut_, 0, 0);
+      AMF_CHECK_RETURN(res, "Init failed");
+      res = AMFContext_->CreateBufferFromHostNative(iData, iDataSize,
+                                                    &iDataWrapBuffer, NULL);
+      AMF_CHECK_RETURN(res, "CreateBufferFromHostNative failed");
+      res = AMFDecoder_->SubmitInput(iDataWrapBuffer);
+    }
     AMF_CHECK_RETURN(res, "SubmitInput failed");
     amf::AMFDataPtr oData = NULL;
     do {
