@@ -71,6 +71,7 @@ public:
     AMF_CHECK_RETURN(res, "CreateBufferFromHostNative failed");
     res = AMFDecoder_->SubmitInput(iDataWrapBuffer);
     if (res == AMF_RESOLUTION_CHANGED) {
+      iDataWrapBuffer = NULL;
       LOG_INFO("resolution changed");
       res = AMFDecoder_->Drain();
       AMF_CHECK_RETURN(res, "Drain failed");
@@ -146,10 +147,15 @@ public:
   }
 
   AMF_RESULT destroy() {
-    if (AMFConverter_ != NULL) {
-      AMFConverter_->Terminate();
-      AMFConverter_ = NULL;
-    }
+    // Terminate converter before terminate decoder get "[AMFDeviceDX11Impl]
+    // Warning: Possible memory leak detected: DX11 device is being destroyed,
+    // but has 6 surfaces associated with it. This is OK if there are references
+    // to the device outside AMF"
+
+    // if (AMFConverter_ != NULL) {
+    //   AMFConverter_->Terminate();
+    //   AMFConverter_ = NULL;
+    // }
     if (AMFDecoder_ != NULL) {
       AMFDecoder_->Terminate();
       AMFDecoder_ = NULL;
