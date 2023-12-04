@@ -1,5 +1,6 @@
 /target
 .vscode
+Cargo.lock
 externals/Video_Codec_SDK_11.1.5/Samples/Utils
 vs/AMFTest/x64
 vs/MFXTest/x64
