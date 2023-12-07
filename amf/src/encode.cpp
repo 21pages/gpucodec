@@ -78,6 +78,8 @@ private:
   int32_t q_min_;
   int32_t q_max_;
   bool enable4K_ = false;
+  bool full_range_ = false;
+  bool bt709_ = false;
 
   // Buffers
   std::vector<uint8_t> packetDataBuffer_;
@@ -320,6 +322,30 @@ private:
         AMF_CHECK_RETURN(res,
                          "SetProperty AMF_VIDEO_ENCODER_PROFILE_LEVEL failed");
       }
+      // color
+      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_FULL_RANGE_COLOR,
+                                     full_range_);
+      AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_FULL_RANGE_COLOR");
+      res = AMFEncoder_->SetProperty<amf_int64>(
+          AMF_VIDEO_ENCODER_OUTPUT_COLOR_PROFILE,
+          bt709_ ? (full_range_ ? AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_709
+                                : AMF_VIDEO_CONVERTER_COLOR_PROFILE_709)
+                 : (full_range_ ? AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_601
+                                : AMF_VIDEO_CONVERTER_COLOR_PROFILE_601));
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_OUTPUT_COLOR_PROFILE");
+      // https://github.com/obsproject/obs-studio/blob/e27b013d4754e0e81119ab237ffedce8fcebcbbf/plugins/obs-ffmpeg/texture-amf.cpp#L924
+      res = AMFEncoder_->SetProperty<amf_int64>(
+          AMF_VIDEO_ENCODER_OUTPUT_TRANSFER_CHARACTERISTIC,
+          bt709_ ? AMF_COLOR_TRANSFER_CHARACTERISTIC_BT709
+                 : AMF_COLOR_TRANSFER_CHARACTERISTIC_SMPTE170M);
+      AMF_CHECK_RETURN(
+          res, "SetProperty AMF_VIDEO_ENCODER_OUTPUT_TRANSFER_CHARACTERISTIC");
+      res = AMFEncoder_->SetProperty<amf_int64>(
+          AMF_VIDEO_ENCODER_OUTPUT_COLOR_PRIMARIES,
+          bt709_ ? AMF_COLOR_PRIMARIES_BT709 : AMF_COLOR_PRIMARIES_SMPTE170M);
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_ENCODER_OUTPUT_COLOR_PRIMARIES");
 
       // ------------- Encoder params dynamic ---------------
       AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_B_PIC_PATTERN, 0);
@@ -389,6 +415,35 @@ private:
         AMF_CHECK_RETURN(
             res, "SetProperty AMF_VIDEO_ENCODER_HEVC_PROFILE_LEVEL failed");
       }
+      // color
+      res = AMFEncoder_->SetProperty<amf_int64>(
+          AMF_VIDEO_ENCODER_HEVC_NOMINAL_RANGE,
+          full_range_ ? AMF_VIDEO_ENCODER_HEVC_NOMINAL_RANGE_FULL
+                      : AMF_VIDEO_ENCODER_HEVC_NOMINAL_RANGE_STUDIO);
+      AMF_CHECK_RETURN(
+          res, "SetProperty AMF_VIDEO_ENCODER_HEVC_NOMINAL_RANGE failed");
+      res = AMFEncoder_->SetProperty<amf_int64>(
+          AMF_VIDEO_ENCODER_HEVC_OUTPUT_COLOR_PROFILE,
+          bt709_ ? (full_range_ ? AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_709
+                                : AMF_VIDEO_CONVERTER_COLOR_PROFILE_709)
+                 : (full_range_ ? AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_601
+                                : AMF_VIDEO_CONVERTER_COLOR_PROFILE_601));
+      AMF_CHECK_RETURN(
+          res,
+          "SetProperty AMF_VIDEO_ENCODER_HEVC_OUTPUT_COLOR_PROFILE failed");
+      res = AMFEncoder_->SetProperty<amf_int64>(
+          AMF_VIDEO_ENCODER_HEVC_OUTPUT_TRANSFER_CHARACTERISTIC,
+          bt709_ ? AMF_COLOR_TRANSFER_CHARACTERISTIC_BT709
+                 : AMF_COLOR_TRANSFER_CHARACTERISTIC_SMPTE170M);
+      AMF_CHECK_RETURN(
+          res, "SetProperty "
+               "AMF_VIDEO_ENCODER_HEVC_OUTPUT_TRANSFER_CHARACTERISTIC failed");
+      res = AMFEncoder_->SetProperty<amf_int64>(
+          AMF_VIDEO_ENCODER_HEVC_OUTPUT_COLOR_PRIMARIES,
+          bt709_ ? AMF_COLOR_PRIMARIES_BT709 : AMF_COLOR_PRIMARIES_SMPTE170M);
+      AMF_CHECK_RETURN(
+          res,
+          "SetProperty AMF_VIDEO_ENCODER_HEVC_OUTPUT_COLOR_PRIMARIES failed");
 
       // ------------- Encoder params dynamic ---------------
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_QUERY_TIMEOUT,

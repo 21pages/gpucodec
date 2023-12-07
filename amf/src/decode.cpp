@@ -44,6 +44,8 @@ private:
   int last_height_ = 0;
   amf_wstring codec_;
   bool outputSharedHandle_;
+  bool full_range_ = false;
+  bool bt709_ = false;
 
   // buffer
   std::vector<std::vector<uint8_t>> buffer_;
@@ -240,6 +242,31 @@ private:
         AMFDecoder_->SetProperty(AMF_VIDEO_DECODER_REORDER_MODE,
                                  amf_int64(AMF_VIDEO_DECODER_MODE_LOW_LATENCY));
     AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_DECODER_REORDER_MODE failed");
+    // color
+    res = AMFDecoder_->SetProperty<amf_int64>(
+        AMF_VIDEO_DECODER_COLOR_RANGE,
+        full_range_ ? AMF_COLOR_RANGE_FULL : AMF_COLOR_RANGE_STUDIO);
+    AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_DECODER_COLOR_RANGE failed");
+    res = AMFDecoder_->SetProperty<amf_int64>(
+        AMF_VIDEO_DECODER_COLOR_PROFILE,
+        bt709_ ? (full_range_ ? AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_709
+                              : AMF_VIDEO_CONVERTER_COLOR_PROFILE_709)
+               : (full_range_ ? AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_601
+                              : AMF_VIDEO_CONVERTER_COLOR_PROFILE_601));
+    AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_DECODER_COLOR_PROFILE failed");
+    // res = AMFDecoder_->SetProperty<amf_int64>(
+    //     AMF_VIDEO_DECODER_COLOR_TRANSFER_CHARACTERISTIC,
+    //     bt709_ ? AMF_COLOR_TRANSFER_CHARACTERISTIC_BT709
+    //            : AMF_COLOR_TRANSFER_CHARACTERISTIC_SMPTE170M);
+    // AMF_CHECK_RETURN(
+    //     res,
+    //     "SetProperty AMF_VIDEO_DECODER_COLOR_TRANSFER_CHARACTERISTIC
+    //     failed");
+    // res = AMFDecoder_->SetProperty<amf_int64>(
+    //     AMF_VIDEO_DECODER_COLOR_PRIMARIES,
+    //     bt709_ ? AMF_COLOR_PRIMARIES_BT709 : AMF_COLOR_PRIMARIES_SMPTE170M);
+    // AMF_CHECK_RETURN(res,
+    //                  "SetProperty AMF_VIDEO_DECODER_COLOR_PRIMARIES failed");
     return AMF_OK;
   }
 
@@ -278,6 +305,36 @@ private:
                        "SetProperty AMF_VIDEO_CONVERTER_OUTPUT_SIZE failed");
       res = AMFConverter_->Init(decodeFormatOut_, width, height);
       AMF_CHECK_RETURN(res, "Init converter failed");
+      // color
+      res = AMFConverter_->SetProperty<amf_int64>(
+          AMF_VIDEO_CONVERTER_INPUT_COLOR_RANGE,
+          full_range_ ? AMF_COLOR_RANGE_FULL : AMF_COLOR_RANGE_STUDIO);
+      AMF_CHECK_RETURN(
+          res, "SetProperty AMF_VIDEO_CONVERTER_INPUT_COLOR_RANGE failed");
+      res = AMFConverter_->SetProperty<amf_int64>(
+          AMF_VIDEO_CONVERTER_OUTPUT_COLOR_RANGE, AMF_COLOR_RANGE_FULL);
+      AMF_CHECK_RETURN(
+          res, "SetProperty AMF_VIDEO_CONVERTER_OUTPUT_COLOR_RANGE failed");
+      res = AMFConverter_->SetProperty<amf_int64>(
+          AMF_VIDEO_CONVERTER_COLOR_PROFILE,
+          bt709_ ? (full_range_ ? AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_709
+                                : AMF_VIDEO_CONVERTER_COLOR_PROFILE_709)
+                 : (full_range_ ? AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_601
+                                : AMF_VIDEO_CONVERTER_COLOR_PROFILE_601));
+      AMF_CHECK_RETURN(res,
+                       "SetProperty AMF_VIDEO_CONVERTER_COLOR_PROFILE failed");
+      res = AMFConverter_->SetProperty<amf_int64>(
+          AMF_VIDEO_CONVERTER_INPUT_TRANSFER_CHARACTERISTIC,
+          bt709_ ? AMF_COLOR_TRANSFER_CHARACTERISTIC_BT709
+                 : AMF_COLOR_TRANSFER_CHARACTERISTIC_SMPTE170M);
+      AMF_CHECK_RETURN(
+          res, "SetProperty AMF_VIDEO_CONVERTER_INPUT_TRANSFER_CHARACTERISTIC "
+               "failed");
+      res = AMFConverter_->SetProperty<amf_int64>(
+          AMF_VIDEO_CONVERTER_INPUT_COLOR_PRIMARIES,
+          bt709_ ? AMF_COLOR_PRIMARIES_BT709 : AMF_COLOR_PRIMARIES_SMPTE170M);
+      AMF_CHECK_RETURN(
+          res, "SetProperty AMF_VIDEO_CONVERTER_INPUT_COLOR_PRIMARIES failed");
     }
     last_width_ = width;
     last_height_ = height;
