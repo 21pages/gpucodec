@@ -73,6 +73,8 @@ public:
   int32_t gop_;
   int32_t q_min_;
   int32_t q_max_;
+  bool full_range_ = false;
+  bool bt709_ = false;
   NV_ENC_CONFIG encodeConfig_ = {0};
 
   NvencEncoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
@@ -165,6 +167,12 @@ public:
         NV_ENC_PARAMS_RC_CBR;
     // qp
     set_qp(initializeParams.encodeConfig, q_min_, q_max_);
+    // color
+    if (dataFormat_ == H264) {
+      setup_h264(initializeParams.encodeConfig);
+    } else {
+      setup_hevc(initializeParams.encodeConfig);
+    }
 
     pEnc_->CreateEncoder(&initializeParams);
     return true;
@@ -232,6 +240,54 @@ public:
     encodeConfig->rcParams.maxQP.qpInterB = q_max;
     encodeConfig->rcParams.maxQP.qpInterP = q_max;
     return 0;
+  }
+
+  void setup_h264(NV_ENC_CONFIG *encodeConfig) {
+    NV_ENC_CODEC_CONFIG *encodeCodecConfig = &encodeConfig->encodeCodecConfig;
+    NV_ENC_CONFIG_H264 *h264 = &encodeCodecConfig->h264Config;
+    NV_ENC_CONFIG_H264_VUI_PARAMETERS *vui = &h264->h264VUIParameters;
+    vui->videoFullRangeFlag = !!full_range_;
+    vui->colourMatrix = bt709_ ? AVCOL_SPC_BT709 : AVCOL_SPC_SMPTE170M;
+    vui->colourPrimaries = bt709_ ? AVCOL_PRI_BT709 : AVCOL_PRI_SMPTE170M;
+    vui->transferCharacteristics =
+        bt709_ ? AVCOL_TRC_BT709 : AVCOL_TRC_SMPTE170M;
+    vui->colourDescriptionPresentFlag = 1;
+    vui->videoSignalTypePresentFlag = 1;
+
+    h264->sliceMode = 3;
+    h264->sliceModeData = 1;
+    h264->repeatSPSPPS = 1;
+    // Specifies the chroma format. Should be set to 1 for yuv420 input, 3 for
+    // yuv444 input
+    h264->chromaFormatIDC = 1;
+    h264->level = NV_ENC_LEVEL_AUTOSELECT;
+
+    encodeConfig->profileGUID = NV_ENC_H264_PROFILE_MAIN_GUID;
+  }
+
+  void setup_hevc(NV_ENC_CONFIG *encodeConfig) {
+    NV_ENC_CODEC_CONFIG *encodeCodecConfig = &encodeConfig->encodeCodecConfig;
+    NV_ENC_CONFIG_HEVC *hevc = &encodeCodecConfig->hevcConfig;
+    NV_ENC_CONFIG_H264_VUI_PARAMETERS *vui = &hevc->hevcVUIParameters;
+    vui->videoFullRangeFlag = !!full_range_;
+    vui->colourMatrix = bt709_ ? AVCOL_SPC_BT709 : AVCOL_SPC_SMPTE170M;
+    vui->colourPrimaries = bt709_ ? AVCOL_PRI_BT709 : AVCOL_PRI_SMPTE170M;
+    vui->transferCharacteristics =
+        bt709_ ? AVCOL_TRC_BT709 : AVCOL_TRC_SMPTE170M;
+    vui->colourDescriptionPresentFlag = 1;
+    vui->videoSignalTypePresentFlag = 1;
+
+    hevc->sliceMode = 3;
+    hevc->sliceModeData = 1;
+    hevc->repeatSPSPPS = 1;
+    // Specifies the chroma format. Should be set to 1 for yuv420 input, 3 for
+    // yuv444 input
+    hevc->chromaFormatIDC = 1;
+    hevc->level = NV_ENC_LEVEL_AUTOSELECT;
+    hevc->outputPictureTimingSEI = 1;
+    hevc->tier = NV_ENC_TIER_HEVC_MAIN;
+
+    encodeConfig->profileGUID = NV_ENC_HEVC_PROFILE_MAIN_GUID;
   }
 
 private:
