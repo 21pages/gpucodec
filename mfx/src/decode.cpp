@@ -245,6 +245,9 @@ private:
     mfxU32 surfaceSize;
     mfxU8 *surfaceBuffers;
 
+    // mfxExtVideoSignalInfo got MFX_ERR_INVALID_VIDEO_PARAM
+    // mfxExtVideoSignalInfo video_signal_info = {0};
+
     // https://spec.oneapi.io/versions/1.1-rev-1/elements/oneVPL/source/API_ref/VPL_func_vid_decode.html#mfxvideodecode-decodeheader
     sts = mfxDEC_->DecodeHeader(mfxBS, &mfxVideoParams_);
     MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);

@@ -86,7 +86,10 @@ public:
   std::vector<mfxFrameSurface1> pEncSurfaces_;
   std::vector<mfxU8> bstData_;
   mfxBitstream mfxBS_;
-  MfxVideoParamsWrapper mfxEncParams_;
+  mfxVideoParam mfxEncParams_;
+  mfxExtBuffer *extbuffers_[2] = {NULL, NULL};
+  mfxExtVideoSignalInfo signal_info_;
+  mfxExtCodingOption2 option2_;
 
   void *handle_ = nullptr;
   int64_t luid_;
@@ -99,6 +102,9 @@ public:
   int32_t gop_;
   int32_t q_min_;
   int32_t q_max_;
+
+  bool full_range_ = false;
+  bool bt709_ = false;
 
   MFXEncoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
              int32_t width, int32_t height, int32_t kbs, int32_t framerate,
@@ -124,10 +130,9 @@ public:
     mfxU16 nEncSurfNum;
     mfxU32 surfaceSize;
     mfxU8 *surfaceBuffers;
-    MfxVideoParamsWrapper retrieved_par;
+    mfxVideoParam retrieved_par;
     memset(&retrieved_par, 0, sizeof(retrieved_par));
     mfxExtCodingOption2 *codingOption2 = nullptr;
-    bool q_valid = false;
 
     memset(&mfxEncParams_, 0, sizeof(mfxEncParams_));
 
@@ -164,14 +169,7 @@ public:
     mfxEncParams_.AsyncDepth = 1; // 1 is best for low latency
     mfxEncParams_.mfx.GopRefDist =
         1; // 1 is best for low latency, I and P frames only
-
-    q_valid = q_min_ >= 0 && q_min_ <= 51 && q_max_ >= 0 && q_max_ <= 51 &&
-              q_min_ <= q_max_;
-    if (false /*q_valid*/) {
-      codingOption2 = mfxEncParams_.AddExtBuffer<mfxExtCodingOption2>();
-      set_qp(codingOption2, q_min_, q_max_);
-    }
-
+    InitExtParams();
     native_ = std::make_unique<NativeDevice>();
     if (!native_->Init(luid_, (ID3D11Device *)handle_)) {
       LOG_ERROR("failed to init native device");
@@ -307,6 +305,33 @@ private:
     return MFX_ERR_NONE;
   }
 
+  void InitExtParams() {
+    memset(&signal_info_, 0, sizeof(mfxExtVideoSignalInfo));
+    memset(&option2_, 0, sizeof(mfxExtCodingOption2));
+    signal_info_.Header.BufferId = MFX_EXTBUFF_VIDEO_SIGNAL_INFO;
+    signal_info_.Header.BufferSz = sizeof(mfxExtVideoSignalInfo);
+    option2_.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
+    option2_.Header.BufferSz = sizeof(mfxExtCodingOption2);
+
+    // https://github.com/GStreamer/gstreamer/blob/651dcb49123ec516e7c582e4a49a5f3f15c10f93/subprojects/gst-plugins-bad/sys/qsv/gstqsvh264enc.cpp#L1647
+    extbuffers_[0] = (mfxExtBuffer *)&signal_info_;
+    extbuffers_[1] = (mfxExtBuffer *)&option2_;
+    mfxEncParams_.ExtParam = extbuffers_;
+    mfxEncParams_.NumExtParam = 2;
+
+    signal_info_.VideoFormat = 5;
+    signal_info_.ColourDescriptionPresent = 1;
+    signal_info_.VideoFullRange = !!full_range_;
+    signal_info_.MatrixCoefficients =
+        bt709_ ? AVCOL_SPC_BT709 : AVCOL_SPC_SMPTE170M;
+    signal_info_.ColourPrimaries =
+        bt709_ ? AVCOL_PRI_BT709 : AVCOL_PRI_SMPTE170M;
+    signal_info_.TransferCharacteristics =
+        bt709_ ? AVCOL_TRC_BT709 : AVCOL_TRC_SMPTE170M;
+
+    set_qp(&option2_, q_min_, q_max_);
+  }
+
   bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId) {
     switch (dataFormat) {
     case H264:
@@ -436,24 +461,20 @@ int mfx_set_bitrate(void *encoder, int32_t kbs) {
 }
 
 int mfx_set_qp(void *encoder, int32_t q_min, int32_t q_max) {
-  /*
-  MFXEncoder *p = (MFXEncoder *)encoder;
-  mfxStatus sts = MFX_ERR_NONE;
+  try {
+    MFXEncoder *p = (MFXEncoder *)encoder;
+    mfxStatus sts = MFX_ERR_NONE;
 
-  mfxExtCodingOption2 *codingOption2 =
-      p->mfxEncParams_.GetExtBuffer<mfxExtCodingOption2>();
-  if (codingOption2 != nullptr) {
-    if (set_qp(codingOption2, q_min, q_max) != 0) {
+    if (set_qp(&p->option2_, q_min, q_max) != 0) {
       return -1;
     }
+    // TODO: whether works
     sts = MFXVideoENCODE_Reset(p->session_, &p->mfxEncParams_);
     CHECK_STATUS_RETURN(sts, "MFXVideoENCODE_Reset");
     return 0;
-  } else {
-    LOG_ERROR("codingOption2 is null");
-    return -1;
+  } catch (const std::exception &e) {
+    LOG_ERROR("mfx_set_qp: " + e.what());
   }
-  */
   return -1;
 }
 
