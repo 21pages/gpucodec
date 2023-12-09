@@ -361,7 +361,7 @@ private:
       }
     } catch (const std::exception &e) {
       unsigned int maxWidth = dec_->GetMaxWidth();
-      unsigned int maxHeight = dec_->GetMaxWidth();
+      unsigned int maxHeight = dec_->GetMaxHeight();
       CUVIDEOFORMAT video_format = dec_->GetLatestVideoFormat();
       // https://github.com/NVIDIA/DALI/blob/4f5ee72b287cfbbe0d400734416ff37bd8027099/dali/operators/reader/loader/video/frames_decoder_gpu.cc#L212
       if (maxWidth > 0 && (video_format.coded_width > maxWidth ||
