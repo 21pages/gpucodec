@@ -34,16 +34,21 @@ bool dumpTexture(ID3D11Device *device, ID3D11Texture2D *texture,
                      &mappedResource);
   string path = string(dir) + "/" + filename;
   std::ofstream file(path, std::ios::binary | std::ios::app);
-  int bpp = 32;
   if (desc.Format == DXGI_FORMAT_NV12) {
-    bpp = 12;
+    int Pitch = mappedResource.RowPitch;
+    uint8_t *Y = (uint8_t *)mappedResource.pData;
+    uint8_t *U =
+        (uint8_t *)mappedResource.pData + desc.Height * mappedResource.RowPitch;
+    uint8_t *V = (desc.Format == DXGI_FORMAT_P010) ? U + 2 : U + 1;
+    for (int i = 0; i < desc.Height; i++) {
+      file.write((const char *)(Y + i * Pitch), desc.Width);
+    }
+    int ChromaH = desc.Height / 2;
+    int ChromaW = desc.Width;
+    for (int i = 0; i < ChromaH; i++) {
+      file.write((const char *)(U + i * Pitch), ChromaW);
+    }
   }
-  int rowPitch = desc.Width * bpp / 8;
-  char *p = (char *)mappedResource.pData;
-  // for (int i = 0; i < desc.Height; i++) {
-  //   file.write(p, rowPitch);
-  //   p += mappedResource.RowPitch;
-  // }
 
   file.close();
   return true;
