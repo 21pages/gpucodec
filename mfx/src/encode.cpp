@@ -11,6 +11,7 @@
 #include "log.h"
 
 // #define CONFIG_USE_VPP
+// #define CONFIG_USE_D3D_CONVERT
 
 #define CHECK_STATUS(X, MSG)                                                   \
   {                                                                            \
@@ -156,6 +157,12 @@ public:
       LOG_ERROR("vppOneFrame failed, sts=" + std::to_string((int)sts));
       return -1;
     }
+#elif defined(CONFIG_USE_D3D_CONVERT)
+    if (!native_->ToNV12(tex, width_, height_, bt709_, full_range_)) {
+      LOG_ERROR("failed to convert to NV12");
+      return -1;
+    }
+    encSurf->Data.MemId = native_->nv12_texture_.Get();
 #else
     encSurf->Data.MemId = tex;
 #endif
@@ -253,12 +260,19 @@ private:
     mfxEncParams_.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
     mfxEncParams_.mfx.TargetKbps = kbs_;
     mfxEncParams_.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
-    mfxEncParams_.mfx.FrameInfo.FourCC = MFX_FOURCC_BGR4;
-    // MFX_FOURCC_NV12; // MFX_FOURCC_BGR4;
     mfxEncParams_.mfx.FrameInfo.FrameRateExtN = framerate_;
     mfxEncParams_.mfx.FrameInfo.FrameRateExtD = 1;
+#ifdef CONFIG_USE_VPP
+    mfxEncParams_.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
+    mfxEncParams_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+#elif defined(CONFIG_USE_D3D_CONVERT)
+    mfxEncParams_.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
+    mfxEncParams_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+#else
+    mfxEncParams_.mfx.FrameInfo.FourCC = MFX_FOURCC_BGR4;
     mfxEncParams_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV444;
-    // MFX_CHROMAFORMAT_YUV444; // MFX_CHROMAFORMAT_YUV420;
+#endif
+
     mfxEncParams_.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
     mfxEncParams_.mfx.FrameInfo.CropX = 0;
     mfxEncParams_.mfx.FrameInfo.CropY = 0;
