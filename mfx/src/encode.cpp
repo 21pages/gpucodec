@@ -272,7 +272,9 @@ private:
     mfxEncParams_.mfx.FrameInfo.FourCC = MFX_FOURCC_BGR4;
     mfxEncParams_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV444;
 #endif
-
+    mfxEncParams_.mfx.FrameInfo.BitDepthLuma = 8;
+    mfxEncParams_.mfx.FrameInfo.BitDepthChroma = 8;
+    mfxEncParams_.mfx.FrameInfo.Shift = 0;
     mfxEncParams_.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
     mfxEncParams_.mfx.FrameInfo.CropX = 0;
     mfxEncParams_.mfx.FrameInfo.CropY = 0;
