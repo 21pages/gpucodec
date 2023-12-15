@@ -11,29 +11,13 @@
 #define LOG_MODULE "MFX DECODE"
 #include "log.h"
 
-#define CHECK_STATUS_GOTO(X, MSG)                                              \
+#define CHECK_STATUS(X, MSG)                                                   \
   {                                                                            \
-    if ((X) < MFX_ERR_NONE) {                                                  \
-      MSDK_PRINT_RET_MSG(X, MSG);                                              \
-      LOG_ERROR(MSG + "failed, sts=" + std::to_string((int)X));                \
-      goto _exit;                                                              \
-    }                                                                          \
-  }
-#define CHECK_STATUS_RETURN(X, MSG)                                            \
-  {                                                                            \
-    if ((X) < MFX_ERR_NONE) {                                                  \
-      MSDK_PRINT_RET_MSG(X, MSG);                                              \
-      LOG_ERROR(MSG + "failed, sts=" + std::to_string((int)X));                \
-      return X;                                                                \
-    }                                                                          \
-  }
-
-#define LOG_MSDK_CHECK_STATUS(X, MSG)                                          \
-  {                                                                            \
-    if ((X) < MFX_ERR_NONE) {                                                  \
-      MSDK_PRINT_RET_MSG(X, MSG);                                              \
-      LOG_ERROR(MSG + "failed, sts=" + std::to_string((int)X));                \
-      return X;                                                                \
+    mfxStatus __sts = (X);                                                     \
+    if (__sts < MFX_ERR_NONE) {                                                \
+      MSDK_PRINT_RET_MSG(__sts, MSG);                                          \
+      LOG_ERROR(MSG + "failed, sts=" + std::to_string((int)__sts));            \
+      return __sts;                                                            \
     }                                                                          \
   }
 
@@ -75,7 +59,7 @@ public:
       return MFX_ERR_DEVICE_FAILED;
     }
     sts = InitializeMFX();
-    CHECK_STATUS_RETURN(sts, "InitializeMFX");
+    CHECK_STATUS(sts, "InitializeMFX");
 
     // Create Media SDK decoder
     mfxDEC_ = new MFXVideoDECODE(session_);
@@ -102,7 +86,7 @@ public:
 
     // Validate video decode parameters (optional)
     sts = mfxDEC_->Query(&mfxVideoParams_, &mfxVideoParams_);
-    CHECK_STATUS_RETURN(sts, "Query");
+    CHECK_STATUS(sts, "Query");
 
     return MFX_ERR_NONE;
   }
@@ -118,7 +102,7 @@ public:
     setBitStream(&mfxBS, data, len);
     if (!initialized_) {
       sts = initializeDecode(&mfxBS, false);
-      CHECK_STATUS_RETURN(sts, "initializeDecode");
+      CHECK_STATUS(sts, "initializeDecode");
       initialized_ = true;
     }
     setBitStream(&mfxBS, data, len);
@@ -151,7 +135,7 @@ public:
         setBitStream(&mfxBS, data, len);
         LOG_INFO("Incompatible video parameters, resetting decoder");
         sts = initializeDecode(&mfxBS, true);
-        CHECK_STATUS_RETURN(sts, "initialize");
+        CHECK_STATUS(sts, "initialize");
         continue;
       }
 
@@ -206,19 +190,19 @@ private:
     D3D11AllocatorParams allocParams;
 
     sts = session_.Init(impl, &ver);
-    LOG_MSDK_CHECK_STATUS(sts, "session Init");
+    CHECK_STATUS(sts, "session Init");
 
     sts = session_.SetHandle(MFX_HANDLE_D3D11_DEVICE, native_->device_.Get());
-    LOG_MSDK_CHECK_STATUS(sts, "SetHandle");
+    CHECK_STATUS(sts, "SetHandle");
 
     allocParams.bUseSingleTexture = false; // important
     allocParams.pDevice = native_->device_.Get();
     allocParams.uncompressedResourceMiscFlags = 0;
     sts = d3d11FrameAllocator_.Init(&allocParams);
-    LOG_MSDK_CHECK_STATUS(sts, "init D3D11FrameAllocator");
+    CHECK_STATUS(sts, "init D3D11FrameAllocator");
 
     sts = session_.SetFrameAllocator(&d3d11FrameAllocator_);
-    LOG_MSDK_CHECK_STATUS(sts, "SetFrameAllocator");
+    CHECK_STATUS(sts, "SetFrameAllocator");
 
     return MFX_ERR_NONE;
   }

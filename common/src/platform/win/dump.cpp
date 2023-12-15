@@ -49,6 +49,7 @@ bool dumpTexture(ID3D11Device *device, ID3D11Texture2D *texture,
       file.write((const char *)(U + i * Pitch), ChromaW);
     }
   }
+  deviceContext->Unmap(stagingTexture.Get(), 0);
 
   file.close();
   return true;
