@@ -11,7 +11,7 @@
 #include "log.h"
 
 // #define CONFIG_USE_VPP
-// #define CONFIG_USE_D3D_CONVERT
+#define CONFIG_USE_D3D_CONVERT
 
 #define CHECK_STATUS(X, MSG)                                                   \
   {                                                                            \
