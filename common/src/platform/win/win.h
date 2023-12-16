@@ -60,9 +60,10 @@ public:
   bool Query();
   bool Process(ID3D11Texture2D *in, ID3D11Texture2D *out,
                D3D11_VIDEO_PROCESSOR_CONTENT_DESC content_desc,
-               D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace);
+               D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace_in,
+               D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace_out);
   bool ToNV12(ID3D11Texture2D *texture, int width, int height, bool bt709,
-              bool fullRange);
+              bool fullRange_out);
 
 private:
   bool InitFromLuid(int64_t luid);

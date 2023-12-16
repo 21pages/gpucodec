@@ -315,12 +315,16 @@ private:
     contentDesc.OutputHeight = pmfxOutSurface->Info.CropH;
     contentDesc.OutputFrameRate.Numerator = 60;
     contentDesc.OutputFrameRate.Denominator = 1;
-    D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace;
-    ZeroMemory(&colorSpace, sizeof(colorSpace));
-    colorSpace.YCbCr_Matrix = 0; // 0:601, 1:709
-    colorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
+    D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace_in;
+    ZeroMemory(&colorSpace_in, sizeof(colorSpace_in));
+    colorSpace_in.YCbCr_Matrix = 0; // 0:601, 1:709
+    colorSpace_in.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
+    D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace_out;
+    ZeroMemory(&colorSpace_out, sizeof(colorSpace_out));
+    colorSpace_out.YCbCr_Matrix = 0; // 0:601, 1:709
+    colorSpace_out.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255;
     if (!native_->Process(texture, native_->GetCurrentTexture(), contentDesc,
-                          colorSpace)) {
+                          colorSpace_in, colorSpace_out)) {
       LOG_ERROR("Failed to process");
       native_->EndQuery();
       return false;

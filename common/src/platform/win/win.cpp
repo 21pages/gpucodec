@@ -199,9 +199,11 @@ bool NativeDevice::Query() {
   return bResult == TRUE;
 }
 
-bool NativeDevice::Process(ID3D11Texture2D *in, ID3D11Texture2D *out,
-                           D3D11_VIDEO_PROCESSOR_CONTENT_DESC content_desc,
-                           D3D11_VIDEO_PROCESSOR_COLOR_SPACE color_space) {
+bool NativeDevice::Process(
+    ID3D11Texture2D *in, ID3D11Texture2D *out,
+    D3D11_VIDEO_PROCESSOR_CONTENT_DESC content_desc,
+    D3D11_VIDEO_PROCESSOR_COLOR_SPACE input_color_space,
+    D3D11_VIDEO_PROCESSOR_COLOR_SPACE output_color_space) {
   D3D11_TEXTURE2D_DESC inDesc = {0};
   D3D11_TEXTURE2D_DESC outDesc = {0};
   in->GetDesc(&inDesc);
@@ -230,15 +232,12 @@ bool NativeDevice::Process(ID3D11Texture2D *in, ID3D11Texture2D *out,
   }
 
   // https://chromium.googlesource.com/chromium/src/media/+/refs/heads/main/gpu/windows/d3d11_video_processor_proxy.cc#138
-  ComPtr<ID3D11VideoContext1> video_context1 = nullptr;
-  video_context_.As(&video_context1);
-  if (video_context1) {
-    video_context1->VideoProcessorSetStreamColorSpace(video_processor_.Get(), 0,
-                                                      &color_space);
-  } else {
-    video_context_->VideoProcessorSetStreamColorSpace(video_processor_.Get(), 0,
-                                                      &color_space);
-  }
+  // https://chromium.googlesource.com/chromium/src/+/a30440e4cfc7016d4f75a4e108025667e130b78b/media/gpu/windows/dxva_video_decode_accelerator_win.cc
+
+  video_context_->VideoProcessorSetStreamColorSpace(video_processor_.Get(), 0,
+                                                    &input_color_space);
+  video_context_->VideoProcessorSetOutputColorSpace(video_processor_.Get(),
+                                                    &output_color_space);
 
   RECT rect = {0};
   rect.right = content_desc.InputWidth;
@@ -277,7 +276,7 @@ bool NativeDevice::Process(ID3D11Texture2D *in, ID3D11Texture2D *out,
 }
 
 bool NativeDevice::ToNV12(ID3D11Texture2D *texture, int width, int height,
-                          bool bt709, bool fullRange) {
+                          bool bt709, bool fullRange_out) {
   if (!nv12_texture_) {
     D3D11_TEXTURE2D_DESC desc;
     ZeroMemory(&desc, sizeof(desc));
@@ -298,13 +297,19 @@ bool NativeDevice::ToNV12(ID3D11Texture2D *texture, int width, int height,
   contentDesc.OutputHeight = height;
   contentDesc.OutputFrameRate.Numerator = 60;
   contentDesc.OutputFrameRate.Denominator = 1;
-  D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace;
-  ZeroMemory(&colorSpace, sizeof(colorSpace));
-  colorSpace.YCbCr_Matrix = bt709 ? 1 : 0; // 0:601, 1:709
-  colorSpace.Nominal_Range = fullRange
-                                 ? D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255
-                                 : D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
-  return Process(texture, nv12_texture_.Get(), contentDesc, colorSpace);
+  D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace_in;
+  ZeroMemory(&colorSpace_in, sizeof(colorSpace_in));
+  colorSpace_in.YCbCr_Matrix = bt709 ? 1 : 0; // 0:601, 1:709
+  colorSpace_in.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255;
+  D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace_out;
+  ZeroMemory(&colorSpace_out, sizeof(colorSpace_out));
+  colorSpace_out.YCbCr_Matrix = bt709 ? 1 : 0; // 0:601, 1:709
+  colorSpace_out.Nominal_Range =
+      fullRange_out ? D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255
+                    : D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
+
+  return Process(texture, nv12_texture_.Get(), contentDesc, colorSpace_in,
+                 colorSpace_out);
 }
 bool Adapter::Init(IDXGIAdapter1 *adapter1) {
   HRESULT hr = S_OK;
