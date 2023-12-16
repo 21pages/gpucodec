@@ -60,10 +60,11 @@ public:
   bool Query();
   bool Process(ID3D11Texture2D *in, ID3D11Texture2D *out,
                D3D11_VIDEO_PROCESSOR_CONTENT_DESC content_desc,
-               D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace_in,
-               D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace_out);
-  bool ToNV12(ID3D11Texture2D *texture, int width, int height, bool bt709,
-              bool fullRange_out);
+               DXGI_COLOR_SPACE_TYPE colorSpace_in,
+               DXGI_COLOR_SPACE_TYPE colorSpace_out);
+  bool ToNV12(ID3D11Texture2D *texture, int width, int height,
+              DXGI_COLOR_SPACE_TYPE colorSpace_in,
+              DXGI_COLOR_SPACE_TYPE colorSpace_outt);
 
 private:
   bool InitFromLuid(int64_t luid);
@@ -82,6 +83,7 @@ public:
   ComPtr<ID3D11Query> query_ = nullptr;
   ComPtr<ID3D11VideoDevice> video_device_ = nullptr;
   ComPtr<ID3D11VideoContext> video_context_ = nullptr;
+  ComPtr<ID3D11VideoContext1> video_context1_ = nullptr;
   ComPtr<ID3D11VideoProcessorEnumerator> video_processor_enumerator_ = nullptr;
   ComPtr<ID3D11VideoProcessor> video_processor_ = nullptr;
   D3D11_VIDEO_PROCESSOR_CONTENT_DESC last_content_desc_ = {};

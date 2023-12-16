@@ -158,7 +158,23 @@ public:
       return -1;
     }
 #elif defined(CONFIG_USE_D3D_CONVERT)
-    if (!native_->ToNV12(tex, width_, height_, bt709_, full_range_)) {
+    DXGI_COLOR_SPACE_TYPE colorSpace_in =
+        DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+    DXGI_COLOR_SPACE_TYPE colorSpace_out;
+    if (bt709_) {
+      if (full_range_) {
+        colorSpace_out = DXGI_COLOR_SPACE_YCBCR_FULL_G22_LEFT_P709;
+      } else {
+        colorSpace_out = DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709;
+      }
+    } else {
+      if (full_range_) {
+        colorSpace_out = DXGI_COLOR_SPACE_YCBCR_FULL_G22_LEFT_P601;
+      } else {
+        colorSpace_out = DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P601;
+      }
+    }
+    if (!native_->ToNV12(tex, width_, height_, colorSpace_in, colorSpace_out)) {
       LOG_ERROR("failed to convert to NV12");
       return -1;
     }

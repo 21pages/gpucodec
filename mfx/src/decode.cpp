@@ -40,6 +40,9 @@ public:
   DataFormat codecID_;
   bool outputSharedHandle_;
 
+  bool bt709_ = false;
+  bool full_range_ = false;
+
   MFXDecoder(void *device, int64_t luid, API api, DataFormat codecID,
              bool outputSharedHandle) {
     device_ = device;
@@ -315,14 +318,22 @@ private:
     contentDesc.OutputHeight = pmfxOutSurface->Info.CropH;
     contentDesc.OutputFrameRate.Numerator = 60;
     contentDesc.OutputFrameRate.Denominator = 1;
-    D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace_in;
-    ZeroMemory(&colorSpace_in, sizeof(colorSpace_in));
-    colorSpace_in.YCbCr_Matrix = 0; // 0:601, 1:709
-    colorSpace_in.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
-    D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace_out;
-    ZeroMemory(&colorSpace_out, sizeof(colorSpace_out));
-    colorSpace_out.YCbCr_Matrix = 0; // 0:601, 1:709
-    colorSpace_out.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255;
+    DXGI_COLOR_SPACE_TYPE colorSpace_out =
+        DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+    DXGI_COLOR_SPACE_TYPE colorSpace_in;
+    if (bt709_) {
+      if (full_range_) {
+        colorSpace_in = DXGI_COLOR_SPACE_YCBCR_FULL_G22_LEFT_P709;
+      } else {
+        colorSpace_in = DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709;
+      }
+    } else {
+      if (full_range_) {
+        colorSpace_in = DXGI_COLOR_SPACE_YCBCR_FULL_G22_LEFT_P601;
+      } else {
+        colorSpace_in = DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P601;
+      }
+    }
     if (!native_->Process(texture, native_->GetCurrentTexture(), contentDesc,
                           colorSpace_in, colorSpace_out)) {
       LOG_ERROR("Failed to process");
