@@ -1,7 +1,7 @@
 #include "win.h"
 #include <fstream>
-bool dumpTexture(ID3D11Device *device, ID3D11Texture2D *texture,
-                 const string &filename) {
+bool dumpTexture(ID3D11Device *device, ID3D11Texture2D *texture, int cropW,
+                 int cropH, const string &filename) {
   const char *dir = "texture";
   DWORD attrib = GetFileAttributesA(dir);
   if (attrib == INVALID_FILE_ATTRIBUTES ||
@@ -40,11 +40,11 @@ bool dumpTexture(ID3D11Device *device, ID3D11Texture2D *texture,
     uint8_t *U =
         (uint8_t *)mappedResource.pData + desc.Height * mappedResource.RowPitch;
     uint8_t *V = (desc.Format == DXGI_FORMAT_P010) ? U + 2 : U + 1;
-    for (int i = 0; i < desc.Height; i++) {
-      file.write((const char *)(Y + i * Pitch), desc.Width);
+    for (int i = 0; i < cropH; i++) {
+      file.write((const char *)(Y + i * Pitch), cropW);
     }
-    int ChromaH = desc.Height / 2;
-    int ChromaW = desc.Width;
+    int ChromaH = cropH / 2;
+    int ChromaW = cropW;
     for (int i = 0; i < ChromaH; i++) {
       file.write((const char *)(U + i * Pitch), ChromaW);
     }
