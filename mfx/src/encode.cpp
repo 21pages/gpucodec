@@ -55,9 +55,8 @@ public:
   std::vector<mfxU8> bstData_;
   mfxBitstream mfxBS_;
   mfxVideoParam mfxEncParams_;
-  mfxExtBuffer *extbuffers_[2] = {NULL, NULL};
+  mfxExtBuffer *extbuffers_[1] = {NULL};
   mfxExtVideoSignalInfo signal_info_;
-  mfxExtCodingOption2 option2_;
 
 // vpp
 #ifdef CONFIG_USE_VPP
@@ -424,17 +423,13 @@ private:
 
   void InitEncExtParams() {
     memset(&signal_info_, 0, sizeof(mfxExtVideoSignalInfo));
-    memset(&option2_, 0, sizeof(mfxExtCodingOption2));
     signal_info_.Header.BufferId = MFX_EXTBUFF_VIDEO_SIGNAL_INFO;
     signal_info_.Header.BufferSz = sizeof(mfxExtVideoSignalInfo);
-    option2_.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
-    option2_.Header.BufferSz = sizeof(mfxExtCodingOption2);
 
     // https://github.com/GStreamer/gstreamer/blob/651dcb49123ec516e7c582e4a49a5f3f15c10f93/subprojects/gst-plugins-bad/sys/qsv/gstqsvh264enc.cpp#L1647
     extbuffers_[0] = (mfxExtBuffer *)&signal_info_;
-    extbuffers_[1] = (mfxExtBuffer *)&option2_;
     mfxEncParams_.ExtParam = extbuffers_;
-    mfxEncParams_.NumExtParam = 2;
+    mfxEncParams_.NumExtParam = 1;
 
     signal_info_.VideoFormat = 5;
     signal_info_.ColourDescriptionPresent = 1;
