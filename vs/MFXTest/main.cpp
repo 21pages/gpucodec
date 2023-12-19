@@ -15,8 +15,7 @@ void destroy_dxgi_capturer(void *self);
 
 void *mfx_new_encoder(void *hdl, int64_t luid, API api, DataFormat dataFormat,
                       int32_t width, int32_t height, int32_t kbs,
-                      int32_t framerate, int32_t gop, int32_t q_min,
-                      int32_t q_max);
+                      int32_t framerate, int32_t gop);
 int mfx_encode(void *e, void *tex, EncodeCallback callback, void *obj);
 int mfx_destroy_encoder(void *e);
 
@@ -68,7 +67,7 @@ int main() {
   std::cout << "width: " << width << " height: " << height << std::endl;
   void *device = dxgi_device(dup);
   void *encoder = mfx_new_encoder(device, luid, API_DX11, dataFormat, width,
-                                  height, 4000, 30, 0xFFFF, 5, 35);
+                                  height, 4000, 30, 0xFFFF);
   if (!encoder) {
     std::cerr << "create encoder failed" << std::endl;
     return -1;

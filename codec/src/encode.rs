@@ -41,8 +41,6 @@ impl Encoder {
                 ctx.d.kbitrate,
                 ctx.d.framerate,
                 ctx.d.gop,
-                ctx.d.q_min,
-                ctx.d.q_max,
             );
             if codec.is_null() {
                 return Err(());
@@ -87,15 +85,6 @@ impl Encoder {
     pub fn set_bitrate(&mut self, kbs: i32) -> Result<(), i32> {
         unsafe {
             match (self.calls.set_bitrate)(&mut *self.codec, kbs) {
-                0 => Ok(()),
-                err => Err(err),
-            }
-        }
-    }
-
-    pub fn set_qp(&mut self, q_min: i32, q_max: i32) -> Result<(), i32> {
-        unsafe {
-            match (self.calls.set_qp)(&mut *self.codec, q_min, q_max) {
                 0 => Ok(()),
                 err => Err(err),
             }
@@ -190,8 +179,6 @@ pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
                     input.d.kbitrate,
                     input.d.framerate,
                     input.d.gop,
-                    input.d.q_min,
-                    input.d.q_max,
                 )
             } {
                 if desc_count as usize <= descs.len() {

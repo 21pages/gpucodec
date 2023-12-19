@@ -71,15 +71,13 @@ public:
   int32_t kbs_;
   int32_t framerate_;
   int32_t gop_;
-  int32_t q_min_;
-  int32_t q_max_;
   bool full_range_ = false;
   bool bt709_ = false;
   NV_ENC_CONFIG encodeConfig_ = {0};
 
   NvencEncoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
                int32_t width, int32_t height, int32_t kbs, int32_t framerate,
-               int32_t gop, int32_t q_min, int32_t q_max) {
+               int32_t gop) {
     handle_ = handle;
     luid_ = luid;
     api_ = api;
@@ -89,8 +87,6 @@ public:
     kbs_ = kbs;
     framerate_ = framerate;
     gop_ = gop;
-    q_min_ = q_min;
-    q_max_ = q_max;
 
     load_driver(&cuda_dl_, &nvenc_dl_);
   }
@@ -165,8 +161,6 @@ public:
     // rc method
     initializeParams.encodeConfig->rcParams.rateControlMode =
         NV_ENC_PARAMS_RC_CBR;
-    // qp
-    set_qp(initializeParams.encodeConfig, q_min_, q_max_);
     // color
     if (dataFormat_ == H264) {
       setup_h264(initializeParams.encodeConfig);
@@ -217,29 +211,6 @@ public:
       cuda_dl_->cuCtxDestroy(cuContext_);
     }
     free_driver(&cuda_dl_, &nvenc_dl_);
-  }
-
-  int set_qp(NV_ENC_CONFIG *encodeConfig, int32_t q_min, int32_t q_max) {
-    bool q_valid = q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 &&
-                   q_min <= q_max;
-    if (!q_valid) {
-      LOG_WARN("invalid qp range: [" + std::to_string(q_min) + ", " +
-               std::to_string(q_max) + "]");
-      return -1;
-    }
-    if (!encodeConfig) {
-      LOG_ERROR("encodeConfig is null");
-      return -1;
-    }
-    encodeConfig->rcParams.enableMinQP = 1;
-    encodeConfig->rcParams.enableMaxQP = 1;
-    encodeConfig->rcParams.minQP.qpIntra = q_min;
-    encodeConfig->rcParams.minQP.qpInterB = q_min;
-    encodeConfig->rcParams.minQP.qpInterP = q_min;
-    encodeConfig->rcParams.maxQP.qpIntra = q_max;
-    encodeConfig->rcParams.maxQP.qpInterB = q_max;
-    encodeConfig->rcParams.maxQP.qpInterP = q_max;
-    return 0;
   }
 
   void setup_h264(NV_ENC_CONFIG *encodeConfig) {
@@ -367,12 +338,11 @@ int nv_destroy_encoder(void *encoder) {
 
 void *nv_new_encoder(void *handle, int64_t luid, API api, DataFormat dataFormat,
                      int32_t width, int32_t height, int32_t kbs,
-                     int32_t framerate, int32_t gop, int32_t q_min,
-                     int32_t q_max) {
+                     int32_t framerate, int32_t gop) {
   NvencEncoder *e = NULL;
   try {
     e = new NvencEncoder(handle, luid, api, dataFormat, width, height, kbs,
-                         framerate, gop, q_min, q_max);
+                         framerate, gop);
     if (!e->init()) {
       goto _exit;
     }
@@ -420,8 +390,8 @@ int nv_encode(void *encoder, void *texture, EncodeCallback callback,
 
 int nv_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
                    API api, DataFormat dataFormat, int32_t width,
-                   int32_t height, int32_t kbs, int32_t framerate, int32_t gop,
-                   int32_t q_min, int32_t q_max) {
+                   int32_t height, int32_t kbs, int32_t framerate,
+                   int32_t gop) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -431,7 +401,7 @@ int nv_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
     for (auto &adapter : adapters.adapters_) {
       NvencEncoder *e = (NvencEncoder *)nv_new_encoder(
           (void *)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_),
-          api, dataFormat, width, height, kbs, framerate, gop, q_min, q_max);
+          api, dataFormat, width, height, kbs, framerate, gop);
       if (!e)
         continue;
       if (!e->native_->EnsureTexture(e->width_, e->height_))
@@ -464,21 +434,6 @@ int nv_set_bitrate(void *e, int32_t kbs) {
   } catch (const std::exception &e) {
     LOG_ERROR("set bitrate to " + std::to_string(kbs) +
               "k failed: " + e.what());
-  }
-  return -1;
-}
-
-int nv_set_qp(void *e, int32_t q_min, int32_t q_max) {
-  try {
-    RECONFIGURE_HEAD
-    if (enc->set_qp(params.reInitEncodeParams.encodeConfig, q_min, q_max) !=
-        0) {
-      return -1;
-    }
-    RECONFIGURE_TAIL
-  } catch (const std::exception &e) {
-    LOG_ERROR("set qp to [" + std::to_string(q_min) + ", " +
-              std::to_string(q_max) + "] failed: " + e.what());
   }
   return -1;
 }

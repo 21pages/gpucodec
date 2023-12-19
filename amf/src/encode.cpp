@@ -75,8 +75,6 @@ private:
   int32_t bitRateIn_;
   int32_t frameRate_;
   int32_t gop_;
-  int32_t q_min_;
-  int32_t q_max_;
   bool enable4K_ = false;
   bool full_range_ = false;
   bool bt709_ = false;
@@ -87,8 +85,7 @@ private:
 public:
   AMFEncoder(void *handle, amf::AMF_MEMORY_TYPE memoryType, amf_wstring codec,
              DataFormat dataFormat, int32_t width, int32_t height,
-             int32_t bitrate, int32_t framerate, int32_t gop, int32_t q_min,
-             int32_t q_max) {
+             int32_t bitrate, int32_t framerate, int32_t gop) {
     handle_ = handle;
     dataFormat_ = dataFormat;
     AMFMemoryType_ = memoryType;
@@ -97,8 +94,6 @@ public:
     bitRateIn_ = bitrate;
     frameRate_ = framerate;
     gop_ = gop;
-    q_min_ = q_min;
-    q_max_ = q_max;
     enable4K_ = width > 1920 && height > 1080;
   }
 
@@ -185,49 +180,6 @@ public:
     if (!native)
       return AMF_FAIL;
     return encode(native, nullptr, nullptr);
-  }
-
-  AMF_RESULT set_qp(int32_t q_min, int32_t q_max) {
-    bool q_valid = q_min >= 0 && q_min <= 51 && q_max >= 0 && q_max <= 51 &&
-                   q_min <= q_max;
-    if (!q_valid) {
-      LOG_WARN("invalid qp range: [" + std::to_string(q_min) + ", " +
-               std::to_string(q_max) + "]");
-      return AMF_FAIL;
-    }
-    AMF_RESULT res = AMF_FAIL;
-    switch (dataFormat_) {
-    case H264:
-      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_MIN_QP, q_min_);
-      AMF_CHECK_RETURN(res,
-                       "SetProperty AMF_VIDEO_ENCODER_MIN_QP failed, val = " +
-                           std::to_string(q_min_));
-
-      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_MAX_QP, q_max_);
-      AMF_CHECK_RETURN(res,
-                       "SetProperty AMF_VIDEO_ENCODER_MAX_QP failed, val = " +
-                           std::to_string(q_max_));
-      break;
-    case H265:
-      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MIN_QP_I, q_min_);
-      AMF_CHECK_RETURN(res,
-                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MIN_QP_I failed");
-
-      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MAX_QP_I, q_max_);
-      AMF_CHECK_RETURN(res,
-                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MAX_QP_I failed");
-
-      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MIN_QP_P, q_min_);
-      AMF_CHECK_RETURN(res,
-                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MIN_QP_P failed");
-
-      res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_HEVC_MAX_QP_P, q_max_);
-      AMF_CHECK_RETURN(res,
-                       "SetProperty AMF_VIDEO_ENCODER_HEVC_MAX_QP_P failed");
-      break;
-    }
-
-    return res;
   }
 
   AMF_RESULT initialize() {
@@ -367,8 +319,6 @@ private:
       res = AMFEncoder_->SetProperty(AMF_VIDEO_ENCODER_IDR_PERIOD, gop_);
       AMF_CHECK_RETURN(res, "SetProperty AMF_VIDEO_ENCODER_IDR_PERIOD failed");
 
-      set_qp(q_min_, q_max_);
-
     } else if (codecStr == amf_wstring(AMFVideoEncoder_HEVC)) {
       // ------------- Encoder params usage---------------
       res = AMFEncoder_->SetProperty(
@@ -466,8 +416,6 @@ private:
                                      gop_); // todo
       AMF_CHECK_RETURN(res,
                        "SetProperty AMF_VIDEO_ENCODER_HEVC_GOP_SIZE failed");
-      set_qp(q_min_, q_max_);
-
     } else {
       return AMF_FAIL;
     }
@@ -522,8 +470,7 @@ int amf_destroy_encoder(void *encoder) {
 
 void *amf_new_encoder(void *handle, int64_t luid, API api,
                       DataFormat dataFormat, int32_t width, int32_t height,
-                      int32_t kbs, int32_t framerate, int32_t gop,
-                      int32_t q_min, int32_t q_max) {
+                      int32_t kbs, int32_t framerate, int32_t gop) {
   AMFEncoder *enc = NULL;
   try {
     amf_wstring codecStr;
@@ -535,7 +482,7 @@ void *amf_new_encoder(void *handle, int64_t luid, API api,
       return NULL;
     }
     enc = new AMFEncoder(handle, memoryType, codecStr, dataFormat, width,
-                         height, kbs * 1000, framerate, gop, q_min, q_max);
+                         height, kbs * 1000, framerate, gop);
     if (enc) {
       if (AMF_OK == enc->initialize()) {
         return enc;
@@ -577,8 +524,8 @@ int amf_driver_support() {
 
 int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
                     API api, DataFormat dataFormat, int32_t width,
-                    int32_t height, int32_t kbs, int32_t framerate, int32_t gop,
-                    int32_t q_min, int32_t q_max) {
+                    int32_t height, int32_t kbs, int32_t framerate,
+                    int32_t gop) {
   try {
     AdapterDesc *descs = (AdapterDesc *)outDescs;
     Adapters adapters;
@@ -588,7 +535,7 @@ int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
     for (auto &adapter : adapters.adapters_) {
       AMFEncoder *e = (AMFEncoder *)amf_new_encoder(
           (void *)adapter.get()->device_.Get(), LUID(adapter.get()->desc1_),
-          api, dataFormat, width, height, kbs, framerate, gop, q_min, q_max);
+          api, dataFormat, width, height, kbs, framerate, gop);
       if (!e)
         continue;
       if (e->test() == AMF_OK) {
@@ -648,18 +595,6 @@ int amf_set_framerate(void *encoder, int32_t framerate) {
   } catch (const std::exception &e) {
     LOG_ERROR("set framerate to " + std::to_string(framerate) +
               " failed: " + e.what());
-  }
-  return -1;
-}
-
-int amf_set_qp(void *encoder, int32_t q_min, int32_t q_max) {
-  try {
-    AMFEncoder *enc = (AMFEncoder *)encoder;
-    AMF_RESULT res = enc->set_qp(q_min, q_max);
-    return res == AMF_OK ? 0 : -1;
-  } catch (const std::exception &e) {
-    LOG_ERROR("set qp to [" + std::to_string(q_min) + ", " +
-              std::to_string(q_max) + "] failed: " + e.what());
   }
   return -1;
 }
