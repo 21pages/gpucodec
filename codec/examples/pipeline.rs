@@ -14,7 +14,7 @@ use std::{
 
 fn main() {
     init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "trace"));
-    let luid = 94758;
+    let luid = 61505;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;
@@ -24,7 +24,7 @@ fn main() {
 
         let en_ctx = EncodeContext {
             f: FeatureContext {
-                driver: EncodeDriver::MFX,
+                driver: EncodeDriver::VPL,
                 api: API_DX11,
                 data_format,
                 luid,
@@ -44,15 +44,15 @@ fn main() {
             } else {
                 Some(render.device())
             },
-            driver: DecodeDriver::MFX,
+            driver: DecodeDriver::VPL,
             api: API_DX11,
             data_format,
             output_shared_handle,
             luid,
         };
 
-        let mut enc = Encoder::new(en_ctx).unwrap();
         let mut dec = Decoder::new(de_ctx).unwrap();
+        let mut enc = Encoder::new(en_ctx).unwrap();
         let filename = PathBuf::from(".\\1.264");
         let mut file = std::fs::File::create(filename).unwrap();
         let mut dup_sum = Duration::ZERO;

@@ -28,7 +28,7 @@ impl Encoder {
         let calls = match ctx.f.driver {
             NVENC => nv::encode_calls(),
             AMF => amf::encode_calls(),
-            MFX => mfx::encode_calls(),
+            VPL => vpl::encode_calls(),
         };
         unsafe {
             let codec = (calls.new)(
@@ -138,9 +138,9 @@ pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
             .collect(),
     );
     natives.append(
-        &mut mfx::possible_support_encoders()
+        &mut vpl::possible_support_encoders()
             .drain(..)
-            .map(|n| (MFX, n))
+            .map(|n| (VPL, n))
             .collect(),
     );
     let inputs = natives.drain(..).map(|(driver, n)| EncodeContext {
@@ -160,7 +160,7 @@ pub fn available(d: DynamicContext) -> Vec<FeatureContext> {
             let test = match input.f.driver {
                 NVENC => nv::encode_calls().test,
                 AMF => amf::encode_calls().test,
-                MFX => mfx::encode_calls().test,
+                VPL => vpl::encode_calls().test,
             };
             let mut descs: Vec<AdapterDesc> = vec![];
             descs.resize(crate::MAX_ADATER_NUM_ONE_VENDER, unsafe {

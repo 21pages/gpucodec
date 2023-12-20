@@ -14,14 +14,14 @@ pub use serde_derive;
 pub enum EncodeDriver {
     NVENC,
     AMF,
-    MFX,
+    VPL,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum DecodeDriver {
     CUVID,
     AMF,
-    MFX,
+    VPL,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

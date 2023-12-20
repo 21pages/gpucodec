@@ -1,5 +1,5 @@
 [package]
-name = "gpucodec"
+name = "vpl"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,19 +7,8 @@ edition = "2021"
 
 [dependencies]
 log = "0.4"
-serde = "1.0"
-serde_derive = "1.0"
-serde_json = "1.0"
 gpu_common = { path = "../common" }
-amf = { path = "../amf" }
-nv = { path = "../nv" }
-vpl = { path = "../vpl" }
 
 [build-dependencies]
 cc = "1.0"
 bindgen = "0.59"
-
-[dev-dependencies]
-env_logger = "0.9"
-capture = { path = "../capture" }
-render = { path = "../render" }

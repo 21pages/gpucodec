@@ -25,7 +25,7 @@ impl Decoder {
         let calls = match ctx.driver {
             CUVID => nv::decode_calls(),
             AMF => amf::decode_calls(),
-            MFX => mfx::decode_calls(),
+            VPL => vpl::decode_calls(),
         };
         unsafe {
             let codec = (calls.new)(
@@ -105,9 +105,9 @@ pub fn available(output_shared_handle: bool) -> Vec<DecodeContext> {
             .collect(),
     );
     natives.append(
-        &mut mfx::possible_support_decoders()
+        &mut vpl::possible_support_decoders()
             .drain(..)
-            .map(|n| (MFX, n))
+            .map(|n| (VPL, n))
             .collect(),
     );
     let inputs = natives.drain(..).map(|(driver, n)| DecodeContext {
@@ -142,7 +142,7 @@ pub fn available(output_shared_handle: bool) -> Vec<DecodeContext> {
             let test = match input.driver {
                 CUVID => nv::decode_calls().test,
                 AMF => amf::decode_calls().test,
-                MFX => mfx::decode_calls().test,
+                VPL => vpl::decode_calls().test,
             };
             let mut descs: Vec<AdapterDesc> = vec![];
             descs.resize(crate::MAX_ADATER_NUM_ONE_VENDER, unsafe {
