@@ -4,8 +4,6 @@
 
   Windows Intel(r) graphics driver since 27.20.100.8935 version. 
 
-  https://github.com/Intel-Media-SDK/MediaSDK/releases
-
   [Hardware Platforms Supported by the Intel(R) Media SDK GPU Runtime](https://www.intel.com/content/www/us/en/docs/onevpl/upgrade-from-msdk/2023-1/onevpl-hardware-support-details.html#HARDWARE-PLATFORMS-SUPPORTED-BY-THE-INTEL-R-MEDIA-SDK-GPU-RUNTIME)
 
 * AMD
