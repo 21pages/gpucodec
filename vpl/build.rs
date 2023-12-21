@@ -50,7 +50,7 @@ fn main() {
         )
         .files(
             [
-                "main.cpp",
+                "mfx_dispatcher_main.cpp",
                 "mfx_critical_section.cpp",
                 "mfx_dispatcher.cpp",
                 "mfx_dispatcher_log.cpp",
