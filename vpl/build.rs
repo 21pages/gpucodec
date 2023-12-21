@@ -104,8 +104,10 @@ fn main() {
         .file("src/decode.cpp")
         .cpp(false)
         .warnings(false)
-        .define("NOMINMAX", "1")
-        .define("MFX_DEPRECATED_OFF", "1")
-        .define("MFX_D3D11_SUPPORT", "1")
+        .define("NOMINMAX", None)
+        .define("MFX_DEPRECATED_OFF", None)
+        .define("MFX_D3D11_SUPPORT", None)
+        // .define("ONEVPL_EXPERIMENTAL", None)
+        // .define("WIN32", None)
         .compile("vpl");
 }
