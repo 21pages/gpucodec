@@ -87,6 +87,13 @@ public:
     // decoders.
     mfxVideoParams_.mfx.DecodedOrder = true; // Not important.
 
+    mfxVideoParams_.mfx.FrameInfo.FrameRateExtN = 30;
+    mfxVideoParams_.mfx.FrameInfo.FrameRateExtD = 1;
+    mfxVideoParams_.mfx.FrameInfo.AspectRatioW = 1;
+    mfxVideoParams_.mfx.FrameInfo.AspectRatioH = 1;
+    mfxVideoParams_.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
+    mfxVideoParams_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+
     // Validate video decode parameters (optional)
     sts = mfxDEC_->Query(&mfxVideoParams_, &mfxVideoParams_);
     CHECK_STATUS(sts, "Query");
