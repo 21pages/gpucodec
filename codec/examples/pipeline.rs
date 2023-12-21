@@ -14,11 +14,11 @@ use std::{
 
 fn main() {
     init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "trace"));
-    let luid = 61505;
+    let luid = 61106;
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;
-        let data_format = DataFormat::H264;
+        let data_format = DataFormat::H265;
         let mut capturer = dxgi::Capturer::new().unwrap();
         let mut render = Render::new(luid, output_shared_handle).unwrap();
 

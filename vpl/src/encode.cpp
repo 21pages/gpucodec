@@ -1,5 +1,7 @@
 #include <cstring>
 #include <iostream>
+#include <sample_defs.h>
+#include <sample_utils.h>
 
 #include "callback.h"
 #include "common.h"
@@ -8,30 +10,63 @@
 #define LOG_MODULE "VPL ENCODE"
 #include "log.h"
 
+// #define CONFIG_USE_VPP
 #define CONFIG_USE_D3D_CONVERT
+
+#define CHECK_STATUS(X, MSG)                                                   \
+  {                                                                            \
+    mfxStatus __sts = (X);                                                     \
+    if (__sts < MFX_ERR_NONE) {                                                \
+      MSDK_PRINT_RET_MSG(__sts, MSG);                                          \
+      LOG_ERROR(MSG + " failed, sts=" + std::to_string((int)__sts));           \
+      return __sts;                                                            \
+    }                                                                          \
+  }
 
 namespace {
 
-#include <api1x_core\legacy-encode\src\util.hpp>
+mfxStatus MFX_CDECL simple_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL *handle) {
+  mfxHDLPair *pair = (mfxHDLPair *)handle;
+  pair->first = mid;
+  pair->second = (mfxHDL)(UINT)0;
+  return MFX_ERR_NONE;
+}
+
+mfxFrameAllocator frameAllocator{{},   NULL,          NULL, NULL,
+                                 NULL, simple_getHDL, NULL};
+
+mfxStatus InitSession(MFXVideoSession &session) {
+  mfxInitParam mfxparams{};
+  mfxIMPL impl = MFX_IMPL_HARDWARE_ANY | MFX_IMPL_VIA_D3D11;
+  mfxparams.Implementation = impl;
+  mfxparams.Version.Major = 1;
+  mfxparams.Version.Minor = 0;
+  mfxparams.GPUCopy = MFX_GPUCOPY_OFF;
+
+  return session.InitEx(mfxparams);
+}
 
 class VplEncoder {
 public:
-  mfxLoader loader_ = NULL;
-  int accel_fd_ = 0;
-  void *accelHandle_ = NULL;
-  mfxConfig cfg_[1];
-  mfxVariant cfgVal_[1];
-  mfxSession session_ = NULL;
-  mfxVideoParam encodeParams_ = {};
+  std::unique_ptr<NativeDevice> native_ = nullptr;
+  MFXVideoSession session_;
+  MFXVideoENCODE *mfxENC_ = nullptr;
   std::vector<mfxFrameSurface1> encSurfaces_;
   std::vector<mfxU8> bstData_;
   mfxBitstream mfxBS_;
-
-  std::unique_ptr<NativeDevice> native_ = nullptr;
-
   mfxVideoParam mfxEncParams_;
   mfxExtBuffer *extbuffers_[1] = {NULL};
   mfxExtVideoSignalInfo signal_info_;
+
+// vpp
+#ifdef CONFIG_USE_VPP
+  MFXVideoVPP *mfxVPP_ = nullptr;
+  mfxVideoParam vppParams_;
+  mfxExtBuffer *vppExtBuffers_[1] = {NULL};
+  mfxExtVPPDoNotUse vppDontUse_;
+  mfxU32 vppDontUseArgList_[4];
+  std::vector<mfxFrameSurface1> vppSurfaces_;
+#endif
 
   void *handle_ = nullptr;
   int64_t luid_;
@@ -60,21 +95,23 @@ public:
     gop_ = gop;
   }
 
-  bool Init() {
+  mfxStatus Init() {
+    mfxStatus sts = MFX_ERR_NONE;
+
     native_ = std::make_unique<NativeDevice>();
     if (!native_->Init(luid_, (ID3D11Device *)handle_)) {
       LOG_ERROR("failed to init native device");
-      return false;
+      return MFX_ERR_DEVICE_FAILED;
     }
-    if (!initMFX()) {
-      LOG_ERROR("failed to init MFX");
-      return false;
-    }
-    if (!initEnc()) {
-      LOG_ERROR("failed to init enc");
-      return false;
-    }
-    return true;
+    sts = initMFX();
+    CHECK_STATUS(sts, "initMFX");
+#ifdef CONFIG_USE_VPP
+    sts = initVpp();
+    CHECK_STATUS(sts, "initVpp");
+#endif
+    sts = initEnc();
+    CHECK_STATUS(sts, "initEnc");
+    return MFX_ERR_NONE;
   }
 
   int encode(ID3D11Texture2D *tex, EncodeCallback callback, void *obj) {
@@ -87,7 +124,15 @@ public:
       return -1;
     }
     mfxFrameSurface1 *encSurf = &encSurfaces_[nEncSurfIdx];
-#ifdef CONFIG_USE_D3D_CONVERT
+#ifdef CONFIG_USE_VPP
+    mfxSyncPoint syncp;
+    sts = vppOneFrame(tex, encSurf, syncp);
+    syncp = NULL;
+    if (sts != MFX_ERR_NONE) {
+      LOG_ERROR("vppOneFrame failed, sts=" + std::to_string((int)sts));
+      return -1;
+    }
+#elif defined(CONFIG_USE_D3D_CONVERT)
     DXGI_COLOR_SPACE_TYPE colorSpace_in =
         DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
     DXGI_COLOR_SPACE_TYPE colorSpace_out;
@@ -115,84 +160,113 @@ public:
     return encodeOneFrame(encSurf, callback, obj);
   }
 
-  void destroy() {
-    // Clean up resources - It is recommended to close components first, before
-    // releasing allocated surfaces, since some surfaces may still be locked by
-    // internal resources.
-    if (session_) {
-      MFXVideoENCODE_Close(session_);
-      MFXClose(session_);
-    }
-
-    FreeAcceleratorHandle(accelHandle_, accel_fd_);
-    accelHandle_ = NULL;
-    accel_fd_ = 0;
-
-    if (loader_)
-      MFXUnload(loader_);
-  }
-
 private:
-  bool initMFX() {
-    loader_ = MFXLoad();
-    if (!loader_) {
-      LOG_ERROR("failed to load MFX");
-      return false;
-    }
-    cfg_[0] = MFXCreateConfig(loader_);
-    if (!cfg_[0]) {
-      LOG_ERROR("MFXCreateConfig failed");
-      return false;
-    }
-    cfgVal_[0].Type = MFX_VARIANT_TYPE_U32;
-    cfgVal_[0].Data.U32 = MFX_IMPL_TYPE_HARDWARE;
+  mfxStatus initMFX() {
+    mfxStatus sts = MFX_ERR_NONE;
 
-    mfxStatus sts = MFXSetConfigFilterProperty(
-        cfg_[0], (mfxU8 *)"mfxImplDescription.Impl", cfgVal_[0]);
-    if (sts != MFX_ERR_NONE) {
-      LOG_ERROR("MFXSetConfigFilterProperty failed for Impl, sts=" +
-                std::to_string(sts));
-      return false;
-    }
-    sts = MFXCreateSession(loader_, 0, &session_);
-    if (sts != MFX_ERR_NONE) {
-      LOG_ERROR("MFXCreateSession failed, sts=" + std::to_string(sts));
-      return false;
-    }
+    sts = InitSession(session_);
+    CHECK_STATUS(sts, "InitSession");
+    sts = session_.SetHandle(MFX_HANDLE_D3D11_DEVICE, native_->device_.Get());
+    CHECK_STATUS(sts, "SetHandle");
+    sts = session_.SetFrameAllocator(&frameAllocator);
+    CHECK_STATUS(sts, "SetFrameAllocator");
 
-    // Print info about implementation loaded
-    ShowImplementationInfo(loader_, 0);
-
-    // Convenience function to initialize available accelerator(s)
-    accelHandle_ = InitAcceleratorHandle(session_, &accel_fd_);
-
-    return true;
+    return MFX_ERR_NONE;
   }
 
-  bool initEnc() {
+#ifdef CONFIG_USE_VPP
+  mfxStatus initVpp() {
     mfxStatus sts = MFX_ERR_NONE;
-    // memset(&mfxEncParams_, 0, sizeof(mfxEncParams_));
+    memset(&vppParams_, 0, sizeof(vppParams_));
+    vppParams_.IOPattern =
+        MFX_IOPATTERN_IN_VIDEO_MEMORY | MFX_IOPATTERN_OUT_VIDEO_MEMORY;
+    vppParams_.vpp.In.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
+    vppParams_.vpp.In.FrameRateExtN = framerate_;
+    vppParams_.vpp.In.FrameRateExtD = 1;
+    vppParams_.vpp.In.Width = MSDK_ALIGN16(width_);
+    vppParams_.vpp.In.Height =
+        (MFX_PICSTRUCT_PROGRESSIVE == vppParams_.vpp.In.PicStruct)
+            ? MSDK_ALIGN16(height_)
+            : MSDK_ALIGN32(height_);
+    vppParams_.vpp.In.CropX = 0;
+    vppParams_.vpp.In.CropY = 0;
+    vppParams_.vpp.In.CropW = width_;
+    vppParams_.vpp.In.CropH = height_;
+    vppParams_.vpp.In.Shift = 0;
+    memcpy(&vppParams_.vpp.Out, &vppParams_.vpp.In, sizeof(vppParams_.vpp.Out));
+    vppParams_.vpp.In.FourCC = MFX_FOURCC_RGB4;
+    vppParams_.vpp.Out.FourCC = MFX_FOURCC_NV12;
+    vppParams_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV444;
+    vppParams_.vpp.Out.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+    vppParams_.AsyncDepth = 1;
+
+    vppParams_.ExtParam = vppExtBuffers_;
+    vppParams_.NumExtParam = 1;
+    vppExtBuffers_[0] = (mfxExtBuffer *)&vppDontUse_;
+    vppDontUse_.Header.BufferId = MFX_EXTBUFF_VPP_DONOTUSE;
+    vppDontUse_.Header.BufferSz = sizeof(vppDontUse_);
+    vppDontUse_.AlgList = vppDontUseArgList_;
+    vppDontUse_.NumAlg = 4;
+    vppDontUseArgList_[0] = MFX_EXTBUFF_VPP_DENOISE;
+    vppDontUseArgList_[1] = MFX_EXTBUFF_VPP_SCENE_ANALYSIS;
+    vppDontUseArgList_[2] = MFX_EXTBUFF_VPP_DETAIL;
+    vppDontUseArgList_[3] = MFX_EXTBUFF_VPP_PROCAMP;
+
+    mfxVPP_ = new MFXVideoVPP(session_);
+    if (!mfxVPP_) {
+      LOG_ERROR("Failed to create MFXVideoVPP");
+      return MFX_ERR_MEMORY_ALLOC;
+    }
+
+    sts = mfxVPP_->Query(&vppParams_, &vppParams_);
+    CHECK_STATUS(sts, "vpp query");
+    mfxFrameAllocRequest vppAllocRequest;
+    ZeroMemory(&vppAllocRequest, sizeof(vppAllocRequest));
+    memcpy(&vppAllocRequest.Info, &vppParams_.vpp.In, sizeof(mfxFrameInfo));
+    sts = mfxVPP_->QueryIOSurf(&vppParams_, &vppAllocRequest);
+    CHECK_STATUS(sts, "vpp QueryIOSurf");
+
+    vppSurfaces_.resize(vppAllocRequest.NumFrameSuggested);
+    for (int i = 0; i < vppAllocRequest.NumFrameSuggested; i++) {
+      memset(&vppSurfaces_[i], 0, sizeof(mfxFrameSurface1));
+      memcpy(&vppSurfaces_[i].Info, &vppParams_.vpp.In, sizeof(mfxFrameInfo));
+    }
+
+    sts = mfxVPP_->Init(&vppParams_);
+    MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
+    CHECK_STATUS(sts, "vpp init");
+
+    return MFX_ERR_NONE;
+  }
+#endif
+
+  mfxStatus initEnc() {
+    mfxStatus sts = MFX_ERR_NONE;
+    memset(&mfxEncParams_, 0, sizeof(mfxEncParams_));
     if (!convert_codec(dataFormat_, mfxEncParams_.mfx.CodecId)) {
       LOG_ERROR("unsupported dataFormat: " + std::to_string(dataFormat_));
-      return false;
+      return MFX_ERR_UNSUPPORTED;
     }
 
     mfxEncParams_.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
-    mfxEncParams_.mfx.TargetKbps = 4000; // kbs_;
-    mfxEncParams_.mfx.RateControlMethod = MFX_RATECONTROL_VBR;
-    mfxEncParams_.mfx.FrameInfo.FrameRateExtN = 30; // framerate_;
+    mfxEncParams_.mfx.TargetKbps = kbs_;
+    mfxEncParams_.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
+    mfxEncParams_.mfx.FrameInfo.FrameRateExtN = framerate_;
     mfxEncParams_.mfx.FrameInfo.FrameRateExtD = 1;
-#ifdef CONFIG_USE_D3D_CONVERT
+#ifdef CONFIG_USE_VPP
+    mfxEncParams_.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
+    mfxEncParams_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+#elif defined(CONFIG_USE_D3D_CONVERT)
     mfxEncParams_.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
     mfxEncParams_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
 #else
     mfxEncParams_.mfx.FrameInfo.FourCC = MFX_FOURCC_BGR4;
     mfxEncParams_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV444;
 #endif
-    // mfxEncParams_.mfx.FrameInfo.BitDepthLuma = 8;
-    // mfxEncParams_.mfx.FrameInfo.BitDepthChroma = 8;
-    // mfxEncParams_.mfx.FrameInfo.Shift = 0;
-    // mfxEncParams_.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
+    mfxEncParams_.mfx.FrameInfo.BitDepthLuma = 8;
+    mfxEncParams_.mfx.FrameInfo.BitDepthChroma = 8;
+    mfxEncParams_.mfx.FrameInfo.Shift = 0;
+    mfxEncParams_.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
     mfxEncParams_.mfx.FrameInfo.CropX = 0;
     mfxEncParams_.mfx.FrameInfo.CropY = 0;
     mfxEncParams_.mfx.FrameInfo.CropW = width_;
@@ -200,56 +274,61 @@ private:
     // Width must be a multiple of 16
     // Height must be a multiple of 16 in case of frame picture and a multiple
     // of 32 in case of field picture
-    mfxEncParams_.mfx.FrameInfo.Width = ALIGN16(width_);
+    mfxEncParams_.mfx.FrameInfo.Width = MSDK_ALIGN16(width_);
     mfxEncParams_.mfx.FrameInfo.Height =
         (MFX_PICSTRUCT_PROGRESSIVE == mfxEncParams_.mfx.FrameInfo.PicStruct)
-            ? ALIGN16(height_)
-            : ALIGN32(height_);
-    // mfxEncParams_.mfx.EncodedOrder = 0;
+            ? MSDK_ALIGN16(height_)
+            : MSDK_ALIGN32(height_);
+    mfxEncParams_.mfx.EncodedOrder = 0;
 
-    mfxEncParams_.IOPattern =
-        MFX_IOPATTERN_IN_SYSTEM_MEMORY; // MFX_IOPATTERN_IN_VIDEO_MEMORY;
+    mfxEncParams_.IOPattern = MFX_IOPATTERN_IN_VIDEO_MEMORY;
 
-    // // Configuration for low latency
-    // mfxEncParams_.AsyncDepth = 1; // 1 is best for low latency
-    // mfxEncParams_.mfx.GopRefDist =
-    //     1; // 1 is best for low latency, I and P frames only
+    // Configuration for low latency
+    mfxEncParams_.AsyncDepth = 1; // 1 is best for low latency
+    mfxEncParams_.mfx.GopRefDist =
+        1; // 1 is best for low latency, I and P frames only
 
-    // InitEncExtParams();
+    InitEncExtParams();
 
-    // Validate video encode parameters
+    // Create Media SDK encoder
+    mfxENC_ = new MFXVideoENCODE(session_);
+    if (!mfxENC_) {
+      LOG_ERROR("failed to create MFXVideoENCODE");
+      return MFX_ERR_NOT_INITIALIZED;
+    }
+
+    // Validate video encode parameters (optional)
     // - In this example the validation result is written to same structure
     // - MFX_WRN_INCOMPATIBLE_VIDEO_PARAM is returned if some of the video
     // parameters are not supported,
     //   instead the encoder will select suitable parameters closest matching
-    //   the requested configuration, and it's ignorable.
-    sts = MFXVideoENCODE_Query(session_, &encodeParams_, &encodeParams_);
-    if (sts == MFX_WRN_INCOMPATIBLE_VIDEO_PARAM)
-      sts = MFX_ERR_NONE;
-    if (sts != MFX_ERR_NONE) {
-      LOG_ERROR("Encode Query failed, sts=" + std::to_string(sts));
-      return false;
-    }
-    // Initialize encoder
-    sts = MFXVideoENCODE_Init(session_, &encodeParams_);
-    if (sts != MFX_ERR_NONE) {
-      LOG_ERROR("Encode init failed, sts=" + std::to_string(sts));
-      return false;
-    }
-    // Query number required surfaces for decoder
-    mfxFrameAllocRequest encRequest = {};
-    sts = MFXVideoENCODE_QueryIOSurf(session_, &encodeParams_, &encRequest);
-    if (sts != MFX_ERR_NONE) {
-      LOG_ERROR("Encode QueryIOSurf failed, sts=" + std::to_string(sts));
-      return false;
-    }
+    //   the requested configuration
+    sts = mfxENC_->Query(&mfxEncParams_, &mfxEncParams_);
+    MSDK_IGNORE_MFX_STS(sts, MFX_WRN_INCOMPATIBLE_VIDEO_PARAM);
+    CHECK_STATUS(sts, "Query");
+
+    mfxFrameAllocRequest EncRequest;
+    memset(&EncRequest, 0, sizeof(EncRequest));
+    sts = mfxENC_->QueryIOSurf(&mfxEncParams_, &EncRequest);
+    CHECK_STATUS(sts, "QueryIOSurf");
+
     // Allocate surface headers (mfxFrameSurface1) for encoder
-    encSurfaces_.resize(encRequest.NumFrameSuggested);
-    for (int i = 0; i < encRequest.NumFrameSuggested; i++) {
+    encSurfaces_.resize(EncRequest.NumFrameSuggested);
+    for (int i = 0; i < EncRequest.NumFrameSuggested; i++) {
       memset(&encSurfaces_[i], 0, sizeof(mfxFrameSurface1));
       memcpy(&encSurfaces_[i].Info, &mfxEncParams_.mfx.FrameInfo,
              sizeof(mfxFrameInfo));
     }
+
+    // Initialize the Media SDK encoder
+    sts = mfxENC_->Init(&mfxEncParams_);
+    MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
+    CHECK_STATUS(sts, "Init");
+
+    // Retrieve video parameters selected by encoder.
+    // - BufferSizeInKB parameter is required to set bit stream buffer size
+    sts = mfxENC_->GetVideoParam(&mfxEncParams_);
+    CHECK_STATUS(sts, "GetVideoParam");
 
     // Prepare Media SDK bit stream buffer
     memset(&mfxBS_, 0, sizeof(mfxBS_));
@@ -257,8 +336,49 @@ private:
     bstData_.resize(mfxBS_.MaxLength);
     mfxBS_.Data = bstData_.data();
 
-    return true;
+    return MFX_ERR_NONE;
   }
+
+#ifdef CONFIG_USE_VPP
+  mfxStatus vppOneFrame(void *texture, mfxFrameSurface1 *out,
+                        mfxSyncPoint syncp) {
+    mfxStatus sts = MFX_ERR_NONE;
+
+    int surfIdx =
+        GetFreeSurfaceIndex(vppSurfaces_.data(),
+                            vppSurfaces_.size()); // Find free frame surface
+    if (surfIdx >= vppSurfaces_.size()) {
+      LOG_ERROR("No free vpp surface");
+      return MFX_ERR_MORE_SURFACE;
+    }
+    mfxFrameSurface1 *in = &vppSurfaces_[surfIdx];
+    in->Data.MemId = texture;
+
+    for (;;) {
+      sts = mfxVPP_->RunFrameVPPAsync(in, out, NULL, &syncp);
+
+      if (MFX_ERR_NONE < sts &&
+          !syncp) // repeat the call if warning and no output
+      {
+        if (MFX_WRN_DEVICE_BUSY == sts)
+          MSDK_SLEEP(1); // wait if device is busy
+      } else if (MFX_ERR_NONE < sts && syncp) {
+        sts = MFX_ERR_NONE; // ignore warnings if output is available
+        break;
+      } else {
+        break; // not a warning
+      }
+    }
+
+    if (MFX_ERR_NONE == sts) {
+      sts = session_.SyncOperation(
+          syncp, 1000); // Synchronize. Wait until encoded frame is ready
+      CHECK_STATUS(sts, "SyncOperation");
+    }
+
+    return sts;
+  }
+#endif
 
   int encodeOneFrame(mfxFrameSurface1 *in, EncodeCallback callback, void *obj) {
     mfxStatus sts = MFX_ERR_NONE;
@@ -269,12 +389,11 @@ private:
     mfxBS_.DataOffset = 0;
     for (;;) {
       // Encode a frame asychronously (returns immediately)
-      sts =
-          MFXVideoENCODE_EncodeFrameAsync(session_, NULL, in, &mfxBS_, &syncp);
+      sts = mfxENC_->EncodeFrameAsync(NULL, in, &mfxBS_, &syncp);
       if (MFX_ERR_NONE < sts &&
           !syncp) { // Repeat the call if warning and no output
         if (MFX_WRN_DEVICE_BUSY == sts)
-          Sleep(1); // Wait if device is busy, then repeat the same call
+          MSDK_SLEEP(1); // Wait if device is busy, then repeat the same call
       } else if (MFX_ERR_NONE < sts && syncp) {
         sts = MFX_ERR_NONE; // Ignore warnings if output is available
         break;
@@ -286,13 +405,9 @@ private:
     }
 
     if (MFX_ERR_NONE == sts) {
-      sts = MFXVideoCORE_SyncOperation(
-          session_, syncp,
-          1000); // Synchronize. Wait until encoded frame is ready
-      if (sts != MFX_ERR_NONE) {
-        LOG_ERROR("SyncOperation failed, sts=" + std::to_string(sts));
-        return -1;
-      }
+      sts = session_.SyncOperation(
+          syncp, 1000); // Synchronize. Wait until encoded frame is ready
+      CHECK_STATUS(sts, "SyncOperation");
       if (mfxBS_.DataLength > 0) {
         int key = (mfxBS_.FrameType & MFX_FRAMETYPE_I) ||
                   (mfxBS_.FrameType & MFX_FRAMETYPE_IDR);
@@ -340,26 +455,32 @@ private:
   }
 };
 
-int driver_support() {
-  mfxLoader loader = MFXLoad();
-  if (loader) {
-    MFXUnload(loader);
-    return 0;
-  } else {
-    return -1;
-  }
-}
-
 } // namespace
 
 extern "C" {
 
-int vpl_driver_support() { return driver_support(); }
+int vpl_driver_support() {
+  MFXVideoSession session;
+  return InitSession(session) == MFX_ERR_NONE ? 0 : -1;
+}
 
 int vpl_destroy_encoder(void *encoder) {
   VplEncoder *p = (VplEncoder *)encoder;
   if (p) {
-    p->destroy();
+    if (p->mfxENC_) {
+      //  - It is recommended to close Media SDK components first, before
+      //  releasing allocated surfaces, since
+      //    some surfaces may still be locked by internal Media SDK resources.
+      p->mfxENC_->Close();
+      delete p->mfxENC_;
+    }
+#ifdef CONFIG_USE_VPP
+    if (p->mfxVPP_) {
+      p->mfxVPP_->Close();
+      delete p->mfxVPP_;
+    }
+#endif
+    // session closed automatically on destruction
   }
   return 0;
 }
@@ -374,10 +495,11 @@ void *vpl_new_encoder(void *handle, int64_t luid, API api,
     if (!p) {
       return NULL;
     }
-    if (p->Init()) {
+    mfxStatus sts = p->Init();
+    if (sts == MFX_ERR_NONE) {
       return p;
     } else {
-      LOG_ERROR("Init failed");
+      LOG_ERROR("Init failed, sts=" + std::to_string(sts));
     }
   } catch (const std::exception &e) {
     LOG_ERROR("Exception: " + e.what());
@@ -445,10 +567,7 @@ int vpl_set_bitrate(void *encoder, int32_t kbs) {
     mfxStatus sts = MFX_ERR_NONE;
     p->mfxEncParams_.mfx.TargetKbps = kbs;
     sts = MFXVideoENCODE_Reset(p->session_, &p->mfxEncParams_);
-    if (sts != MFX_ERR_NONE) {
-      LOG_ERROR("MFXVideoENCODE_Reset failed, sts=" + std::to_string(sts));
-      return -1;
-    }
+    CHECK_STATUS(sts, "MFXVideoENCODE_Reset");
     return 0;
   } catch (const std::exception &e) {
     LOG_ERROR("Exception: " + e.what());

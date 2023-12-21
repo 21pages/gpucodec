@@ -26,10 +26,17 @@ fn main() {
     // libvpl
     let libvpl_path = sdk_path.join("libvpl");
     let api_path = sdk_path.join("api");
-    let examples_path = sdk_path.join("examples");
+    let legacy_tool_path = sdk_path.join("tools").join("legacy");
+    let samples_common_path = legacy_tool_path.join("sample_common");
 
     builder
-        .includes([&libvpl_path, &api_path, &examples_path])
+        .includes([
+            &libvpl_path,
+            &api_path,
+            &samples_common_path.join("include"),
+            &samples_common_path.join("include").join("vm"),
+            &legacy_tool_path.join("media_sdk_compatibility_headers"),
+        ])
         .files(
             [
                 "mfx_dispatcher_vpl.cpp",
@@ -62,6 +69,26 @@ fn main() {
                 "mfx_config_interface_string_api.cpp",
             ]
             .map(|f| libvpl_path.join("src").join("mfx_config_interface").join(f)),
+        )
+        .files(
+            [
+                "sample_utils.cpp",
+                "base_allocator.cpp",
+                "d3d11_allocator.cpp",
+                "avc_bitstream.cpp",
+                "avc_spl.cpp",
+                "avc_nal_spl.cpp",
+            ]
+            .map(|f| samples_common_path.join("src").join(f)),
+        )
+        .files(
+            [
+                "time.cpp",
+                "atomic.cpp",
+                "shared_object.cpp",
+                "thread_windows.cpp",
+            ]
+            .map(|f| samples_common_path.join("src").join("vm").join(f)),
         );
 
     // link
@@ -77,10 +104,8 @@ fn main() {
         .file("src/decode.cpp")
         .cpp(false)
         .warnings(false)
-        .define("WIN32", "")
-        .define("_WINDOWS", "")
-        .define("MFX_DEPRECATED_OFF", "")
-        .define("ONEVPL_EXPERIMENTAL", "")
         .define("NOMINMAX", "1")
+        .define("MFX_DEPRECATED_OFF", "1")
+        .define("MFX_D3D11_SUPPORT", "1")
         .compile("vpl");
 }
