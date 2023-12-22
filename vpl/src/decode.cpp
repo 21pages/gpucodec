@@ -105,7 +105,7 @@ public:
     mfxStatus sts = MFX_ERR_NONE;
     mfxSyncPoint syncp;
     mfxFrameSurface1 *pmfxOutSurface = NULL;
-    int nIndex = 0;
+    void *output = nullptr;
     bool decoded = false;
     mfxBitstream mfxBS;
 
@@ -120,42 +120,30 @@ public:
     int loop_counter = 0;
     do {
       if (loop_counter++ > 100) {
-        std::cerr << "mfx decode loop two many times" << std::endl;
+        LOG_ERROR("mfx decode loop two many times");
         break;
       }
-
-      if (MFX_WRN_DEVICE_BUSY == sts)
-        MSDK_SLEEP(1);
-      if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_NONE == sts) {
-        nIndex = GetFreeSurfaceIndex(
-            pmfxSurfaces_.data(),
-            pmfxSurfaces_.size()); // Find free frame surface
-        if (nIndex >= pmfxSurfaces_.size()) {
-          LOG_ERROR("GetFreeSurfaceIndex failed, nIndex=" +
-                    std::to_string(nIndex));
-          return -1;
-        }
+      int nIndex =
+          GetFreeSurfaceIndex(pmfxSurfaces_.data(),
+                              pmfxSurfaces_.size()); // Find free frame surface
+      if (nIndex >= pmfxSurfaces_.size()) {
+        LOG_ERROR("GetFreeSurfaceIndex failed, nIndex=" +
+                  std::to_string(nIndex));
+        return -1;
       }
-
       sts = mfxDEC_->DecodeFrameAsync(&mfxBS, &pmfxSurfaces_[nIndex],
                                       &pmfxOutSurface, &syncp);
-
-      if (MFX_ERR_INCOMPATIBLE_VIDEO_PARAM == sts) {
-        // https://github.com/FFmpeg/FFmpeg/blob/f84412d6f4e9c1f1d1a2491f9337d7e789c688ba/libavcodec/qsvdec.c#L736
-        setBitStream(&mfxBS, data, len);
-        LOG_INFO("Incompatible video parameters, resetting decoder");
-        sts = initializeDecode(&mfxBS, true);
-        CHECK_STATUS(sts, "initialize");
-        continue;
-      }
-
-      // Ignore warnings if output is available,
-      if (MFX_ERR_NONE < sts && syncp)
-        sts = MFX_ERR_NONE;
-
-      if (MFX_ERR_NONE == sts)
+      switch (sts) {
+      case MFX_ERR_NONE:
+        if (!syncp) {
+          LOG_ERROR("should not happen, syncp is NULL while error is none");
+          return -1;
+        }
         sts = session_.SyncOperation(syncp, 1000);
-      if (MFX_ERR_NONE == sts) {
+        if (MFX_ERR_NONE != sts) {
+          LOG_ERROR("SyncOperation failed, sts=" + std::to_string((int)sts));
+          return -1;
+        }
         if (!pmfxOutSurface) {
           LOG_ERROR("pmfxOutSurface is null");
           return -1;
@@ -164,7 +152,6 @@ public:
           LOG_ERROR("Failed to convert");
           return -1;
         }
-        void *output = nullptr;
         if (outputSharedHandle_) {
           HANDLE sharedHandle = native_->GetSharedHandle();
           if (!sharedHandle) {
@@ -175,18 +162,34 @@ public:
         } else {
           output = native_->GetCurrentTexture();
         }
-
-        if (MFX_ERR_NONE == sts) {
-          if (callback)
-            callback(output, obj);
-          decoded = true;
-        }
+        if (callback)
+          callback(output, obj);
+        decoded = true;
         break;
+      case MFX_WRN_DEVICE_BUSY:
+        LOG_INFO("Device busy");
+        Sleep(1);
+        continue;
+      case MFX_ERR_INCOMPATIBLE_VIDEO_PARAM:
+        LOG_INFO("Incompatible video param, reset decoder");
+        // https://github.com/FFmpeg/FFmpeg/blob/f84412d6f4e9c1f1d1a2491f9337d7e789c688ba/libavcodec/qsvdec.c#L736
+        setBitStream(&mfxBS, data, len);
+        sts = initializeDecode(&mfxBS, true);
+        CHECK_STATUS(sts, "initialize");
+        Sleep(1);
+        continue;
+      case MFX_ERR_MORE_SURFACE:
+        LOG_INFO("More surface");
+        Sleep(1);
+        continue;
+      default:
+        LOG_ERROR("DecodeFrameAsync failed, sts=" + std::to_string(sts));
+        return -1;
       }
-    } while (MFX_ERR_NONE <= sts || MFX_ERR_MORE_SURFACE == sts);
+    } while (MFX_WRN_DEVICE_BUSY == sts);
 
     if (!decoded) {
-      std::cerr << "decoded failed, sts=" << sts << std::endl;
+      LOG_ERROR("decode failed, sts=" + std::to_string(sts));
     }
 
     return decoded ? 0 : -1;
