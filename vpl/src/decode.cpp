@@ -14,7 +14,7 @@
 #define CHECK_STATUS(X, MSG)                                                   \
   {                                                                            \
     mfxStatus __sts = (X);                                                     \
-    if (__sts < MFX_ERR_NONE) {                                                \
+    if (__sts != MFX_ERR_NONE) {                                               \
       MSDK_PRINT_RET_MSG(__sts, MSG);                                          \
       LOG_ERROR(MSG + "failed, sts=" + std::to_string((int)__sts));            \
       return __sts;                                                            \
@@ -112,7 +112,10 @@ public:
     setBitStream(&mfxBS, data, len);
     if (!initialized_) {
       sts = initializeDecode(&mfxBS, false);
-      CHECK_STATUS(sts, "initializeDecode");
+      if (sts != MFX_ERR_NONE) {
+        LOG_ERROR("initializeDecode failed, sts=" + std::to_string((int)sts));
+        return -1;
+      }
       initialized_ = true;
     }
     setBitStream(&mfxBS, data, len);
@@ -129,34 +132,33 @@ public:
       if (nIndex >= pmfxSurfaces_.size()) {
         LOG_ERROR("GetFreeSurfaceIndex failed, nIndex=" +
                   std::to_string(nIndex));
-        return -1;
+        break;
       }
       sts = mfxDEC_->DecodeFrameAsync(&mfxBS, &pmfxSurfaces_[nIndex],
                                       &pmfxOutSurface, &syncp);
-      switch (sts) {
-      case MFX_ERR_NONE:
+      if (MFX_ERR_NONE == sts) {
         if (!syncp) {
           LOG_ERROR("should not happen, syncp is NULL while error is none");
-          return -1;
+          break;
         }
         sts = session_.SyncOperation(syncp, 1000);
         if (MFX_ERR_NONE != sts) {
           LOG_ERROR("SyncOperation failed, sts=" + std::to_string((int)sts));
-          return -1;
+          break;
         }
         if (!pmfxOutSurface) {
           LOG_ERROR("pmfxOutSurface is null");
-          return -1;
+          break;
         }
         if (!convert(pmfxOutSurface)) {
           LOG_ERROR("Failed to convert");
-          return -1;
+          break;
         }
         if (outputSharedHandle_) {
           HANDLE sharedHandle = native_->GetSharedHandle();
           if (!sharedHandle) {
             LOG_ERROR("Failed to GetSharedHandle");
-            return -1;
+            break;
           }
           output = sharedHandle;
         } else {
@@ -166,27 +168,33 @@ public:
           callback(output, obj);
         decoded = true;
         break;
-      case MFX_WRN_DEVICE_BUSY:
+      } else if (MFX_WRN_DEVICE_BUSY == sts) {
         LOG_INFO("Device busy");
         Sleep(1);
         continue;
-      case MFX_ERR_INCOMPATIBLE_VIDEO_PARAM:
+      } else if (MFX_ERR_INCOMPATIBLE_VIDEO_PARAM == sts) {
         LOG_INFO("Incompatible video param, reset decoder");
         // https://github.com/FFmpeg/FFmpeg/blob/f84412d6f4e9c1f1d1a2491f9337d7e789c688ba/libavcodec/qsvdec.c#L736
         setBitStream(&mfxBS, data, len);
         sts = initializeDecode(&mfxBS, true);
-        CHECK_STATUS(sts, "initialize");
+        if (sts != MFX_ERR_NONE) {
+          LOG_ERROR("initializeDecode failed, sts=" + std::to_string((int)sts));
+          break;
+        }
         Sleep(1);
         continue;
-      case MFX_ERR_MORE_SURFACE:
+      } else if (MFX_ERR_MORE_SURFACE == sts) {
         LOG_INFO("More surface");
         Sleep(1);
         continue;
-      default:
+      } else {
         LOG_ERROR("DecodeFrameAsync failed, sts=" + std::to_string(sts));
-        return -1;
+        break;
       }
-    } while (MFX_WRN_DEVICE_BUSY == sts);
+      // double confirm, check continue
+    } while (MFX_WRN_DEVICE_BUSY == sts ||
+             MFX_ERR_INCOMPATIBLE_VIDEO_PARAM == sts ||
+             MFX_ERR_MORE_SURFACE == sts);
 
     if (!decoded) {
       LOG_ERROR("decode failed, sts=" + std::to_string(sts));

@@ -16,7 +16,7 @@
 #define CHECK_STATUS(X, MSG)                                                   \
   {                                                                            \
     mfxStatus __sts = (X);                                                     \
-    if (__sts < MFX_ERR_NONE) {                                                \
+    if (__sts != MFX_ERR_NONE) {                                               \
       MSDK_PRINT_RET_MSG(__sts, MSG);                                          \
       LOG_ERROR(MSG + " failed, sts=" + std::to_string((int)__sts));           \
       return __sts;                                                            \
@@ -385,39 +385,63 @@ private:
     mfxSyncPoint syncp;
     bool encoded = false;
 
-    mfxBS_.DataLength = 0;
-    mfxBS_.DataOffset = 0;
-    for (;;) {
-      // Encode a frame asychronously (returns immediately)
+    int loop_counter = 0;
+    do {
+      if (loop_counter++ > 100) {
+        LOG_ERROR("mfx encode loop two many times");
+        break;
+      }
+      mfxBS_.DataLength = 0;
+      mfxBS_.DataOffset = 0;
       sts = mfxENC_->EncodeFrameAsync(NULL, in, &mfxBS_, &syncp);
-      if (MFX_ERR_NONE < sts &&
-          !syncp) { // Repeat the call if warning and no output
-        if (MFX_WRN_DEVICE_BUSY == sts)
-          MSDK_SLEEP(1); // Wait if device is busy, then repeat the same call
-      } else if (MFX_ERR_NONE < sts && syncp) {
-        sts = MFX_ERR_NONE; // Ignore warnings if output is available
-        break;
-      } else if (MFX_ERR_NOT_ENOUGH_BUFFER == sts) {
-        // Allocate more bitstream buffer memory here if needed...
-        break;
-      } else
-        break;
-    }
-
-    if (MFX_ERR_NONE == sts) {
-      sts = session_.SyncOperation(
-          syncp, 1000); // Synchronize. Wait until encoded frame is ready
-      CHECK_STATUS(sts, "SyncOperation");
-      if (mfxBS_.DataLength > 0) {
+      if (MFX_ERR_NONE == sts) {
+        if (!syncp) {
+          LOG_ERROR("should not happen, error is none while syncp is null");
+          break;
+        }
+        sts = session_.SyncOperation(
+            syncp, 1000); // Synchronize. Wait until encoded frame is ready
+        if (MFX_ERR_NONE != sts) {
+          LOG_ERROR("SyncOperation failed, sts=" + std::to_string(sts));
+          break;
+        }
+        if (mfxBS_.DataLength <= 0) {
+          LOG_ERROR("mfxBS_.DataLength <= 0");
+          break;
+        }
         int key = (mfxBS_.FrameType & MFX_FRAMETYPE_I) ||
                   (mfxBS_.FrameType & MFX_FRAMETYPE_IDR);
         if (callback)
           callback(mfxBS_.Data + mfxBS_.DataOffset, mfxBS_.DataLength, key,
                    obj);
         encoded = true;
+        break;
+      } else if (MFX_WRN_DEVICE_BUSY == sts) {
+        LOG_INFO("device busy");
+        Sleep(1);
+        continue;
+      } else if (MFX_ERR_NOT_ENOUGH_BUFFER == sts) {
+        LOG_ERROR("not enough buffer, size=" +
+                  std::to_string(mfxBS_.MaxLength));
+        if (mfxBS_.MaxLength < 10 * 1024 * 1024) {
+          mfxBS_.MaxLength *= 2;
+          bstData_.resize(mfxBS_.MaxLength);
+          mfxBS_.Data = bstData_.data();
+          Sleep(1);
+          continue;
+        } else {
+          break;
+        }
+      } else {
+        LOG_ERROR("EncodeFrameAsync failed, sts=" + std::to_string(sts));
+        break;
       }
-    }
+      // double confirm, check continue
+    } while (MFX_WRN_DEVICE_BUSY == sts || MFX_ERR_NOT_ENOUGH_BUFFER == sts);
 
+    if (!encoded) {
+      LOG_ERROR("EncodeFrameAsync failed, sts=" + std::to_string(sts));
+    }
     return encoded ? 0 : -1;
   }
 
@@ -567,7 +591,10 @@ int vpl_set_bitrate(void *encoder, int32_t kbs) {
     mfxStatus sts = MFX_ERR_NONE;
     p->mfxEncParams_.mfx.TargetKbps = kbs;
     sts = MFXVideoENCODE_Reset(p->session_, &p->mfxEncParams_);
-    CHECK_STATUS(sts, "MFXVideoENCODE_Reset");
+    if (sts != MFX_ERR_NONE) {
+      LOG_ERROR("MFXVideoENCODE_Reset failed, sts=" + std::to_string(sts));
+      return -1;
+    }
     return 0;
   } catch (const std::exception &e) {
     LOG_ERROR("Exception: " + e.what());
