@@ -46,6 +46,20 @@ mfxStatus InitSession(MFXVideoSession &session) {
   return session.InitEx(mfxparams);
 }
 
+// https://github.com/GStreamer/gstreamer/blob/e19428a802c2f4ee9773818aeb0833f93509a1c0/subprojects/gst-plugins-bad/sys/qsv/gstqsvav1enc.cpp#L430
+void set_bitrate(mfxVideoParam *param, int bitrate) {
+  int multiplier;
+  switch (param->mfx.RateControlMethod) {
+  case MFX_RATECONTROL_CBR:
+    multiplier = (bitrate + 0x10000) / 0x10000;
+    param->mfx.TargetKbps = param->mfx.MaxKbps = bitrate / multiplier;
+    param->mfx.BRCParamMultiplier = (mfxU16)multiplier;
+    break;
+  default:
+    break;
+  }
+}
+
 class VplEncoder {
 public:
   std::unique_ptr<NativeDevice> native_ = nullptr;
@@ -95,22 +109,24 @@ public:
     gop_ = gop;
   }
 
-  mfxStatus Init() {
+  mfxStatus Reset() {
     mfxStatus sts = MFX_ERR_NONE;
 
-    native_ = std::make_unique<NativeDevice>();
-    if (!native_->Init(luid_, (ID3D11Device *)handle_)) {
-      LOG_ERROR("failed to init native device");
-      return MFX_ERR_DEVICE_FAILED;
+    if (!native_) {
+      native_ = std::make_unique<NativeDevice>();
+      if (!native_->Init(luid_, (ID3D11Device *)handle_)) {
+        LOG_ERROR("failed to init native device");
+        return MFX_ERR_DEVICE_FAILED;
+      }
     }
-    sts = initMFX();
-    CHECK_STATUS(sts, "initMFX");
+    sts = resetMFX();
+    CHECK_STATUS(sts, "resetMFX");
 #ifdef CONFIG_USE_VPP
-    sts = initVpp();
-    CHECK_STATUS(sts, "initVpp");
+    sts = resetVpp();
+    CHECK_STATUS(sts, "resetVpp");
 #endif
-    sts = initEnc();
-    CHECK_STATUS(sts, "initEnc");
+    sts = resetEnc();
+    CHECK_STATUS(sts, "resetEnc");
     return MFX_ERR_NONE;
   }
 
@@ -160,8 +176,27 @@ public:
     return encodeOneFrame(encSurf, callback, obj);
   }
 
+  void destroy() {
+    if (mfxENC_) {
+      //  - It is recommended to close Media SDK components first, before
+      //  releasing allocated surfaces, since
+      //    some surfaces may still be locked by internal Media SDK resources.
+      mfxENC_->Close();
+      delete mfxENC_;
+      mfxENC_ = NULL;
+    }
+#ifdef CONFIG_USE_VPP
+    if (mfxVPP_) {
+      mfxVPP_->Close();
+      delete mfxVPP_;
+      mfxVPP_ = NULL;
+    }
+#endif
+    // session closed automatically on destruction
+  }
+
 private:
-  mfxStatus initMFX() {
+  mfxStatus resetMFX() {
     mfxStatus sts = MFX_ERR_NONE;
 
     sts = InitSession(session_);
@@ -175,7 +210,7 @@ private:
   }
 
 #ifdef CONFIG_USE_VPP
-  mfxStatus initVpp() {
+  mfxStatus resetVpp() {
     mfxStatus sts = MFX_ERR_NONE;
     memset(&vppParams_, 0, sizeof(vppParams_));
     vppParams_.IOPattern =
@@ -212,6 +247,11 @@ private:
     vppDontUseArgList_[2] = MFX_EXTBUFF_VPP_DETAIL;
     vppDontUseArgList_[3] = MFX_EXTBUFF_VPP_PROCAMP;
 
+    if (mfxVPP_) {
+      mfxVPP_->Close();
+      delete mfxVPP_;
+      mfxVPP_ = NULL;
+    }
     mfxVPP_ = new MFXVideoVPP(session_);
     if (!mfxVPP_) {
       LOG_ERROR("Failed to create MFXVideoVPP");
@@ -240,7 +280,7 @@ private:
   }
 #endif
 
-  mfxStatus initEnc() {
+  mfxStatus resetEnc() {
     mfxStatus sts = MFX_ERR_NONE;
     memset(&mfxEncParams_, 0, sizeof(mfxEncParams_));
     if (!convert_codec(dataFormat_, mfxEncParams_.mfx.CodecId)) {
@@ -248,9 +288,6 @@ private:
       return MFX_ERR_UNSUPPORTED;
     }
 
-    mfxEncParams_.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
-    mfxEncParams_.mfx.TargetKbps = kbs_;
-    mfxEncParams_.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
     mfxEncParams_.mfx.FrameInfo.FrameRateExtN = framerate_;
     mfxEncParams_.mfx.FrameInfo.FrameRateExtD = 1;
 #ifdef CONFIG_USE_VPP
@@ -288,9 +325,27 @@ private:
     mfxEncParams_.mfx.GopRefDist =
         1; // 1 is best for low latency, I and P frames only
 
-    InitEncExtParams();
+    // quality
+    // https://www.intel.com/content/www/us/en/developer/articles/technical/common-bitrate-control-methods-in-intel-media-sdk.html
+    mfxEncParams_.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
+    mfxEncParams_.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
+    set_bitrate(&mfxEncParams_, kbs_);
+    if (H264 == dataFormat_) {
+      mfxEncParams_.mfx.CodecLevel = MFX_LEVEL_AVC_51;
+      mfxEncParams_.mfx.CodecProfile = MFX_PROFILE_AVC_MAIN;
+    } else if (H265 == dataFormat_) {
+      mfxEncParams_.mfx.CodecLevel = MFX_LEVEL_HEVC_51;
+      mfxEncParams_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN;
+    }
+
+    resetEncExtParams();
 
     // Create Media SDK encoder
+    if (mfxENC_) {
+      mfxENC_->Close();
+      delete mfxENC_;
+      mfxENC_ = NULL;
+    }
     mfxENC_ = new MFXVideoENCODE(session_);
     if (!mfxENC_) {
       LOG_ERROR("failed to create MFXVideoENCODE");
@@ -322,7 +377,6 @@ private:
 
     // Initialize the Media SDK encoder
     sts = mfxENC_->Init(&mfxEncParams_);
-    MSDK_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
     CHECK_STATUS(sts, "Init");
 
     // Retrieve video parameters selected by encoder.
@@ -445,16 +499,10 @@ private:
     return encoded ? 0 : -1;
   }
 
-  void InitEncExtParams() {
+  void resetEncExtParams() {
     memset(&signal_info_, 0, sizeof(mfxExtVideoSignalInfo));
     signal_info_.Header.BufferId = MFX_EXTBUFF_VIDEO_SIGNAL_INFO;
     signal_info_.Header.BufferSz = sizeof(mfxExtVideoSignalInfo);
-
-    // https://github.com/GStreamer/gstreamer/blob/651dcb49123ec516e7c582e4a49a5f3f15c10f93/subprojects/gst-plugins-bad/sys/qsv/gstqsvh264enc.cpp#L1647
-    extbuffers_[0] = (mfxExtBuffer *)&signal_info_;
-    mfxEncParams_.ExtParam = extbuffers_;
-    mfxEncParams_.NumExtParam = 1;
-
     signal_info_.VideoFormat = 5;
     signal_info_.ColourDescriptionPresent = 1;
     signal_info_.VideoFullRange = !!full_range_;
@@ -464,6 +512,11 @@ private:
         bt709_ ? AVCOL_PRI_BT709 : AVCOL_PRI_SMPTE170M;
     signal_info_.TransferCharacteristics =
         bt709_ ? AVCOL_TRC_BT709 : AVCOL_TRC_SMPTE170M;
+
+    // https://github.com/GStreamer/gstreamer/blob/651dcb49123ec516e7c582e4a49a5f3f15c10f93/subprojects/gst-plugins-bad/sys/qsv/gstqsvh264enc.cpp#L1647
+    extbuffers_[0] = (mfxExtBuffer *)&signal_info_;
+    mfxEncParams_.ExtParam = extbuffers_;
+    mfxEncParams_.NumExtParam = 1;
   }
 
   bool convert_codec(DataFormat dataFormat, mfxU32 &CodecId) {
@@ -491,20 +544,7 @@ int vpl_driver_support() {
 int vpl_destroy_encoder(void *encoder) {
   VplEncoder *p = (VplEncoder *)encoder;
   if (p) {
-    if (p->mfxENC_) {
-      //  - It is recommended to close Media SDK components first, before
-      //  releasing allocated surfaces, since
-      //    some surfaces may still be locked by internal Media SDK resources.
-      p->mfxENC_->Close();
-      delete p->mfxENC_;
-    }
-#ifdef CONFIG_USE_VPP
-    if (p->mfxVPP_) {
-      p->mfxVPP_->Close();
-      delete p->mfxVPP_;
-    }
-#endif
-    // session closed automatically on destruction
+    p->destroy();
   }
   return 0;
 }
@@ -519,7 +559,7 @@ void *vpl_new_encoder(void *handle, int64_t luid, API api,
     if (!p) {
       return NULL;
     }
-    mfxStatus sts = p->Init();
+    mfxStatus sts = p->Reset();
     if (sts == MFX_ERR_NONE) {
       return p;
     } else {
@@ -585,14 +625,16 @@ int vpl_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
 
 // https://github.com/Intel-Media-SDK/MediaSDK/blob/master/doc/mediasdk-man.md#dynamic-bitrate-change
 // https://github.com/Intel-Media-SDK/MediaSDK/blob/master/doc/mediasdk-man.md#mfxinfomfx
+// https://spec.oneapi.io/onevpl/2.4.0/programming_guide/VPL_prg_encoding.html#configuration-change
 int vpl_set_bitrate(void *encoder, int32_t kbs) {
   try {
     VplEncoder *p = (VplEncoder *)encoder;
     mfxStatus sts = MFX_ERR_NONE;
-    p->mfxEncParams_.mfx.TargetKbps = kbs;
-    sts = MFXVideoENCODE_Reset(p->session_, &p->mfxEncParams_);
+    // https://github.com/GStreamer/gstreamer/blob/e19428a802c2f4ee9773818aeb0833f93509a1c0/subprojects/gst-plugins-bad/sys/qsv/gstqsvencoder.cpp#L1312
+    p->kbs_ = kbs;
+    sts = p->Reset();
     if (sts != MFX_ERR_NONE) {
-      LOG_ERROR("MFXVideoENCODE_Reset failed, sts=" + std::to_string(sts));
+      LOG_ERROR("reset failed, sts=" + std::to_string(sts));
       return -1;
     }
     return 0;
