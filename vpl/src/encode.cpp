@@ -46,7 +46,7 @@ mfxStatus InitSession(MFXVideoSession &session) {
   return session.InitEx(mfxparams);
 }
 
-// https://github.com/GStreamer/gstreamer/blob/e19428a802c2f4ee9773818aeb0833f93509a1c0/subprojects/gst-plugins-bad/sys/qsv/gstqsvav1enc.cpp#L430
+// https://github.com/GStreamer/gstreamer/blob/e19428a802c2f4ee9773818aeb0833f93509a1c0/subprojects/gst-plugins-bad/sys/qsv/gstqsvh264enc.cpp#L1353
 void set_bitrate(mfxVideoParam *param, int bitrate) {
   int multiplier;
   switch (param->mfx.RateControlMethod) {
@@ -494,7 +494,7 @@ private:
     } while (MFX_WRN_DEVICE_BUSY == sts || MFX_ERR_NOT_ENOUGH_BUFFER == sts);
 
     if (!encoded) {
-      LOG_ERROR("EncodeFrameAsync failed, sts=" + std::to_string(sts));
+      LOG_ERROR("encode failed, sts=" + std::to_string(sts));
     }
     return encoded ? 0 : -1;
   }

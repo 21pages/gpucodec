@@ -172,7 +172,8 @@ public:
         LOG_INFO("Device busy");
         Sleep(1);
         continue;
-      } else if (MFX_ERR_INCOMPATIBLE_VIDEO_PARAM == sts) {
+      } else if (MFX_ERR_INCOMPATIBLE_VIDEO_PARAM == sts ||
+                 MFX_WRN_VIDEO_PARAM_CHANGED == sts) {
         LOG_INFO("Incompatible video param, reset decoder");
         // https://github.com/FFmpeg/FFmpeg/blob/f84412d6f4e9c1f1d1a2491f9337d7e789c688ba/libavcodec/qsvdec.c#L736
         setBitStream(&mfxBS, data, len);
@@ -192,9 +193,9 @@ public:
         break;
       }
       // double confirm, check continue
-    } while (MFX_WRN_DEVICE_BUSY == sts ||
+    } while (MFX_ERR_NONE == sts || MFX_WRN_DEVICE_BUSY == sts ||
              MFX_ERR_INCOMPATIBLE_VIDEO_PARAM == sts ||
-             MFX_ERR_MORE_SURFACE == sts);
+             MFX_WRN_VIDEO_PARAM_CHANGED == sts || MFX_ERR_MORE_SURFACE == sts);
 
     if (!decoded) {
       LOG_ERROR("decode failed, sts=" + std::to_string(sts));
