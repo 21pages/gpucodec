@@ -24,6 +24,9 @@
     return res;                                                                \
   }
 
+extern bool dumpTexture(ID3D11Device *device, ID3D11Texture2D *texture,
+                        int cropW, int cropH, const string &filename);
+
 namespace {
 class AMFDecoder {
 
@@ -101,6 +104,10 @@ public:
       if (surface->GetPlanesCount() == 0)
         return AMF_FAIL;
 
+      dumpTexture(nativeDevice_->device_.Get(),
+                  (ID3D11Texture2D *)surface->GetPlaneAt(0)->GetNative(),
+                  surface->GetPlaneAt(0)->GetWidth(),
+                  surface->GetPlaneAt(0)->GetHeight(), "texture.yuv");
       // convert texture
       amf::AMFDataPtr convertData;
       res = Convert(surface, convertData);

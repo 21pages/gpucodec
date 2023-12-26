@@ -110,7 +110,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>..\..\externals\SDL\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;dxgi.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dxgi.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -133,10 +133,10 @@
     <ClCompile Include="..\..\amf\src\common.cpp" />
     <ClCompile Include="..\..\amf\src\decode.cpp" />
     <ClCompile Include="..\..\amf\src\encode.cpp" />
-    <ClCompile Include="..\..\capture\src\dxgi.cpp" />
     <ClCompile Include="..\..\codec\src\data.c" />
     <ClCompile Include="..\..\codec\src\utils.c" />
     <ClCompile Include="..\..\common\src\log.cpp" />
+    <ClCompile Include="..\..\common\src\platform\win\dump.cpp" />
     <ClCompile Include="..\..\common\src\platform\win\win.cpp" />
     <ClCompile Include="..\..\externals\AMF_v1.4.29\amf\public\common\AMFFactory.cpp" />
     <ClCompile Include="..\..\externals\AMF_v1.4.29\amf\public\common\AMFSTL.cpp" />
@@ -145,7 +145,6 @@
     <ClCompile Include="..\..\externals\AMF_v1.4.29\amf\public\common\Windows\ThreadWindows.cpp" />
     <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\DDAImpl.cpp" />
     <ClCompile Include="..\..\externals\nvEncDXGIOutputDuplicationSample\Preproc.cpp" />
-    <ClCompile Include="..\..\render\src\dxgi_sdl.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
