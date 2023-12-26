@@ -40,9 +40,29 @@ fn main() {
         #[cfg(target_os = "linux")]
         "Linux/ThreadLinux.cpp",
         "TraceAdapter.cpp",
+        "DataStreamFactory.cpp",
+        "DataStreamFile.cpp",
+        "DataStreamMemory.cpp",
     ] {
         builder.file(format!("{}/amf/public/common/{}", amf_path.display(), f));
     }
+    builder.files(
+        [
+            "BitStreamParser.cpp",
+            "BitStreamParserH264.cpp",
+            "BitStreamParserH265.cpp",
+            "BitStreamParserIVF.cpp",
+        ]
+        .map(|f| {
+            amf_path
+                .join("amf")
+                .join("public")
+                .join("samples")
+                .join("CPPSamples")
+                .join("common")
+                .join(f)
+        }),
+    );
 
     // crate
     builder

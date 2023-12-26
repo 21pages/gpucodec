@@ -5,6 +5,7 @@
 #include <public/common/TraceAdapter.h>
 #include <public/include/components/VideoConverter.h>
 #include <public/include/components/VideoDecoderUVD.h>
+#include <public/samples/CPPSamples/common/BitStreamParser.h>
 
 #include <cstring>
 #include <iostream>
@@ -66,14 +67,56 @@ public:
                     void *obj) {
     AMF_RESULT res = AMF_FAIL;
     bool decoded = false;
-    amf::AMFBufferPtr iDataWrapBuffer = NULL;
 
-    res = AMFContext_->CreateBufferFromHostNative(iData, iDataSize,
-                                                  &iDataWrapBuffer, NULL);
-    AMF_CHECK_RETURN(res, "CreateBufferFromHostNative failed");
-    res = AMFDecoder_->SubmitInput(iDataWrapBuffer);
+    amf::AMFDataStreamPtr dataStreamPtr = NULL;
+    res = amf::AMFDataStream::OpenDataStream(
+        L"memory://", amf::AMFSO_READ, amf::AMFFS_SHARE_READ, &dataStreamPtr);
+    AMF_CHECK_RETURN(res, "OpenDataStream failed");
+    if (!dataStreamPtr) {
+      LOG_ERROR("dataStreamPtr is NULL");
+      return AMF_FAIL;
+    }
+    amf_size written = 0;
+    res = dataStreamPtr->Write(iData, iDataSize, &written);
+    AMF_CHECK_RETURN(res, "write dataStream failed");
+    dataStreamPtr->Seek(amf::AMF_SEEK_BEGIN, 0, NULL);
+    if (written != iDataSize) {
+      LOG_ERROR("write data size mismatch, " + std::to_string(written) +
+                "!= " + std::to_string(iDataSize));
+      return AMF_FAIL;
+    }
+    BitStreamType bsType = BitStreamH264AnnexB;
+    if (codec_ == AMFVideoDecoderHW_H265_HEVC) {
+      bsType = BitStream265AnnexB;
+    }
+    BitStreamParserPtr parser =
+        BitStreamParser::Create(dataStreamPtr, bsType, AMFContext_);
+    if (!parser) {
+      LOG_ERROR("Create parser failed");
+      return AMF_FAIL;
+    }
+    amf::AMFDataPtr parsedDataPtr = NULL;
+    res = parser->QueryOutput(&parsedDataPtr);
+    if (AMF_EOF == res) {
+      res = AMF_OK;
+    }
+    AMF_CHECK_RETURN(res, "parser QueryOutput failed");
+
+    if (parser->GetExtraDataSize()) { // set SPS/PPS extracted from stream or
+                                      // container; Alternatively can use
+                                      // parser->SetUseStartCodes(true)
+      amf::AMFBufferPtr buffer;
+      AMFContext_->AllocBuffer(amf::AMF_MEMORY_HOST, parser->GetExtraDataSize(),
+                               &buffer);
+
+      memcpy(buffer->GetNative(), parser->GetExtraData(),
+             parser->GetExtraDataSize());
+      AMFContext_->SetProperty(AMF_VIDEO_DECODER_EXTRADATA,
+                               amf::AMFVariant(buffer));
+    }
+
+    res = AMFDecoder_->SubmitInput(parsedDataPtr);
     if (res == AMF_RESOLUTION_CHANGED) {
-      iDataWrapBuffer = NULL;
       LOG_INFO("resolution changed");
       res = AMFDecoder_->Drain();
       AMF_CHECK_RETURN(res, "Drain failed");
@@ -81,10 +124,7 @@ public:
       AMF_CHECK_RETURN(res, "Terminate failed");
       res = AMFDecoder_->Init(decodeFormatOut_, 0, 0);
       AMF_CHECK_RETURN(res, "Init failed");
-      res = AMFContext_->CreateBufferFromHostNative(iData, iDataSize,
-                                                    &iDataWrapBuffer, NULL);
-      AMF_CHECK_RETURN(res, "CreateBufferFromHostNative failed");
-      res = AMFDecoder_->SubmitInput(iDataWrapBuffer);
+      res = AMFDecoder_->SubmitInput(parsedDataPtr);
     }
     AMF_CHECK_RETURN(res, "SubmitInput failed");
     amf::AMFDataPtr oData = NULL;
@@ -143,7 +183,6 @@ public:
       convertSurface = NULL;
     }
     oData = NULL;
-    iDataWrapBuffer = NULL;
     return decoded ? AMF_OK : AMF_FAIL;
     return AMF_OK;
   }
