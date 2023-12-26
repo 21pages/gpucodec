@@ -13,7 +13,7 @@
 #include "common.h"
 #include "system.h"
 
-#define LOG_MODULE "AMF DECODE"
+#define LOG_MODULE "AMFDEC"
 #include "log.h"
 
 #define AMF_FACILITY L"AMFDecoder"
@@ -214,11 +214,8 @@ public:
 private:
   AMF_RESULT setParameters() {
     AMF_RESULT res;
-    res = AMFDecoder_->SetProperty(
-        AMF_TIMESTAMP_MODE,
-        amf_int64(
-            AMF_TS_DECODE)); // our sample H264 parser provides decode order
-                             // timestamps - change this depend on demuxer
+    res =
+        AMFDecoder_->SetProperty(AMF_TIMESTAMP_MODE, amf_int64(AMF_TS_DECODE));
     AMF_RETURN_IF_FAILED(
         res, L"SetProperty AMF_TIMESTAMP_MODE to AMF_TS_DECODE failed");
     res =

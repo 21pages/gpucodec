@@ -7,7 +7,7 @@
 #include "common.h"
 #include "system.h"
 
-#define LOG_MODULE "VPL ENCODE"
+#define LOG_MODULE "VPLENC"
 #include "log.h"
 
 // #define CONFIG_USE_VPP

@@ -16,7 +16,7 @@
 #include "common.h"
 #include "system.h"
 
-#define LOG_MODULE "AMF ENCODE"
+#define LOG_MODULE "AMFENC"
 #include "log.h"
 
 #define AMF_FACILITY L"AMFEncoder"

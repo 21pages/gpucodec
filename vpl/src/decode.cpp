@@ -8,7 +8,7 @@
 #include "common.h"
 #include "system.h"
 
-#define LOG_MODULE "VPL DECODE"
+#define LOG_MODULE "VPLDEC"
 #include "log.h"
 
 #define CHECK_STATUS(X, MSG)                                                   \
