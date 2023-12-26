@@ -183,10 +183,6 @@ public:
     AMF_CHECK_RETURN(res, "CreateContext failed");
 
     switch (AMFMemoryType_) {
-    case amf::AMF_MEMORY_DX9:
-      res = AMFContext_->InitDX9(NULL); // can be DX9 or DX9Ex device
-      AMF_CHECK_RETURN(res, "InitDX9 failed");
-      break;
     case amf::AMF_MEMORY_DX11:
       nativeDevice_ = std::make_unique<NativeDevice>();
       if (!nativeDevice_->Init(luid_, (ID3D11Device *)device_, 4)) {
@@ -197,22 +193,9 @@ public:
           nativeDevice_->device_.Get()); // can be DX11 device
       AMF_CHECK_RETURN(res, "InitDX11 failed");
       break;
-    case amf::AMF_MEMORY_DX12: {
-      amf::AMFContext2Ptr context2(AMFContext_);
-      if (context2 == nullptr) {
-        LOG_ERROR("amf::AMFContext2 is null");
-        return AMF_FAIL;
-      }
-      res = context2->InitDX12(NULL); // can be DX11 device
-      AMF_CHECK_RETURN(res, "InitDX12 failed");
-    } break;
-    case amf::AMF_MEMORY_VULKAN:
-      res = amf::AMFContext1Ptr(AMFContext_)
-                ->InitVulkan(NULL); // can be Vulkan device
-      AMF_CHECK_RETURN(res, "InitVulkan failed");
-      break;
     default:
-      break;
+      LOG_ERROR("unsupported memory type: %d", AMFMemoryType_);
+      return AMF_FAIL;
     }
 
     res = AMFFactory_.GetFactory()->CreateComponent(AMFContext_, codec_.c_str(),

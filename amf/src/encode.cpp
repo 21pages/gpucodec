@@ -117,6 +117,8 @@ public:
       }
       break;
     default:
+      LOG_ERROR("Unsupported memory type");
+      return AMF_NOT_IMPLEMENTED;
       break;
     }
     res = AMFEncoder_->SubmitInput(surface);
@@ -202,14 +204,6 @@ public:
     case amf::AMF_MEMORY_DX11:
       res = AMFContext_->InitDX11(handle_); // can be DX11 device
       AMF_CHECK_RETURN(res, "InitDX11 failed");
-      break;
-    case amf::AMF_MEMORY_VULKAN:
-      res = amf::AMFContext1Ptr(AMFContext_)->InitVulkan(handle_);
-      AMF_CHECK_RETURN(res, "InitVulkan failed");
-      break;
-    case amf::AMF_MEMORY_OPENCL:
-      res = AMFContext_->InitOpenCL(NULL);
-      AMF_CHECK_RETURN(res, "InitOpenCL failed");
       break;
     default:
       LOG_ERROR("unsupported amf memory type");
