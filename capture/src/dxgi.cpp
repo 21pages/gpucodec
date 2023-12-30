@@ -2,8 +2,8 @@
 #include <Windows.h>
 #include <string>
 
-extern "C" void *dxgi_new_capturer() {
-  DemoApplication *d = new DemoApplication();
+extern "C" void *dxgi_new_capturer(int64_t luid) {
+  DemoApplication *d = new DemoApplication(luid);
   HRESULT hr = d->Init();
   if (FAILED(hr)) {
     delete d;

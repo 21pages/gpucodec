@@ -76,7 +76,7 @@ struct AdatperOutputs {
   }
 };
 
-void get_first_adapter_output(IDXGIFactory2 *factory2,
+bool get_first_adapter_output(IDXGIFactory2 *factory2,
                               IDXGIAdapter1 **adapter_out,
                               IDXGIOutput1 **output_out, int64_t luid) {
   UINT num_adapters = 0;
@@ -84,6 +84,7 @@ void get_first_adapter_output(IDXGIFactory2 *factory2,
   IDXGIAdapter1 *selected_adapter = nullptr;
   IDXGIOutput1 *selected_output = nullptr;
   HRESULT hr = S_OK;
+  bool found = false;
   while (factory2->EnumAdapters1(num_adapters, &curent_adapter.adapter) !=
          DXGI_ERROR_NOT_FOUND) {
     ++num_adapters;
@@ -103,10 +104,12 @@ void get_first_adapter_output(IDXGIFactory2 *factory2,
         selected_output = temp;
       }
     }
+    found = true;
     break;
   }
   *adapter_out = selected_adapter;
   *output_out = selected_output;
+  return found;
 }
 
 class dx_device_context {
@@ -117,7 +120,10 @@ public:
     HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&factory2));
     if (FAILED(hr))
       exit(hr);
-    get_first_adapter_output(factory2, &adapter1, &output1, luid);
+    if (!get_first_adapter_output(factory2, &adapter1, &output1, luid)) {
+      std::cout << "no render adapter found" << std::endl;
+      exit(-1);
+    }
     D3D_FEATURE_LEVEL levels[]{D3D_FEATURE_LEVEL_11_0};
     hr = D3D11CreateDevice(
         adapter1, D3D_DRIVER_TYPE_UNKNOWN, NULL,

@@ -11,8 +11,8 @@ pub struct Capturer {
 }
 
 impl Capturer {
-    pub fn new() -> Result<Self, ()> {
-        let inner = unsafe { dxgi_new_capturer() };
+    pub fn new(luid: i64) -> Result<Self, ()> {
+        let inner = unsafe { dxgi_new_capturer(luid) };
         if inner.is_null() {
             Err(())
         } else {

@@ -1,7 +1,9 @@
 #ifndef FFI_H
 #define FFI_H
 
-void *dxgi_new_capturer();
+#include <stdint.h>
+
+void *dxgi_new_capturer(int64_t luid);
 void *dxgi_device(void *capturer);
 int dxgi_width(const void *capturer);
 int dxgi_height(const void *capturer);

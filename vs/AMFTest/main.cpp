@@ -6,7 +6,7 @@
 #include <system.h>
 
 extern "C" {
-void *dxgi_new_capturer();
+void *dxgi_new_capturer(int64_t luid);
 void *dxgi_device(void *self);
 int dxgi_width(const void *self);
 int dxgi_height(const void *self);
@@ -56,7 +56,7 @@ int main() {
   }
   int64_t luid = LUID(adapters.adapters_[0].get()->desc1_);
   DataFormat dataFormat = H264;
-  void *dup = dxgi_new_capturer();
+  void *dup = dxgi_new_capturer(luid);
   if (!dup) {
     std::cerr << "create duplicator failed" << std::endl;
     return -1;
