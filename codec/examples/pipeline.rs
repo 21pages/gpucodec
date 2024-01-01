@@ -14,7 +14,7 @@ use std::{
 
 fn main() {
     init_from_env(Env::default().filter_or(DEFAULT_FILTER_ENV, "trace"));
-    let luid = 63444; // 63444; // 59677
+    let luid = 62983; // 63444; // 59677
     unsafe {
         // one luid create render failed on my pc, wouldn't happen in rustdesk
         let output_shared_handle = false;
@@ -44,7 +44,7 @@ fn main() {
             } else {
                 Some(render.device())
             },
-            driver: DecodeDriver::VPL,
+            driver: DecodeDriver::MFDX,
             api: API_DX11,
             data_format,
             output_shared_handle,

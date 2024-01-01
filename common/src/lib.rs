@@ -22,6 +22,7 @@ pub enum DecodeDriver {
     CUVID,
     AMF,
     VPL,
+    MFDX,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

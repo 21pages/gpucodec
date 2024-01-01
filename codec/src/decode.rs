@@ -26,6 +26,7 @@ impl Decoder {
             CUVID => nv::decode_calls(),
             AMF => amf::decode_calls(),
             VPL => vpl::decode_calls(),
+            MFDX => mfdx::decode_calls(),
         };
         unsafe {
             let codec = (calls.new)(
@@ -143,6 +144,7 @@ pub fn available(output_shared_handle: bool) -> Vec<DecodeContext> {
                 CUVID => nv::decode_calls().test,
                 AMF => amf::decode_calls().test,
                 VPL => vpl::decode_calls().test,
+                MFDX => mfdx::decode_calls().test,
             };
             let mut descs: Vec<AdapterDesc> = vec![];
             descs.resize(crate::MAX_ADATER_NUM_ONE_VENDER, unsafe {

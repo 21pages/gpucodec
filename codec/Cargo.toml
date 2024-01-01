@@ -14,6 +14,7 @@ gpu_common = { path = "../common" }
 amf = { path = "../amf" }
 nv = { path = "../nv" }
 vpl = { path = "../vpl" }
+mfdx = { path = "../mfdx" }
 
 [build-dependencies]
 cc = "1.0"
