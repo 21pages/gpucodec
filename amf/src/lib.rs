@@ -63,7 +63,8 @@ pub fn possible_support_decoders() -> Vec<InnerDecodeContext> {
     devices.append(&mut vec![API_DX11]);
     #[cfg(target_os = "linux")]
     devices.append(&mut vec![OPENCL, VULKAN]);
-    let codecs = vec![H264, H265];
+    // https://github.com/GPUOpen-LibrariesAndSDKs/AMF/issues/432#issuecomment-1873141122
+    let codecs = vec![H264];
 
     let mut v = vec![];
     for device in devices.iter() {
