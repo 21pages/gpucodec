@@ -493,81 +493,12 @@ private:
   }
 
   bool set_shader() {
-    // https://gist.github.com/RomiTT/9c05d36fe339b899793a3252297a5624
-    const char *vertexShaderCode = R"(
-struct VS_INPUT
-{
-    float4 Pos : POSITION;
-    float2 Tex : TEXCOORD;
-};
-
-struct VS_OUTPUT
-{
-    float4 Pos : SV_POSITION;
-    float2 Tex : TEXCOORD;
-};
-VS_OUTPUT VS(VS_INPUT input)
-{
-    return input;
-}
-)";
-    const char *pixleShaderCode601 = R"(
-Texture2D g_txFrame0 : register(t0);
-Texture2D g_txFrame1 : register(t1);
-SamplerState g_Sam : register(s0);
-
-struct PS_INPUT
-{
-    float4 Pos : SV_POSITION;
-    float2 Tex : TEXCOORD0;
-};
-float4 PS(PS_INPUT input) : SV_TARGET{
-  float y = g_txFrame0.Sample(g_Sam, input.Tex).r;
-  y = 1.164383561643836 * (y - 0.0625);
-  float2 uv = g_txFrame1.Sample(g_Sam, input.Tex).rg - float2(0.5f, 0.5f);
-  float u = uv.x;
-  float v = uv.y;
-  float r = saturate(y + 1.596026785714286 * v);
-  float g = saturate(y - 0.812967647237771 * v - 0.391762290094914 * u);
-  float b = saturate(y + 2.017232142857142 * u);
-  return float4(r, g, b, 1.0f);
-}
-)";
-    const char *pixleShaderCode709 = R"(
-Texture2D g_txFrame0 : register(t0);
-Texture2D g_txFrame1 : register(t1);
-SamplerState g_Sam : register(s0);
-
-struct PS_INPUT
-{
-    float4 Pos : SV_POSITION;
-    float2 Tex : TEXCOORD0;
-};
-float4 PS(PS_INPUT input) : SV_TARGET{
-  float y = g_txFrame0.Sample(g_Sam, input.Tex).r;
-  y = 1.164383561643836 * (y - 0.0625);
-  float2 uv = g_txFrame1.Sample(g_Sam, input.Tex).rg - float2(0.5f, 0.5f);
-  float u = uv.x;
-  float v = uv.y;
-  float r = saturate(y + 1.792741071428571 * v);
-  float g = saturate(y - 0.532909328559444 * v - 0.21324861427373 * u);
-  float b = saturate(y + 2.112401785714286 * u);
-  return float4(r, g, b, 1.0f);
-}
-)";
-    ComPtr<ID3DBlob> vsBlob = NULL;
-    ComPtr<ID3DBlob> psBlob = NULL;
-    HRB(D3DCompile(vertexShaderCode, strlen(vertexShaderCode), NULL, NULL, NULL,
-                   "VS", "vs_4_0", 0, 0, vsBlob.ReleaseAndGetAddressOf(),
-                   NULL));
-    HRB(D3DCompile(pixleShaderCode601, strlen(pixleShaderCode601), NULL, NULL,
-                   NULL, "PS", "ps_4_0", 0, 0, psBlob.ReleaseAndGetAddressOf(),
-                   NULL));
+// https://gist.github.com/RomiTT/9c05d36fe339b899793a3252297a5624
+#include "nv_pixel_shader_601.h"
+#include "nv_vertex_shader.h"
     native_->device_->CreateVertexShader(
-        vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr,
-        vertexShader_.ReleaseAndGetAddressOf());
-    native_->device_->CreatePixelShader(psBlob->GetBufferPointer(),
-                                        psBlob->GetBufferSize(), nullptr,
+        g_VS, ARRAYSIZE(g_VS), nullptr, vertexShader_.ReleaseAndGetAddressOf());
+    native_->device_->CreatePixelShader(g_PS, ARRAYSIZE(g_PS), nullptr,
                                         pixelShader_.ReleaseAndGetAddressOf());
 
     // set InputLayout
@@ -578,9 +509,9 @@ float4 PS(PS_INPUT input) : SV_TARGET{
          D3D11_INPUT_PER_VERTEX_DATA, 0},
     }};
     ComPtr<ID3D11InputLayout> inputLayout = NULL;
-    HRB(native_->device_->CreateInputLayout(
-        Layout.data(), Layout.size(), vsBlob->GetBufferPointer(),
-        vsBlob->GetBufferSize(), inputLayout.GetAddressOf()));
+    HRB(native_->device_->CreateInputLayout(Layout.data(), Layout.size(), g_VS,
+                                            ARRAYSIZE(g_VS),
+                                            inputLayout.GetAddressOf()));
     native_->context_->IASetInputLayout(inputLayout.Get());
 
     native_->context_->VSSetShader(vertexShader_.Get(), NULL, 0);
