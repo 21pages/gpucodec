@@ -292,6 +292,10 @@ bool NativeDevice::ToNV12(ID3D11Texture2D *texture, int width, int height,
   contentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
   contentDesc.InputFrameRate.Numerator = 60;
   contentDesc.InputFrameRate.Denominator = 1;
+  // TODO: width height always same with desc.Width and desc.Height in test,
+  // need test for decide to use which one
+  // https://chromium.googlesource.com/chromium/src/media/+/refs/heads/main/gpu/windows/d3d11_video_processor_proxy.cc#72
+  // https://chromium.googlesource.com/chromium/src/media/+/refs/heads/main/gpu/windows/media_foundation_video_encode_accelerator_win.cc#2170
   contentDesc.InputWidth = width;
   contentDesc.InputHeight = height;
   contentDesc.OutputWidth = width;
