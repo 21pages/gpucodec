@@ -331,6 +331,7 @@ private:
     contentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
     contentDesc.InputFrameRate.Numerator = 60;
     contentDesc.InputFrameRate.Denominator = 1;
+    // TODO: aligned width, height or crop width, height
     contentDesc.InputWidth = pmfxOutSurface->Info.CropW;
     contentDesc.InputHeight = pmfxOutSurface->Info.CropH;
     contentDesc.OutputWidth = pmfxOutSurface->Info.CropW;

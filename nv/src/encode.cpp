@@ -177,6 +177,9 @@ public:
     std::vector<NvPacket> vPacket;
     const NvEncInputFrame *pEncInput = pEnc_->GetNextInputFrame();
 
+    // TODO: sdk can ensure the inputPtr's width, height same as width_,
+    // height_, does capture's frame can ensure width height same with width_,
+    // height_ ?
     ID3D11Texture2D *pBgraTextyure =
         reinterpret_cast<ID3D11Texture2D *>(pEncInput->inputPtr);
 #ifdef CONFIG_NV_OPTIMUS_FOR_DEV
