@@ -1,5 +1,5 @@
-#ifndef FFI_H
-#define FFI_H
+#ifndef GPUCODEC_FFI_H
+#define GPUCODEC_FFI_H
 
 #include <stdint.h>
 

@@ -53,7 +53,7 @@ using Microsoft::WRL::ComPtr;
   (((int64_t)desc.AdapterLuid.HighPart << 32) | desc.AdapterLuid.LowPart)
 
 #ifndef CSO_DIR
-#define CSO_DIR "render/res"
+#define CSO_DIR "dev/render/res"
 #endif
 
 struct AdatperOutputs {
