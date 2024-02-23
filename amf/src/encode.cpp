@@ -539,9 +539,11 @@ int amf_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
         AdapterDesc *desc = descs + count;
         desc->luid = LUID(adapter.get()->desc1_);
         count += 1;
-        if (count >= maxDescNum)
-          break;
       }
+      amf_destroy_encoder(e);
+      e = NULL;
+      if (count >= maxDescNum)
+        break;
     }
     *outDescNum = count;
     return 0;

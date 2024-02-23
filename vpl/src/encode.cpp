@@ -604,17 +604,19 @@ int vpl_test_encode(void *outDescs, int32_t maxDescNum, int32_t *outDescNum,
           api, dataFormat, width, height, kbs, framerate, gop);
       if (!e)
         continue;
-      if (!e->native_->EnsureTexture(e->width_, e->height_))
-        continue;
-      e->native_->next();
-      if (vpl_encode(e, e->native_->GetCurrentTexture(), nullptr, nullptr) ==
-          0) {
-        AdapterDesc *desc = descs + count;
-        desc->luid = LUID(adapter.get()->desc1_);
-        count += 1;
-        if (count >= maxDescNum)
-          break;
+      if (e->native_->EnsureTexture(e->width_, e->height_)) {
+        e->native_->next();
+        if (vpl_encode(e, e->native_->GetCurrentTexture(), nullptr, nullptr) ==
+            0) {
+          AdapterDesc *desc = descs + count;
+          desc->luid = LUID(adapter.get()->desc1_);
+          count += 1;
+        }
       }
+      vpl_destroy_encoder(e);
+      e = NULL;
+      if (count >= maxDescNum)
+        break;
     }
     *outDescNum = count;
     return 0;
