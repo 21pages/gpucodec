@@ -389,6 +389,8 @@ int vpl_destroy_decoder(void *decoder) {
       p->mfxDEC_->Close();
       delete p->mfxDEC_;
     }
+    delete p;
+    p = NULL;
   }
   return 0;
 }
@@ -409,7 +411,6 @@ void *vpl_new_decoder(void *device, int64_t luid, API api, DataFormat codecID,
 
   if (p) {
     vpl_destroy_decoder(p);
-    delete p;
     p = NULL;
   }
   return NULL;

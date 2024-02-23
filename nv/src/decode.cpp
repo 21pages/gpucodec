@@ -631,6 +631,8 @@ int nv_destroy_decoder(void *decoder) {
     CuvidDecoder *p = (CuvidDecoder *)decoder;
     if (p) {
       p->destroy();
+      delete p;
+      p = NULL;
     }
     return 0;
   } catch (const std::exception &e) {
@@ -657,7 +659,7 @@ void *nv_new_decoder(void *device, int64_t luid, API api, DataFormat dataFormat,
 _exit:
   if (p) {
     nv_destroy_decoder(p);
-    delete p;
+    p = NULL;
   }
   return NULL;
 }

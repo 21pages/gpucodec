@@ -12,7 +12,7 @@ use DecodeDriver::*;
 
 pub struct Decoder {
     calls: DecodeCalls,
-    codec: Box<c_void>,
+    codec: *mut c_void,
     frames: *mut Vec<DecodeFrame>,
     pub ctx: DecodeContext,
 }
@@ -40,7 +40,7 @@ impl Decoder {
             }
             Ok(Self {
                 calls,
-                codec: Box::from_raw(codec as *mut c_void),
+                codec,
                 frames: Box::into_raw(Box::new(Vec::<DecodeFrame>::new())),
                 ctx,
             })
@@ -51,7 +51,7 @@ impl Decoder {
         unsafe {
             (&mut *self.frames).clear();
             let ret = (self.calls.decode)(
-                &mut *self.codec,
+                self.codec,
                 packet.as_ptr() as _,
                 packet.len() as _,
                 Some(Self::callback),
@@ -78,7 +78,7 @@ impl Decoder {
 impl Drop for Decoder {
     fn drop(&mut self) {
         unsafe {
-            (self.calls.destroy)(self.codec.as_mut());
+            (self.calls.destroy)(self.codec);
             let _ = Box::from_raw(self.frames);
             trace!("Decoder dropped");
         }

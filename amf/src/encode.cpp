@@ -455,7 +455,11 @@ extern "C" {
 int amf_destroy_encoder(void *encoder) {
   try {
     AMFEncoder *enc = (AMFEncoder *)encoder;
-    return enc->destroy();
+    if (enc) {
+      enc->destroy();
+      delete enc;
+      enc = NULL;
+    }
   } catch (const std::exception &e) {
     LOG_ERROR("destroy failed: " + e.what());
   }
@@ -487,7 +491,6 @@ void *amf_new_encoder(void *handle, int64_t luid, API api,
   }
   if (enc) {
     amf_destroy_encoder(enc);
-    delete enc;
     enc = NULL;
   }
   return NULL;

@@ -545,6 +545,8 @@ int vpl_destroy_encoder(void *encoder) {
   VplEncoder *p = (VplEncoder *)encoder;
   if (p) {
     p->destroy();
+    delete p;
+    p = NULL;
   }
   return 0;
 }
@@ -571,7 +573,7 @@ void *vpl_new_encoder(void *handle, int64_t luid, API api,
 
   if (p) {
     vpl_destroy_encoder(p);
-    delete p;
+    p = NULL;
   }
   return NULL;
 }

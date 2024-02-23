@@ -352,6 +352,8 @@ int amf_destroy_decoder(void *decoder) {
     AMFDecoder *dec = (AMFDecoder *)decoder;
     if (dec) {
       return dec->destroy();
+      delete dec;
+      dec = NULL;
     }
   } catch (const std::exception &e) {
     LOG_ERROR("destroy failed: " + e.what());
@@ -384,7 +386,6 @@ void *amf_new_decoder(void *device, int64_t luid, API api,
   }
   if (dec) {
     amf_destroy_decoder(dec);
-    delete dec;
     dec = NULL;
   }
   return NULL;
