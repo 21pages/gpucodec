@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use bindgen::callbacks::{DeriveInfo, ParseCallbacks, TypeKind};
 use cc::Build;
 
 fn main() {
@@ -13,7 +14,8 @@ fn main() {
     bindgen::builder()
         .header("src/common.h")
         .header("src/callback.h")
-        .rustified_enum("*")
+        // https://github.com/rust-lang/rust-bindgen/issues/2373
+        .rustified_enum(".*")
         .parse_callbacks(Box::new(MyCallbacks))
         .generate()
         .unwrap()
@@ -48,10 +50,10 @@ fn main() {
 
 #[derive(Debug)]
 struct MyCallbacks;
-impl bindgen::callbacks::ParseCallbacks for MyCallbacks {
-    fn add_derives(&self, name: &str) -> Vec<String> {
+impl ParseCallbacks for MyCallbacks {
+    fn add_derives(&self, name: &DeriveInfo) -> Vec<String> {
         let names = vec!["DataFormat", "SurfaceFormat", "API"];
-        if names.contains(&name) {
+        if name.kind == TypeKind::Enum && names.contains(&name.name) {
             vec!["Serialize", "Deserialize"]
                 .drain(..)
                 .map(|s| s.to_string())

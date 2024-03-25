@@ -13,7 +13,7 @@ fn main() {
     println!("cargo:rerun-if-changed={}", common_dir.display());
     bindgen::builder()
         .header("src/ffi.h")
-        .rustified_enum("*")
+        .rustified_enum(".*")
         .generate()
         .unwrap()
         .write_to_file(Path::new(&env::var_os("OUT_DIR").unwrap()).join("amf_ffi.rs"))

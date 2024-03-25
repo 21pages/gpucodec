@@ -12,7 +12,7 @@ fn main() {
     let ffi_header = "src/render_ffi.h";
     bindgen::builder()
         .header(ffi_header)
-        .rustified_enum("*")
+        .rustified_enum(".*")
         .generate()
         .unwrap()
         .write_to_file(Path::new(&env::var_os("OUT_DIR").unwrap()).join("render_ffi.rs"))
