@@ -10,4 +10,5 @@ log = "0.4"
 gpu_common = { path = "../common" }
 
 [build-dependencies]
-bindgen = "0.65"
+cc = "1.0"
+bindgen = "0.59"
